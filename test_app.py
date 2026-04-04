@@ -1,5 +1,5 @@
 import pytest
-from odoo_wt import OdooWtApp, load_config
+from odoo_wt import OdooWtApp, WizardApp, load_config
 
 @pytest.mark.asyncio
 async def test_app_starts():
@@ -7,4 +7,12 @@ async def test_app_starts():
     async with app.run_test() as pilot:
         await pilot.pause()
         assert pilot.app.query_one('.title')
-        print('\n🚀 UI MOUNT SUCCESSFUL: No TypeErrors!')
+        print('\n🚀 MAIN APP MOUNT SUCCESSFUL!')
+
+@pytest.mark.asyncio
+async def test_wizard_starts():
+    app = WizardApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.query_one('.title')
+        print('\n🚀 WIZARD MOUNT SUCCESSFUL!')
