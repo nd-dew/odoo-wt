@@ -32,7 +32,7 @@ def fast_scan():
                     if dirpath != home_str and dirpath not in found_roots:
                         found_roots.append(dirpath)
                     break
-            except Exception:
+            except OSError:
                 pass
     return [shorten_path(p) for p in found_roots]
 
@@ -60,7 +60,7 @@ def discover_system_data(wt_root, default_suffix):
                 v, s = parse_branch_name(entry.name)
                 try:
                     is_wt = sum(1 for sub in entry.iterdir() if sub.is_dir() and (sub / ".git").exists()) >= 1
-                except Exception:
+                except OSError:
                     is_wt = False
                     
                 if is_wt and entry.name != "master":
