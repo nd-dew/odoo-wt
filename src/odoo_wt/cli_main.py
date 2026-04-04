@@ -34,13 +34,17 @@ def main():
         app = OdooWtApp(config, v_list, s_list, worktrees)
         data = app.run()
 
-    # Handle the "take me there" shell replacement
+    # Handle deployment completion actions
     if data and isinstance(data, dict):
-        if data.get("take_me_there"):
+        action = data.get("action")
+        if action == "terminal":
             target = data["path"]
             os.chdir(target)
             shell = os.environ.get("SHELL", "/bin/bash")
             os.execv(shell, [shell])
+        elif action == "vscode":
+            target = data["path"]
+            os.system(f"code {target}")
 
 if __name__ == "__main__":
     main()
