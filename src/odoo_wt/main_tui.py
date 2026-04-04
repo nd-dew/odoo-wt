@@ -8,7 +8,7 @@ from textual.widgets import Header, Footer, Select, Input, Label, Button, Tabbed
 from textual import on, work
 from textual.binding import Binding
 
-from .app_config import append_log, LOG_FILE, save_config
+from .app_config import append_log, LOG_FILE, save_config, load_config
 from .system_discovery import discover_system_data, get_remote, run_git
 from .custom_screens import DeleteConfirmScreen, DeployScreen, LogDetailScreen
 
@@ -16,14 +16,24 @@ class OdooWtApp(App):
     ENABLE_COMMAND_PALETTE = False
     CSS_PATH = "stylesheet.tcss"
     
-    BINDINGS = [
-        Binding("ctrl+s", "submit", "Create"),
-        Binding("ctrl+d", "delete_wt", "Delete"),
-        Binding("ctrl+r", "refresh_wts", "Refresh"),
-        Binding("ctrl+t", "next_tab", "Next Tab"),
-        Binding("escape", "quit", "", show=False),
-        Binding("ctrl+c", "quit", "Close", key_display="^c"),
-    ]
+
+    @property
+    def bindings(self) -> list[Binding]:
+        # We need to be careful if #tabs is not yet mounted
+        try:
+            active = self.query_one("#tabs").active
+        except:
+            active = "tab-create"
+            
+        return [
+            Binding("ctrl+s", "submit", "Create", key_display="Ctrl+S", show=(active == "tab-create")),
+            Binding("ctrl+d", "delete_wt", "Delete", key_display="Ctrl+D", show=(active == "tab-manage")),
+            Binding("ctrl+r", "refresh", "Reset" if active == "tab-settings" else "Refresh", key_display="Ctrl+R", show=(active != "tab-create")),
+            Binding("ctrl+t", "next_tab", "Tab", key_display="Ctrl+T"),
+            Binding("escape", "quit", "", show=False),
+            Binding("ctrl+c", "quit", "Close", key_display="Ctrl+C"),
+        ]
+
 
     def __init__(self, config, v_list, s_list, worktrees):
         super().__init__()
@@ -166,6 +176,7 @@ class OdooWtApp(App):
         elif active_pane == "tab-logs":
             self.populate_logs_table()
             self.query_one("#logs-table").focus()
+        self.query_one(Footer).refresh()
 
     def update_summary(self) -> None:
         try:
@@ -264,6 +275,27 @@ class OdooWtApp(App):
         table.add_columns("Branch Name", "Version", "Suffix")
         for wt in self.worktrees:
             table.add_row(wt["name"], wt["version"], wt["suffix"], key=wt["path"])
+
+
+    def action_reset_settings(self) -> None:
+        self.config = load_config()
+        self.query_one("#set-wt", Input).value = self.config.get("wt_root", "")
+        self.query_one("#set-env", Input).value = self.config.get("env_root", "")
+        self.query_one("#set-suffix", Input).value = self.config.get("suffix", "")
+        self.query_one("#set-remote", Input).value = self.config.get("remote_name", "odoo-dev")
+        self.query_one("#set-comm", Input).value = self.config.get("community_dir", "odoo")
+        self.query_one("#set-ent", Input).value = self.config.get("enterprise_dir", "enterprise")
+        self.notify("Settings reset to last saved state.")
+
+    def action_refresh(self) -> None:
+        active = self.query_one("#tabs").active
+        if active == "tab-logs":
+            self.populate_logs_table()
+            self.notify("Logs refreshed!")
+        elif active == "tab-manage":
+            self.action_refresh_wts()
+        elif active == "tab-settings":
+            self.action_reset_settings()
 
     def action_refresh_wts(self) -> None:
         _, _, self.worktrees = discover_system_data(self.config["wt_root"], self.config["suffix"])
