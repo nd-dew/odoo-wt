@@ -18,7 +18,7 @@ class OdooWtApp(App):
     BINDINGS = [
         ("ctrl+s", "submit", "Create"), ("ctrl+d", "delete_wt", "Delete"),
         ("ctrl+r", "refresh_wts", "Refresh"), ("ctrl+t", "next_tab", "Next Tab"),
-        ("escape", "quit", "Cancel"), ("ctrl+c", "quit", "Quit"),
+        ("ctrl+c", "quit", "Close"),
     ]
 
     def __init__(self, config, v_list, s_list, worktrees):
@@ -31,8 +31,11 @@ class OdooWtApp(App):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
-            yield Label("Odoo WorkTree Tool", classes="title")
-            yield Label("Opinionated tool for Odoo development. Creates/removes WorkTrees\nreusing UV environments per Odoo version.", classes="description")
+            with Horizontal(id="top-bar"):
+                with Vertical(id="title-container"):
+                    yield Label("Odoo WorkTree Tool", classes="title")
+                    yield Label("Opinionated tool for Odoo development. Creates/removes WorkTrees\nreusing UV environments per Odoo version.", classes="description")
+                yield Button("X", id="btn-close-app", classes="close-btn")
             yield Label("")
             with TabbedContent(id="tabs"):
                 with TabPane("Creation", id="tab-create"):
@@ -57,7 +60,6 @@ class OdooWtApp(App):
                     yield Label("", id="dynamic-summary", classes="summary-box")
                     with Horizontal(classes="btn-row"):
                         yield Button("Create", variant="success", id="submit-btn")
-                        yield Button("Cancel", variant="error", id="cancel-btn")
                 with TabPane("Existing / Removal", id="tab-manage"):
                     yield Label("Discovery: Scans 'Worktree Root Path' (in Settings)\nfor 'odoo/.git' folders.", classes="tab-description")
                     yield DataTable(id="wt-table", cursor_type="row")
@@ -78,7 +80,13 @@ class OdooWtApp(App):
                         with Horizontal(classes="setting-item"):
                             yield Label("Remote Name:", classes="setting-label")
                             yield Input(value=self.config.get("remote_name", "odoo-dev"), id="set-remote", classes="setting-input")
-                        yield Label("Worktree Root: Base directory where worktree folders are created.\\nUV Envs Path: Directory storing shared Python virtual environments.\\nDefault Suffix: Developer quadrigram appended to new branches.\\nRemote Name: Personal fork remote used to push/pull branches.", classes="tab-description")
+                        yield Label(
+                            "Worktree Root: Base directory where worktree folders are created.\n"
+                            "UV Envs Path: Directory storing shared Python virtual environments.\n"
+                            "Default Suffix: Developer quadrigram appended to new branches.\n"
+                            "Remote Name: Personal fork remote used to push/pull branches.",
+                            classes="tab-description"
+                        )
                         with Center(classes="btn-row"):
                             yield Button("Save", variant="primary", id="save-settings")
                 with TabPane("Logs", id="tab-logs"):
@@ -129,6 +137,8 @@ class OdooWtApp(App):
     @on(TabbedContent.TabActivated, "#tabs")
     def on_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         append_log("Tab Changed", {"tab": event.tab.id if event.tab else "unknown"})
+        if event.tab and event.tab.id == "tab-logs":
+            self.populate_logs_table()
 
     def update_summary(self) -> None:
         try:
@@ -164,9 +174,24 @@ class OdooWtApp(App):
     def on_text_changed(self, event) -> None: self.update_summary()
 
     def populate_logs_table(self) -> None:
+        import datetime
         table = self.query_one("#logs-table", DataTable)
         table.clear(columns=True)
         table.add_columns("Time", "Action", "Details")
+        
+        def relative_time(iso_str):
+            if not iso_str: return "unknown"
+            try:
+                dt = datetime.datetime.fromisoformat(iso_str)
+                diff = datetime.datetime.now() - dt
+                secs = diff.total_seconds()
+                if secs < 60: return f"{int(secs)} sec ago"
+                elif secs < 3600: return f"{int(secs//60)} min ago"
+                elif secs < 86400: return f"{int(secs//3600)} hours ago"
+                else: return f"{int(secs//86400)} days ago"
+            except:
+                return iso_str
+
         if LOG_FILE.exists():
             try:
                 with open(LOG_FILE, "r") as f:
@@ -174,8 +199,12 @@ class OdooWtApp(App):
                 for line in reversed(lines):
                     if not line.strip(): continue
                     data = json.loads(line)
-                    ts = data.get("timestamp", "")[:19].replace("T", " ")
-                    table.add_row(ts, data.get("action", ""), json.dumps(data.get("details", {})))
+                    ts = data.get("timestamp", "")
+                    rt = relative_time(ts)
+                    details_str = json.dumps(data.get("details", {}))
+                    if len(details_str) > 60:
+                        details_str = details_str[:57] + "..."
+                    table.add_row(rt, data.get("action", ""), details_str)
             except: pass
 
     @on(Button.Pressed, "#refresh-logs-btn")
@@ -263,8 +292,8 @@ class OdooWtApp(App):
         append_log("Delete Button Clicked")
         self.action_delete_wt()
         
-    @on(Button.Pressed, "#cancel-btn")
-    def on_cancel_btn(self) -> None:
+    @on(Button.Pressed, "#btn-close-app")
+    def on_close_app_btn(self) -> None:
         append_log("Cancel Button Clicked")
         self.exit()
 
