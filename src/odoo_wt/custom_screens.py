@@ -73,7 +73,7 @@ class DeployScreen(Screen):
         self.config = config
 
     def compose(self):
-        with VerticalScroll():
+        with VerticalScroll(id="deploy-logs-scroll"):
             with Vertical(classes="log-box"):
                 with Horizontal(classes="log-header"):
                     yield Label("Community", classes="log-title")
@@ -92,11 +92,11 @@ class DeployScreen(Screen):
                     yield ProgressBar(id="prog-uv", show_eta=False)
                 yield RichLog(id="log-uv", markup=False, highlight=False)
                 
-            with Vertical(id="success-footer", classes="hidden"):
-                yield Label("", id="success-message", classes="success-msg")
-                with Horizontal(classes="success-btn-row"):
-                    yield Button("Yes, take me there!", variant="success", id="btn-take-me-there")
-                    yield Button("No, just exit", variant="primary", id="btn-just-exit")
+        with Vertical(id="success-footer", classes="hidden"):
+            yield Label("", id="success-message", classes="success-msg")
+            with Horizontal(classes="success-btn-row"):
+                yield Button("Yes, take me there!", variant="success", id="btn-take-me-there")
+                yield Button("No, just exit", variant="primary", id="btn-just-exit")
 
     def on_mount(self):
         self.run_deployment()
