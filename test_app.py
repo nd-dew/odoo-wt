@@ -105,6 +105,8 @@ def test_git_branch_strategy_detection(tmp_path):
     
     # 1. Init a blank git repo
     run_git(["init"], cwd=repo)
+    run_git(["config", "user.email", "test@example.com"], cwd=repo)
+    run_git(["config", "user.name", "Test User"], cwd=repo)
     
     # 2. Branch should definitely NOT exist
     assert check_local(repo, "saas-17.1-fix-test-pian") is False
