@@ -1,10 +1,10 @@
 [project]
 name = "odoo-wt"
-version = "1.0.0"
+version = "1.1.0"
 description = "Modern TUI-driven Odoo Worktree Manager"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["textual>=0.52.1", "rich>=13.7.1"]
+dependencies = ["textual>=0.52.1", "rich>=13.7.1", "pyspellchecker>=0.8.1"]
 
 [project.scripts]
 odoo-wt = "odoo_wt.cli_main:main"
