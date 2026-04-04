@@ -14,27 +14,36 @@ def expand_path(path_str):
     return path_str
 
 def fast_scan():
-    home_str = str(Path.home())
+    home = Path.home()
     found_roots = []
-    ignore = {".cache", ".local", ".cargo", ".rustup", ".npm", ".mozilla", ".config", "node_modules", ".vscode"}
     
-    for dirpath, dirnames, filenames in os.walk(home_str):
-        if dirpath.count(os.sep) - home_str.count(os.sep) > 5:
-            dirnames.clear()
-            continue
-        dirnames[:] = [d for d in dirnames if not d.startswith(".") and d not in ignore]
-        
-        for d in dirnames:
-            base_candidate = Path(dirpath) / d
-            try:
-                git_dirs = [sub for sub in base_candidate.iterdir() if sub.is_dir() and (sub / ".git").exists()]
-                if len(git_dirs) == 2:
-                    if dirpath != home_str and dirpath not in found_roots:
-                        found_roots.append(dirpath)
-                    break
-            except OSError:
-                pass
+    # Strategy 1: Check highly likely paths first (Fastest)
+    likely_dirs = ["repos", "Projects", "src", "workspace", "Documents/repos"]
+    for d in likely_dirs:
+        p = home / d
+        if p.exists() and p.is_dir():
+            if _check_is_root_container(p):
+                found_roots.append(str(p))
+
+    # Strategy 2: If nothing found, do a shallow walk (max depth 3)
+    if not found_roots:
+        ignore = {".cache", ".local", ".cargo", ".rustup", ".npm", ".mozilla", ".config", "node_modules", ".vscode", "Library"}
+        for entry in home.iterdir():
+            if entry.is_dir() and not entry.name.startswith(".") and entry.name not in ignore:
+                if _check_is_root_container(entry):
+                    found_roots.append(str(entry))
+    
     return [shorten_path(p) for p in found_roots]
+
+def _check_is_root_container(path: Path):
+    """Checks if a directory contains any folder with an odoo/.git subfolder."""
+    try:
+        for sub in path.iterdir():
+            if sub.is_dir() and (sub / "odoo" / ".git").exists():
+                return True
+    except OSError:
+        pass
+    return False
 
 def parse_branch_name(name):
     if name.startswith("saas-"):
@@ -55,24 +64,24 @@ def discover_system_data(wt_root, default_suffix):
     worktrees = []
     wt_path = Path(wt_root)
     if wt_path.exists():
-        for entry in wt_path.iterdir():
-            if entry.is_dir() and not entry.name.startswith("."):
-                v, s = parse_branch_name(entry.name)
-                try:
-                    is_wt = sum(1 for sub in entry.iterdir() if sub.is_dir() and (sub / ".git").exists()) >= 1
-                except OSError:
-                    is_wt = False
-                    
-                if is_wt and entry.name != "master":
-                    worktrees.append({"name": entry.name, "path": str(entry), "version": v, "suffix": s})
-                if v == "master" or v.startswith("saas-") or (v and v[0].isdigit()):
-                    versions.add(v)
-                if s: suffixes.add(s)
+        try:
+            for entry in wt_path.iterdir():
+                if entry.is_dir() and not entry.name.startswith("."):
+                    v, s = parse_branch_name(entry.name)
+                    is_wt = (entry / "odoo" / ".git").exists()
+                    if is_wt and entry.name != "master":
+                        worktrees.append({"name": entry.name, "path": str(entry), "version": v, "suffix": s})
+                    if v == "master" or v.startswith("saas-") or (v and v[0].isdigit()):
+                        versions.add(v)
+                    if s: suffixes.add(s)
+        except OSError: pass
+
     v_list = sorted(list(versions))
     if "master" in v_list: v_list.remove("master")
     v_list.insert(0, "master")
     v_list.append("none")
     v_list.append("custom...")
+    
     s_list = sorted(list(suffixes))
     if default_suffix in s_list: s_list.remove(default_suffix)
     if "none" in s_list: s_list.remove("none")
