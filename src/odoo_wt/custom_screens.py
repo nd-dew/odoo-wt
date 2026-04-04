@@ -95,8 +95,10 @@ class DeployScreen(Screen):
         with Vertical(id="success-footer", classes="hidden"):
             yield Label("", id="success-message", classes="success-msg")
             with Horizontal(classes="success-btn-row"):
-                yield Button("Yes, take me there!", variant="success", id="btn-take-me-there")
-                yield Button("No, just exit", variant="primary", id="btn-just-exit")
+                yield Button("Terminal", variant="success", id="btn-terminal")
+                yield Button("VS Code", variant="primary", id="btn-vscode")
+                yield Button("Back to Tool", variant="warning", id="btn-back")
+                yield Button("Exit", variant="error", id="btn-exit")
 
     def on_mount(self):
         self.run_deployment()
@@ -208,19 +210,29 @@ class DeployScreen(Screen):
 
     def show_success_footer(self):
         msg = self.query_one("#success-message", Label)
-        msg.update(f"SUCCESS! Worktree ready at: {self.target_dir}\nWould you like me to take you there now?")
+        msg.update(f"SUCCESS! Worktree ready at: {self.target_dir}\nWhat would you like to do next?")
         self.query_one("#success-footer").remove_class("hidden")
-        self.query_one("#btn-take-me-there").focus()
+        self.query_one("#btn-terminal").focus()
 
-    @on(Button.Pressed, "#btn-take-me-there")
-    def on_take_me_there(self):
-        append_log("Deployment Complete", {"choice": "take_me_there"})
-        self.app.exit({"take_me_there": True, "path": str(self.target_dir)})
+    @on(Button.Pressed, "#btn-terminal")
+    def on_terminal(self):
+        append_log("Deployment Complete", {"choice": "terminal"})
+        self.app.exit({"action": "terminal", "path": str(self.target_dir)})
 
-    @on(Button.Pressed, "#btn-just-exit")
-    def on_just_exit(self):
-        append_log("Deployment Complete", {"choice": "stay"})
+    @on(Button.Pressed, "#btn-vscode")
+    def on_vscode(self):
+        append_log("Deployment Complete", {"choice": "vscode"})
+        self.app.exit({"action": "vscode", "path": str(self.target_dir)})
+
+    @on(Button.Pressed, "#btn-back")
+    def on_back(self):
+        append_log("Deployment Complete", {"choice": "back"})
         self.app.exit({"refresh": True})
+
+    @on(Button.Pressed, "#btn-exit")
+    def on_exit(self):
+        append_log("Deployment Complete", {"choice": "exit"})
+        self.app.exit()
 
 class LogDetailScreen(ModalScreen[None]):
     def __init__(self, ts, action, details):
