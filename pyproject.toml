@@ -7,11 +7,14 @@ requires-python = ">=3.11"
 dependencies = ["textual>=0.52.1", "rich>=13.7.1"]
 
 [project.scripts]
-odoo-wt = "odoo_wt:main"
+odoo-wt = "odoo_wt.cli_main:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/odoo_wt"]
 
 [dependency-groups]
 dev = [
