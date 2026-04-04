@@ -1,0 +1,133 @@
+import asyncio
+import os
+from pathlib import Path
+from dataclasses import dataclass
+from typing import AsyncGenerator, List, Optional
+from .system_discovery import get_remote, check_local
+
+@dataclass
+class DeployUpdate:
+    category: str  # "odoo", "ent", "uv"
+    message: Optional[str] = None
+    advance: int = 0
+    total: Optional[int] = None
+    log_line: Optional[str] = None
+
+async def run_cmd_stream_gen(cmd: List[str], cwd: Path, category: str, prefix: str = "") -> AsyncGenerator[DeployUpdate, None]:
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        cwd=cwd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT
+    )
+    while True:
+        line = await process.stdout.readline()
+        if not line:
+            break
+        text = line.decode('utf-8', errors='replace').rstrip()
+        yield DeployUpdate(category=category, log_line=f"{prefix}{text}")
+    
+    await process.wait()
+    if process.returncode != 0:
+        yield DeployUpdate(category=category, log_line=f"[bold red]❌ Command failed with exit code {process.returncode}[/bold red]")
+        raise RuntimeError(f"Command failed: {' '.join(cmd)}")
+
+class DeployEngine:
+    def __init__(self, config: dict, data: dict):
+        self.config = config
+        self.data = data
+        self.wt_root = Path(config["wt_root"])
+        self.dev_remote = config.get("remote_name", "odoo-dev")
+        self.comm_dir = config.get("community_dir", "odoo")
+        self.ent_dir = config.get("enterprise_dir", "enterprise")
+        self.env_root = Path(config["env_root"])
+        
+        clean_desc = data["desc"].strip().replace(" ", "_")
+        parts = [p for p in [data["version"], clean_desc, data["suffix"]] if p]
+        self.branch_name = "-".join(parts)
+        self.target_dir = self.wt_root / self.branch_name
+        self.base_v = data["version"] or "master"
+
+    async def deploy_repo(self, repo_path: Path, dest_label: str, category: str) -> AsyncGenerator[DeployUpdate, None]:
+        yield DeployUpdate(category=category, total=3)
+        
+        remote = await asyncio.to_thread(get_remote, repo_path)
+        yield DeployUpdate(category=category, log_line=f"Detected base remote: {remote}", advance=1)
+
+        yield DeployUpdate(category=category, log_line=f"Fetching '{self.branch_name}' from '{self.dev_remote}'...")
+        
+        fetch_success = True
+        try:
+            async for update in run_cmd_stream_gen(["git", "fetch", self.dev_remote, f"{self.branch_name}:{self.branch_name}", "--force"], repo_path, category):
+                yield update
+        except RuntimeError:
+            fetch_success = False
+        
+        yield DeployUpdate(category=category, advance=1)
+
+        try:
+            if fetch_success:
+                yield DeployUpdate(category=category, log_line="Fetch successful. Creating worktree...")
+                async for update in run_cmd_stream_gen(["git", "worktree", "add", str(self.target_dir / dest_label), self.branch_name], repo_path, category):
+                    yield update
+            else:
+                yield DeployUpdate(category=category, log_line=f"Branch not found on '{self.dev_remote}'. Fetching '{self.base_v}' from '{remote}'...")
+                async for update in run_cmd_stream_gen(["git", "fetch", remote, self.base_v], repo_path, category):
+                    yield update
+                
+                is_local = await asyncio.to_thread(check_local, repo_path, self.branch_name)
+                if is_local:
+                    yield DeployUpdate(category=category, log_line="Branch exists locally. Creating worktree...")
+                    async for update in run_cmd_stream_gen(["git", "worktree", "add", str(self.target_dir / dest_label), self.branch_name], repo_path, category):
+                        yield update
+                    # No error if checkout worked
+                else:
+                    yield DeployUpdate(category=category, log_line=f"Creating new branch from {remote}/{self.base_v}...")
+                    async for update in run_cmd_stream_gen(["git", "worktree", "add", "-b", self.branch_name, str(self.target_dir / dest_label), f"{remote}/{self.base_v}"], repo_path, category):
+                        yield update
+                    async for update in run_cmd_stream_gen(["git", "branch", "--set-upstream-to", f"{remote}/{self.base_v}", self.branch_name], repo_path, category):
+                        yield update
+            
+            yield DeployUpdate(category=category, advance=1, log_line="✅ Done.")
+        except RuntimeError as e:
+            yield DeployUpdate(category=category, log_line=f"[bold red]CRITICAL FAILURE: Repo deployment aborted.[/bold red]")
+
+    async def setup_uv(self) -> AsyncGenerator[DeployUpdate, None]:
+        category = "uv"
+        yield DeployUpdate(category=category, total=4)
+        
+        self.env_root.mkdir(parents=True, exist_ok=True)
+        target_env = self.env_root / self.base_v
+        
+        try:
+            if not target_env.exists():
+                yield DeployUpdate(category=category, log_line=f"Initializing UV environment for {self.base_v}...", advance=1)
+                async for update in run_cmd_stream_gen(["uv", "venv", str(target_env), "--python", "3.12"], self.env_root, category):
+                    yield update
+                
+                base_req = self.wt_root / "master" / self.comm_dir / "requirements.txt"
+                if base_req.exists():
+                    yield DeployUpdate(category=category, log_line=f"Installing requirements from base '{self.comm_dir}'...", advance=1)
+                    async for update in run_cmd_stream_gen([
+                        "uv", "pip", "install", "-r", str(base_req), 
+                        "--python", str(target_env / "bin" / "python")
+                    ], self.env_root, category):
+                        yield update
+                else:
+                    yield DeployUpdate(category=category, advance=1)
+            else:
+                yield DeployUpdate(category=category, log_line=f"UV environment '{self.base_v}' already exists.", advance=2)
+
+            venv_symlink = self.target_dir / ".venv"
+            if not venv_symlink.exists():
+                try:
+                    os.symlink(target_env, venv_symlink)
+                    yield DeployUpdate(category=category, log_line="Created .venv symlink.")
+                except OSError as e:
+                    yield DeployUpdate(category=category, log_line=f"[bold red]Failed to create symlink: {e}[/bold red]")
+                    return # Exit early on link failure
+            
+            yield DeployUpdate(category=category, advance=1, log_line="✅ Done.")
+        except RuntimeError:
+            yield DeployUpdate(category=category, log_line=f"[bold red]CRITICAL FAILURE: UV setup aborted.[/bold red]")
+
