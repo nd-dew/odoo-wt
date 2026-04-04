@@ -89,13 +89,20 @@ class OdooWtApp(App):
                             yield Label("Default Suffix:", classes="setting-label")
                             yield Input(value=self.config.get("suffix", ""), id="set-suffix", classes="setting-input")
                         with Horizontal(classes="setting-item"):
-                            yield Label("Remote Name:", classes="setting-label")
+                            yield Label("Dev Remote (Fork):", classes="setting-label")
                             yield Input(value=self.config.get("remote_name", "odoo-dev"), id="set-remote", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Community Dir:", classes="setting-label")
+                            yield Input(value=self.config.get("community_dir", "odoo"), id="set-comm", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Enterprise Dir:", classes="setting-label")
+                            yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input")
                         yield Label(
                             "Worktree Root: Base directory where worktree folders are created.\n"
                             "UV Envs Path: Directory storing shared Python virtual environments.\n"
                             "Default Suffix: Developer quadrigram appended to new branches.\n"
-                            "Remote Name: Personal fork remote used to push/pull branches.",
+                            "Dev Remote: Personal fork remote used to push/pull branches.\n"
+                            "Repo Dirs: Names of the subfolders created inside each worktree.",
                             classes="tab-description"
                         )
                         with Center(classes="btn-row"):
@@ -293,6 +300,8 @@ class OdooWtApp(App):
         self.config["env_root"] = self.query_one("#set-env").value
         self.config["suffix"] = self.query_one("#set-suffix").value
         self.config["remote_name"] = self.query_one("#set-remote").value
+        self.config["community_dir"] = self.query_one("#set-comm").value
+        self.config["enterprise_dir"] = self.query_one("#set-ent").value
         save_config(self.config)
         append_log("Settings Saved", self.config)
         self.notify("Settings saved!")
