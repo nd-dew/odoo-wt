@@ -228,7 +228,7 @@ DeployScreen {
 
 
 .log-box {
-    height: 1fr;
+    height: 15;
     width: 1fr;
     border: solid $surface;
 }
