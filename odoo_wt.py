@@ -168,9 +168,11 @@ class WizardApp(App):
         yield Footer()
 
     def action_quit(self) -> None:
+        append_log("Wizard Quit")
         self.exit()
 
     def on_mount(self) -> None:
+        append_log("Wizard Started")
         self.run_scanner()
 
     @work(exclusive=True)
@@ -199,6 +201,7 @@ class WizardApp(App):
 
     @on(Select.Changed, "#root-select")
     def on_root_change(self, event: Select.Changed):
+        append_log("Wizard Root Selected", {"value": str(event.value)})
         custom = self.query_one("#custom-root")
         if event.value == "custom":
             custom.remove_class("hidden")
@@ -295,6 +298,7 @@ class DeleteConfirmScreen(ModalScreen[bool]):
 
     @on(Button.Pressed, "#btn-yes")
     async def on_yes(self):
+        append_log("Delete Confirm Step", {"step": self.step, "worktree": self.wt_name})
         self.step += 1
         if self.step > 3:
             self.dismiss(True)
@@ -314,6 +318,7 @@ class DeleteConfirmScreen(ModalScreen[bool]):
 
     @on(Button.Pressed, "#btn-cancel")
     def on_cancel(self):
+        append_log("Delete Cancelled", {"worktree": self.wt_name})
         self.dismiss(False)
 
 
@@ -355,10 +360,12 @@ class SuccessModal(ModalScreen[bool]):
 
     @on(Button.Pressed, "#btn-yes")
     def on_yes(self):
+        append_log("Success Modal", {"choice": "take_me_there"})
         self.dismiss(True)
 
     @on(Button.Pressed, "#btn-no")
     def on_no(self):
+        append_log("Success Modal", {"choice": "stay"})
         self.dismiss(False)
 
 class DeployScreen(Screen):
@@ -624,6 +631,7 @@ class OdooWtApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        append_log("App Started")
         self.query_one("#desc").focus()
         self.populate_table()
         self.populate_logs_table()
@@ -658,6 +666,11 @@ class OdooWtApp(App):
         self.fetched_versions.add(version)
         append_log("Background Fetch Finished", {"version": version})
         self.app.call_from_thread(self.notify, f"Prefetched {version} updates in background.")
+
+
+    @on(TabbedContent.TabActivated, "#tabs")
+    def on_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        append_log("Tab Changed", {"tab": event.tab.id if event.tab else "unknown"})
 
     def update_summary(self) -> None:
         try:
@@ -739,9 +752,11 @@ class OdooWtApp(App):
         self.notify("Worktrees refreshed!")
 
     def action_quit(self) -> None:
+        append_log("Wizard Quit")
         self.exit()
 
     def action_next_tab(self) -> None:
+        append_log("Next Tab Shortcut Used")
         tabs = self.query_one("#tabs")
         if tabs.active == "tab-create": tabs.active = "tab-manage"
         elif tabs.active == "tab-manage": tabs.active = "tab-settings"
@@ -750,6 +765,7 @@ class OdooWtApp(App):
 
     @on(Select.Changed, "#version")
     def version_changed(self, event: Select.Changed) -> None:
+        append_log("Version Dropdown Changed", {"value": str(event.value)})
         custom = self.query_one("#custom_version")
         if event.value == "custom...":
             custom.add_class("visible")
@@ -762,6 +778,7 @@ class OdooWtApp(App):
 
     @on(Select.Changed, "#suffix")
     def suffix_changed(self, event: Select.Changed) -> None:
+        append_log("Suffix Dropdown Changed", {"value": str(event.value)})
         custom = self.query_one("#custom_suffix")
         if event.value == "custom...": custom.add_class("visible"); custom.focus()
         else: custom.remove_class("visible")
@@ -780,11 +797,17 @@ class OdooWtApp(App):
     @on(Button.Pressed, "#submit-btn")
     def on_submit_btn(self) -> None: self.action_submit()
     @on(Button.Pressed, "#refresh-btn")
-    def on_refresh_btn(self) -> None: self.action_refresh_wts()
+    def on_refresh_btn(self) -> None:
+        append_log("Refresh Button Clicked")
+        self.action_refresh_wts()
     @on(Button.Pressed, "#delete-btn")
-    def on_delete_btn(self) -> None: self.action_delete_wt()
+    def on_delete_btn(self) -> None:
+        append_log("Delete Button Clicked")
+        self.action_delete_wt()
     @on(Button.Pressed, "#cancel-btn")
-    def on_cancel_btn(self) -> None: self.exit()
+    def on_cancel_btn(self) -> None:
+        append_log("Cancel Button Clicked")
+        self.exit()
 
     def action_delete_wt(self) -> None:
         table = self.query_one("#wt-table")
