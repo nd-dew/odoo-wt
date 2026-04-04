@@ -101,7 +101,7 @@ class OdooWtApp(App):
                             "Worktree Root: Base directory where worktree folders are created.\n"
                             "UV Envs Path: Directory storing shared Python virtual environments.\n"
                             "Default Suffix: Developer quadrigram appended to new branches.\n"
-                            "Dev Remote: Personal fork remote used to push/pull branches.\n"
+                            "Dev Remote: Your personal fork (e.g. 'odoo-dev'). Used to push your features for PRs, and fetch colleagues' branches.\n"
                             "Repo Dirs: Names of the subfolders created inside each worktree.",
                             classes="tab-description"
                         )
