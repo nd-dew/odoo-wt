@@ -63,3 +63,23 @@ async def test_wizard_mount():
         await pilot.pause()
         assert pilot.app.query_one(".title")
         print("\n🚀 WIZARD MOUNT SUCCESSFUL!")
+
+def test_git_branch_strategy_detection(tmp_path):
+    from odoo_wt.system_discovery import run_git, check_local
+    import subprocess
+    
+    repo = tmp_path / "mock_repo"
+    repo.mkdir()
+    
+    # 1. Init a blank git repo
+    run_git(["init"], cwd=repo)
+    
+    # 2. Branch should definitely NOT exist
+    assert check_local(repo, "saas-17.1-fix-test-pian") is False
+    
+    # 3. Create a dummy commit and the branch
+    subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=repo)
+    run_git(["branch", "saas-17.1-fix-test-pian"], cwd=repo)
+    
+    # 4. Strategy detection should now properly identify it exists locally
+    assert check_local(repo, "saas-17.1-fix-test-pian") is True
