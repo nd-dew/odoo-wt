@@ -43,14 +43,15 @@ The tool creates and manages a standardized folder structure that looks like thi
 
 ## Installation
 
-The recommended way to install odoo-wt is using uv tool:
+`odoo-wt` is officially published on PyPI. The recommended way to install it globally is using `uv tool`:
 
 ```bash
-# From the project directory
-uv tool install . --force
+uv tool install odoo-wt
 ```
 
-This creates an isolated environment for the tool and places an odoo-wt executable in your ~/.local/bin/.
+This creates an isolated, globally available environment for the tool and places an `odoo-wt` executable in your `~/.local/bin/`.
+
+*(Note: If you already installed a previous version locally, you can upgrade to the latest PyPI release by running `uv tool upgrade odoo-wt` or `uv tool install odoo-wt --force`).*
 
 ## Configuration
 
