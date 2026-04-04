@@ -4,7 +4,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll, Center
-from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable
+from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable, Checkbox, Static
 from textual import on, work
 from textual.events import Paste
 from textual.binding import Binding
@@ -20,7 +20,6 @@ from .custom_screens import DeleteConfirmScreen, DeployScreen, LogDetailScreen
 class OdooWtApp(App):
     ENABLE_COMMAND_PALETTE = False
     CSS_PATH = "stylesheet.tcss"
-    
 
     BINDINGS = [
         Binding("ctrl+s", "submit", "Create", key_display="Ctrl+S"),
@@ -32,7 +31,6 @@ class OdooWtApp(App):
         Binding("ctrl+q", "quit", "Quit", show=True, key_display="Ctrl+Q"),
         Binding("ctrl+c", "quit", "Quit", show=False),
     ]
-
 
     def __init__(self, config, v_list, s_list, worktrees):
         super().__init__()
@@ -53,6 +51,35 @@ class OdooWtApp(App):
         self.branch_status = ""
         self.save_timer = None
 
+    def on_key(self, event) -> None:
+        if self.query_one("#tabs").active == "tab-settings":
+            if event.key == "up":
+                self.screen.focus_previous()
+                event.prevent_default()
+            elif event.key == "down":
+                self.screen.focus_next()
+                event.prevent_default()
+            elif event.key == "pageup":
+                container = self.query_one(".settings-container", VerticalScroll)
+                container.scroll_page_up()
+            elif event.key == "pagedown":
+                container = self.query_one(".settings-container", VerticalScroll)
+                container.scroll_page_down()
+
+    def on_descendant_focus(self, event) -> None:
+        try:
+            if self.query_one("#tabs").active != "tab-settings":
+                return
+            widget = event.widget
+            
+            help_bar = self.query_one("#settings-help-bar", Static)
+            if hasattr(widget, "tooltip") and widget.tooltip:
+                help_bar.update(f"[bold cyan]Info:[/bold cyan] {widget.tooltip}")
+            else:
+                help_bar.update("")
+        except Exception:
+            pass
+
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
             with Horizontal(id="top-bar"):
@@ -70,12 +97,12 @@ class OdooWtApp(App):
                             yield Select(((v, v) for v in self.v_list), value=self.v_list[0] if self.v_list else None, id="version")
                             yield Input(id="custom_version", classes="custom-field")
 
-                        yield Label("-", classes="dash")
+                        yield Label("-", classes="dash", id="dash-version")
 
                         with Vertical(id="desc-col"):
                             yield Input(placeholder="fix_bug", id="desc")
 
-                        yield Label("-", classes="dash")
+                        yield Label("-", classes="dash", id="dash-suffix")
 
                         with Vertical(id="suffix-col"):
                             yield Select(((s, s) for s in self.s_list), value=self.s_list[0] if self.s_list else None, id="suffix")
@@ -101,46 +128,51 @@ class OdooWtApp(App):
                     with VerticalScroll(classes="settings-container"):
                         with Horizontal(classes="setting-item"):
                             yield Label("Worktree Root:", classes="setting-label")
-                            yield Input(value=self.config.get("wt_root", ""), id="set-wt", classes="setting-input")
+                            yield Input(value=self.config.get("wt_root", ""), id="set-wt", classes="setting-input", tooltip="Base directory where worktree folders are created.")
                         with Horizontal(classes="setting-item"):
                             yield Label("UV Envs Path:", classes="setting-label")
-                            yield Input(value=self.config.get("env_root", ""), id="set-env", classes="setting-input")
+                            yield Input(value=self.config.get("env_root", ""), id="set-env", classes="setting-input", tooltip="Directory storing shared Python virtual environments.")
                         with Horizontal(classes="setting-item"):
                             yield Label("Default Suffix:", classes="setting-label")
-                            yield Input(value=self.config.get("suffix", ""), id="set-suffix", classes="setting-input")
+                            yield Input(value=self.config.get("suffix", ""), id="set-suffix", classes="setting-input", tooltip="Developer quadrigram appended to new branches.")
                         with Horizontal(classes="setting-item"):
                             yield Label("Dev Remote (Fork):", classes="setting-label")
-                            yield Input(value=self.config.get("remote_name", "odoo-dev"), id="set-remote", classes="setting-input")
+                            yield Input(value=self.config.get("remote_name", "odoo-dev"), id="set-remote", classes="setting-input", tooltip="Your personal fork (e.g. 'odoo-dev'). Used to push your features for PRs, and fetch colleagues' branches.")
                         with Horizontal(classes="setting-item"):
                             yield Label("Community Dir:", classes="setting-label")
-                            yield Input(value=self.config.get("community_dir", "odoo"), id="set-comm", classes="setting-input")
+                            yield Input(value=self.config.get("community_dir", "odoo"), id="set-comm", classes="setting-input", tooltip="Name of the subfolder created inside each worktree for the community repo.")
                         with Horizontal(classes="setting-item"):
                             yield Label("Enterprise Dir:", classes="setting-label")
-                            yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input")
+                            yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input", tooltip="Name of the subfolder created inside each worktree for the enterprise repo.")
                         with Horizontal(classes="setting-item"):
                             yield Label("Default Tab:", classes="setting-label")
                             yield Select(
                                 [("Creation", "tab-create"), ("Existing", "tab-manage")],
                                 value=self.config.get("default_tab", "tab-create"),
                                 id="set-default-tab",
-                                classes="setting-input"
+                                classes="setting-input",
+                                tooltip="Which tab to open by default when the app starts."
                             )
                         with Horizontal(classes="setting-item"):
                             yield Label("Removed Versions:", classes="setting-label")
-                            yield Input(value=",".join(self.config.get("ignored_versions", [])), id="set-ig-v", classes="setting-input")
+                            yield Input(value=",".join(self.config.get("ignored_versions", [])), id="set-ig-v", classes="setting-input", tooltip="Comma-separated lists of auto-discovered versions to hide from the creation dropdowns.")
                         with Horizontal(classes="setting-item"):
                             yield Label("Removed Suffixes:", classes="setting-label")
-                            yield Input(value=",".join(self.config.get("ignored_suffixes", [])), id="set-ig-s", classes="setting-input")
-                        yield Label(
-                            f"[bold]Config File:[/bold] {CONFIG_FILE}\n\n"
-                            "Worktree Root: Base directory where worktree folders are created.\n"
-                            "UV Envs Path: Directory storing shared Python virtual environments.\n"
-                            "Default Suffix: Developer quadrigram appended to new branches.\n"
-                            "Dev Remote: Your personal fork (e.g. 'odoo-dev'). Used to push your features for PRs, and fetch colleagues' branches.\n"
-                            "Repo Dirs: Names of the subfolders created inside each worktree.\n"
-                            "Removed Items: Comma-separated lists of auto-discovered versions/suffixes to hide from the creation dropdowns.",
-                            classes="tab-description"
-                        )
+                            yield Input(value=",".join(self.config.get("ignored_suffixes", [])), id="set-ig-s", classes="setting-input", tooltip="Comma-separated lists of auto-discovered suffixes to hide from the creation dropdowns.")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Show Prefix (Version):", classes="setting-label")
+                            yield Checkbox(value=self.config.get("show_prefix", True), id="set-show-prefix", classes="setting-input", tooltip="Toggle visibility of the version dropdown in the Creation tab.")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Show Suffix:", classes="setting-label")
+                            yield Checkbox(value=self.config.get("show_suffix", True), id="set-show-suffix", classes="setting-input", tooltip="Toggle visibility of the suffix dropdown in the Creation tab.")
+                        with Horizontal(classes="setting-item full-width"):
+                            yield Label("Config Path:", classes="setting-label")
+                            yield Input(value=self.config.get("config_path", ""), id="set-config-path", classes="setting-input", tooltip="Changing this will automatically move your existing config to the new location.")
+                        with Horizontal(classes="setting-item full-width"):
+                            yield Label("Log Path:", classes="setting-label")
+                            yield Input(value=self.config.get("log_path", ""), id="set-log-path", classes="setting-input", tooltip="Changing this will automatically move your existing logs to the new location.")
+                            
+                        yield Static("Navigate inputs to see descriptions.", id="settings-help-bar", classes="help-bar")
                 with TabPane("Logs", id="tab-logs"):
                     yield Label("System Logs (Newest first)", classes="tab-description")
                     yield DataTable(id="logs-table", cursor_type="row")
@@ -159,15 +191,27 @@ class OdooWtApp(App):
                 self.query_one("#wt-table").focus()
             else:
                 self.query_one("#desc").focus()
-        except:
+        except Exception as e:
             self.query_one("#desc").focus()
+            append_log("on_mount focus error", {"error": str(e)})
 
+        self.apply_visibility_settings()
         self.populate_table()
         self.populate_logs_table()
         self.update_summary()
         v_sel = self.query_one("#version", Select).value
         if v_sel and str(v_sel) != "custom...":
             self.background_fetch(str(v_sel))
+
+    def apply_visibility_settings(self) -> None:
+        show_prefix = self.config.get("show_prefix", True)
+        show_suffix = self.config.get("show_suffix", True)
+        
+        self.query_one("#version-col").set_class(not show_prefix, "hidden")
+        self.query_one("#dash-version").set_class(not show_prefix, "hidden")
+        
+        self.query_one("#suffix-col").set_class(not show_suffix, "hidden")
+        self.query_one("#dash-suffix").set_class(not show_suffix, "hidden")
 
     @work(exclusive=True, thread=True)
     async def background_fetch(self, version: str) -> None:
@@ -227,7 +271,7 @@ class OdooWtApp(App):
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         try:
             active_pane = self.query_one("#tabs").active
-        except:
+        except Exception:
             active_pane = "tab-create"
 
         if action == "submit":
@@ -350,7 +394,7 @@ class OdooWtApp(App):
                 elif secs < 3600: return f"{int(secs//60)} min ago"
                 elif secs < 86400: return f"{int(secs//3600)} hours ago"
                 else: return f"{int(secs//86400)} days ago"
-            except:
+            except ValueError:
                 return iso_str
 
         if LOG_FILE.exists():
@@ -366,7 +410,8 @@ class OdooWtApp(App):
                     if len(details_str) > 60:
                         details_str = details_str[:57] + "..."
                     table.add_row(rt, data.get("action", ""), details_str)
-            except: pass
+            except (OSError, IOError, json.JSONDecodeError) as e:
+                append_log("Log table parsing error", {"error": str(e)})
 
     @on(Button.Pressed, "#refresh-logs-btn")
     def on_refresh_logs(self):
@@ -413,6 +458,12 @@ class OdooWtApp(App):
         self.query_one("#set-default-tab", Select).value = self.config.get("default_tab", "tab-create")
         self.query_one("#set-ig-v", Input).value = ",".join(self.config.get("ignored_versions", []))
         self.query_one("#set-ig-s", Input).value = ",".join(self.config.get("ignored_suffixes", []))
+        self.query_one("#set-config-path", Input).value = self.config.get("config_path", "")
+        self.query_one("#set-log-path", Input).value = self.config.get("log_path", "")
+        self.query_one("#set-show-prefix", Checkbox).value = self.config.get("show_prefix", True)
+        self.query_one("#set-show-suffix", Checkbox).value = self.config.get("show_suffix", True)
+        
+        self.apply_visibility_settings()
         self.notify("Settings reset to last saved state.")
 
     def action_refresh(self) -> None:
@@ -558,7 +609,11 @@ class OdooWtApp(App):
     @on(Input.Changed, "#set-ent")
     @on(Input.Changed, "#set-ig-v")
     @on(Input.Changed, "#set-ig-s")
+    @on(Input.Changed, "#set-config-path")
+    @on(Input.Changed, "#set-log-path")
     @on(Select.Changed, "#set-default-tab")
+    @on(Checkbox.Changed, "#set-show-prefix")
+    @on(Checkbox.Changed, "#set-show-suffix")
     def on_setting_changed(self, event) -> None:
         if self.is_mounted:
             if self.save_timer:
@@ -566,6 +621,7 @@ class OdooWtApp(App):
             self.save_timer = self.set_timer(0.5, self.save_settings_auto)
 
     def save_settings_auto(self) -> None:
+        from .app_config import CONFIG_FILE, LOG_FILE
         self.config["wt_root"] = self.query_one("#set-wt", Input).value
         self.config["env_root"] = self.query_one("#set-env", Input).value
         self.config["suffix"] = self.query_one("#set-suffix", Input).value
@@ -573,14 +629,21 @@ class OdooWtApp(App):
         self.config["community_dir"] = self.query_one("#set-comm", Input).value
         self.config["enterprise_dir"] = self.query_one("#set-ent", Input).value
         self.config["default_tab"] = self.query_one("#set-default-tab", Select).value
-        
+        self.config["config_path"] = self.query_one("#set-config-path", Input).value
+        self.config["log_path"] = self.query_one("#set-log-path", Input).value
+        self.config["show_prefix"] = self.query_one("#set-show-prefix", Checkbox).value
+        self.config["show_suffix"] = self.query_one("#set-show-suffix", Checkbox).value
+
         ig_v = [v.strip() for v in self.query_one("#set-ig-v", Input).value.split(",") if v.strip()]
         ig_s = [s.strip() for s in self.query_one("#set-ig-s", Input).value.split(",") if s.strip()]
         self.config["ignored_versions"] = ig_v
         self.config["ignored_suffixes"] = ig_s
-        
+
         save_config(self.config)
         append_log("Settings Auto-Saved", self.config)
+        
+        self.apply_visibility_settings()
+        self.update_summary()
         
         v_list, s_list, _ = discover_system_data(self.config["wt_root"], self.config["suffix"])
         self.v_list = [v for v in v_list if v not in ig_v or v in ("none", "custom...")]

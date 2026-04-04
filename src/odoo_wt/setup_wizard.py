@@ -4,7 +4,7 @@ from textual.app import App
 from textual import on, work
 from textual.binding import Binding
 from textual.widgets import Select, Input, Label, Button, ProgressBar, Footer
-from textual.containers import Vertical, Horizontal
+from textual.containers import Vertical, Horizontal, VerticalScroll
 
 from .app_config import append_log, save_config
 from .system_discovery import fast_scan, expand_path
@@ -14,56 +14,78 @@ class WizardApp(App):
     CSS_PATH = "stylesheet.tcss"
     
     BINDINGS = [
+        Binding("enter", "submit_step", "Next", show=True, key_display="Enter"),
         Binding("escape", "quit", "", show=False),
-        Binding("ctrl+c", "quit", "Close", key_display="Ctrl+C"),
+        Binding("ctrl+c", "quit", "Quit", show=False),
+        Binding("ctrl+q", "quit", "Quit", show=True, key_display="Ctrl+Q"),
     ]
 
-    def compose(self):
-        with Vertical(id="wizard-dialog"):
-            yield Label("[bold]Welcome to Odoo WorkTree Tool[/bold]", classes="title")
-            yield Label(
-                "This tool will create new directories with Community and Enterprise worktrees.\n"
-                "You should have a structure like this somewhere on your PC:",
-                classes="req"
-            )
-            
-            with Vertical(classes="tree-box"):
-                yield Label(
-                    "[bold magenta]Worktree Root/[/bold magenta]\n"
-                    " ├── master/       (Base Folder)\n"
-                    " │    ├── odoo/       (Community clone)\n"
-                    " │    └── enterprise/ (Enterprise clone)\n"
-                    " └── ...           (Tool creates new ones here)"
-                )
-            
-            yield Label("Step 1: Tell me where that '[bold magenta]Worktree Root[/bold magenta]' is:", classes="step-title")
-            yield ProgressBar(id="scanner-progress")
-            yield Label("", id="scanner-status")
-            yield Select([], id="root-select", classes="hidden", prompt="Select discovered root")
-            yield Input(placeholder="Or enter path manually (~/ allowed)...", id="custom-root", classes="hidden")
-            
-            with Vertical(id="final-steps", classes="hidden"):
-                yield Label("[bold]Step 2: UV Environments Path[/bold]", classes="step-title")
-                yield Label(
-                    "This tool uses `uv` to manage your Python dependencies.\n"
-                    "It builds one central virtual environment per Odoo version, "
-                    "so they can be instantly reused across all your worktrees without re-downloading packages.",
-                    classes="step-desc"
-                )
-                yield Input(value="~/.envs", id="env-path")
-                
-                yield Label("[bold]Step 3: Developer Suffix[/bold]", classes="step-title")
-                yield Label(
-                    "Your personal identifier (e.g. 'pian' or 'test').\n"
-                    "This gets automatically appended to the end of your new branch names.",
-                    classes="step-desc"
-                )
-                yield Input(value="pian", id="suffix-input")
-                
-                yield Label("\nDon't worry, you can change all of these later in the Settings tab!", classes="step-desc")
+    def __init__(self):
+        super().__init__()
+        self.initial_load = True
 
-                with Horizontal(classes="btn-row"):
-                    yield Button("Finish Setup", variant="success", id="btn-finish")
+    def action_submit_step(self):
+        focused = self.focused
+        if focused:
+            if focused.id == "root-select":
+                # Only manually force next if custom isn't selected, 
+                # otherwise the Select dropdown catches Enter to select items
+                if focused.value != "custom":
+                    self.query_one("#env-path").focus()
+            elif focused.id == "custom-root":
+                self.query_one("#env-path").focus()
+            elif focused.id == "env-path":
+                self.query_one("#suffix-input").focus()
+            elif focused.id == "suffix-input":
+                self.query_one("#btn-finish").focus()
+            elif focused.id == "btn-finish":
+                self.on_finish()
+
+    def compose(self):
+        with VerticalScroll(id="wizard-scroll"):
+            with Vertical(id="wizard-dialog"):
+                yield Label("[bold]Welcome to Odoo WorkTree Tool[/bold]", classes="title")
+                yield Label(
+                    "This tool will create new directories with Community and Enterprise worktrees.\n"
+                    "You should have a structure like this somewhere on your PC:",
+                    classes="req"
+                )
+                
+                with Vertical(classes="tree-box"):
+                    yield Label(
+                        "[bold magenta]Worktree Root/[/bold magenta]\n"
+                        " ├── master/       (Base Folder)\n"
+                        " │    ├── odoo/       (Community clone)\n"
+                        " │    └── enterprise/ (Enterprise clone)\n"
+                        " └── ...           (Tool creates new ones here)"
+                    )
+                
+                yield Label("Step 1: Tell me where that '[bold magenta]Worktree Root[/bold magenta]' is:", classes="step-title", id="scanner-status")
+                yield ProgressBar(id="scanner-progress")
+                yield Select([], id="root-select", classes="hidden", prompt="Select discovered root")
+                yield Input(placeholder="Or enter path manually (~/ allowed)...", id="custom-root", classes="hidden")
+                
+                with Vertical(id="final-steps", classes="hidden"):
+                    yield Label("[bold]Step 2: UV Environments Path[/bold]", classes="step-title")
+                    yield Label(
+                        "I'm a neat manager; I use `uv` to build one central virtual environment "
+                        "per Odoo version so they can be instantly reused. Tell me where to put them:",
+                        classes="step-desc"
+                    )
+                    yield Input(value="~/.envs", id="env-path")
+                    
+                    yield Label("[bold]Step 3: Developer Suffix[/bold]", classes="step-title")
+                    yield Label(
+                        "Your personal identifier (e.g. 'pian' or 'test').\n"
+                        "This gets automatically appended to the end of your new branch names.",
+                        classes="step-desc"
+                    )
+                    yield Input(value="pian", id="suffix-input")
+                    
+                    yield Label("\nDon't worry, you can change all of these later in the Settings tab!", classes="step-desc")
+
+                    with Horizontal(classes="btn-row"):
+                        yield Button("Finish Setup", variant="success", id="btn-finish")
         yield Footer()
 
     def action_quit(self):
@@ -79,20 +101,22 @@ class WizardApp(App):
         roots = await asyncio.to_thread(fast_scan)
         try:
             self.query_one("#scanner-progress").remove()
-        except:
+        except Exception:
             pass
         
         if roots:
             status = self.query_one("#scanner-status")
-            status.update(f"Found {len(roots)} potential root(s)!")
-            
-            select = self.query_one("#root-select")
+            status.update("Step 1: Select a root from the proposed ones or set your own:")
+
+            sel = self.query_one("#root-select", Select)
             options = [(r, r) for r in roots] + [("Custom Path", "custom")]
-            select.set_options(options)
-            select.value = roots[0]
-            select.remove_class("hidden")
+            sel.set_options(options)
+            with self.prevent(Select.Changed):
+                sel.value = roots[0]
+            sel.remove_class("hidden")
+            sel.focus()
         else:
-            self.query_one("#scanner-status").update("No standard roots found. Please specify manually:")
+            self.query_one("#scanner-status").update("Step 1: No standard roots found. Please specify manually:")
             self.query_one("#custom-root").remove_class("hidden")
             self.query_one("#custom-root").focus()
 
@@ -107,6 +131,19 @@ class WizardApp(App):
             custom.focus()
         else:
             custom.add_class("hidden")
+            self.query_one("#env-path").focus()
+
+    @on(Input.Submitted, "#custom-root")
+    def on_custom_root_submit(self, event):
+        self.query_one("#env-path").focus()
+
+    @on(Input.Submitted, "#env-path")
+    def on_env_path_submit(self, event):
+        self.query_one("#suffix-input").focus()
+
+    @on(Input.Submitted, "#suffix-input")
+    def on_suffix_submit(self, event):
+        self.query_one("#btn-finish").focus()
 
     @on(Button.Pressed, "#btn-finish")
     def on_finish(self):
