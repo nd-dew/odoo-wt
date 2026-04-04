@@ -1,12 +1,12 @@
 import sys
 import os
 import shutil
-from .app_config import load_config, CONFIG_FILE
+from .app_config import config_mgr
 from .system_discovery import discover_system_data
 from .setup_wizard import WizardApp
 from .main_tui import OdooWtApp
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 def show_help():
     print(f"Odoo Worktree Assistant (odoo-wt) v{VERSION}")
@@ -56,31 +56,47 @@ def main():
 
     check_dependencies()
     
-    if not CONFIG_FILE.exists():
+    if not config_mgr.config_file.exists():
         app = WizardApp()
         config = app.run()
         if not config:
             return
     else:
-        config = load_config()
+        config = config_mgr.load()
 
     if forced_tab:
         config["default_tab"] = forced_tab
 
     # CLI direct creation mode
-    if len(sys.argv) > 1:
-        branch = sys.argv[1]
-        v = branch.split("-")[0] if "-" in branch else "master"
-        # We manually build the data for DeployScreen
-        data = {"action": "create", "version": v, "desc": branch, "suffix": ""}
-        # In CLI mode, we still need to boot OdooWtApp to push the DeployScreen
-        # or we just boot a minimal app to host the DeployScreen.
-        # For now, let's just launch the full app and it will handle it if we modify init.
-        # But easier: just boot the app normally.
-        v_list, s_list, worktrees = discover_system_data(config["wt_root"], config["suffix"])
-        app = OdooWtApp(config, v_list, s_list, worktrees)
-        # We don't have an easy way to auto-start deployment from CLI yet, let's just open the app for now. 
-        app.run()
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
+        branch_name = sys.argv[1]
+        from .system_discovery import parse_branch_name
+        v, s = parse_branch_name(branch_name)
+
+        # Remove the prefix/suffix to get just the description part
+        desc = branch_name
+        if v and desc.startswith(f"{v}-"):
+            desc = desc[len(v)+1:]
+        if s and desc.endswith(f"-{s}"):
+            desc = desc[:-len(s)-1]
+
+        data = {
+            "action": "create",
+            "version": v,
+            "desc": desc,
+            "suffix": s
+        }
+
+        from textual.app import App
+        from .custom_screens import DeployScreen
+
+        class FastModeApp(App):
+            CSS_PATH = "stylesheet.tcss"
+            def on_mount(self):
+                self.push_screen(DeployScreen(data, config))
+
+        app = FastModeApp()
+        data = app.run()
     else:
         v_list, s_list, worktrees = discover_system_data(config["wt_root"], config["suffix"])
         app = OdooWtApp(config, v_list, s_list, worktrees)
