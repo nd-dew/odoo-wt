@@ -8,7 +8,7 @@ from textual.screen import ModalScreen, Screen
 from textual.widgets import Label, Button, ProgressBar, RichLog
 from textual.containers import Vertical, Horizontal, VerticalScroll
 
-from .app_config import append_log
+from .app_config import config_mgr
 from .system_discovery import get_remote, check_local
 from .deployment_engine import DeployEngine, DeployUpdate
 
@@ -33,7 +33,7 @@ class DeleteConfirmScreen(ModalScreen[bool]):
 
     @on(Button.Pressed, "#btn-yes")
     async def on_yes(self):
-        append_log("Delete Confirm Step", {"step": self.step, "worktree": self.wt_name})
+        config_mgr.append_log("Delete Confirm Step", {"step": self.step, "worktree": self.wt_name})
         self.step += 1
         if self.step > 3:
             self.dismiss(True)
@@ -53,7 +53,7 @@ class DeleteConfirmScreen(ModalScreen[bool]):
 
     @on(Button.Pressed, "#btn-cancel")
     def on_cancel(self):
-        append_log("Delete Cancelled", {"worktree": self.wt_name})
+        config_mgr.append_log("Delete Cancelled", {"worktree": self.wt_name})
         self.dismiss(False)
 
 
@@ -120,7 +120,7 @@ class DeployScreen(Screen):
 
     @work(exclusive=True)
     async def run_deployment(self):
-        append_log("Deployment Started", {"branch": self.engine.branch_name, "version": self.data["version"]})
+        config_mgr.append_log("Deployment Started", {"branch": self.engine.branch_name, "version": self.data["version"]})
         self.engine.target_dir.mkdir(parents=True, exist_ok=True)
         
         base_odoo = self.engine.wt_root / "master" / self.engine.comm_dir
@@ -141,7 +141,7 @@ class DeployScreen(Screen):
             handle_updates(self.engine.setup_uv())
         )
 
-        append_log("Deployment Success", {"branch": self.engine.branch_name, "path": str(self.engine.target_dir)})
+        config_mgr.append_log("Deployment Success", {"branch": self.engine.branch_name, "path": str(self.engine.target_dir)})
         self.show_success_footer()
 
     def show_success_footer(self):
@@ -152,22 +152,22 @@ class DeployScreen(Screen):
 
     @on(Button.Pressed, "#btn-terminal")
     def on_terminal(self):
-        append_log("Deployment Complete", {"choice": "terminal"})
+        config_mgr.append_log("Deployment Complete", {"choice": "terminal"})
         self.app.exit({"action": "terminal", "path": str(self.engine.target_dir)})
 
     @on(Button.Pressed, "#btn-vscode")
     def on_vscode(self):
-        append_log("Deployment Complete", {"choice": "vscode"})
+        config_mgr.append_log("Deployment Complete", {"choice": "vscode"})
         self.app.exit({"action": "vscode", "path": str(self.engine.target_dir)})
 
     @on(Button.Pressed, "#btn-back")
     def on_back(self):
-        append_log("Deployment Complete", {"choice": "back"})
+        config_mgr.append_log("Deployment Complete", {"choice": "back"})
         self.dismiss()
 
     @on(Button.Pressed, "#btn-exit")
     def on_exit(self):
-        append_log("Deployment Complete", {"choice": "exit"})
+        config_mgr.append_log("Deployment Complete", {"choice": "exit"})
         self.app.exit()
 
 class LogDetailScreen(ModalScreen[None]):
