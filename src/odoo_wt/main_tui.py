@@ -17,22 +17,14 @@ class OdooWtApp(App):
     CSS_PATH = "stylesheet.tcss"
     
 
-    @property
-    def bindings(self) -> list[Binding]:
-        # We need to be careful if #tabs is not yet mounted
-        try:
-            active = self.query_one("#tabs").active
-        except:
-            active = "tab-create"
-            
-        return [
-            Binding("ctrl+s", "submit", "Create", key_display="Ctrl+S", show=(active == "tab-create")),
-            Binding("ctrl+d", "delete_wt", "Delete", key_display="Ctrl+D", show=(active == "tab-manage")),
-            Binding("ctrl+r", "refresh", "Reset" if active == "tab-settings" else "Refresh", key_display="Ctrl+R", show=(active != "tab-create")),
-            Binding("ctrl+t", "next_tab", "Tab", key_display="Ctrl+T"),
-            Binding("escape", "quit", "", show=False),
-            Binding("ctrl+c", "quit", "Close", key_display="Ctrl+C"),
-        ]
+    BINDINGS = [
+        Binding("ctrl+s", "submit", "Create", key_display="Ctrl+S"),
+        Binding("ctrl+d", "delete_wt", "Delete", key_display="Ctrl+D"),
+        Binding("ctrl+r", "refresh", "Refresh/Reset", key_display="Ctrl+R"),
+        Binding("ctrl+t", "next_tab", "Tab", key_display="Ctrl+T"),
+        Binding("escape", "quit", "", show=False),
+        Binding("ctrl+c", "quit", "Close", key_display="Ctrl+C"),
+    ]
 
 
     def __init__(self, config, v_list, s_list, worktrees):
@@ -176,7 +168,22 @@ class OdooWtApp(App):
         elif active_pane == "tab-logs":
             self.populate_logs_table()
             self.query_one("#logs-table").focus()
-        self.query_one(Footer).refresh()
+            
+        self.app.refresh_bindings()
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        try:
+            active_pane = self.query_one("#tabs").active
+        except:
+            active_pane = "tab-create"
+
+        if action == "submit":
+            return active_pane == "tab-create"
+        if action == "delete_wt":
+            return active_pane == "tab-manage"
+        if action == "refresh":
+            return active_pane != "tab-create"
+        return True
 
     def update_summary(self) -> None:
         try:
