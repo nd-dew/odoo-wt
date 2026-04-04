@@ -22,7 +22,10 @@ def load_config():
         "suffix": "pian",
         "remote_name": "odoo-dev",
         "community_dir": "odoo",
-        "enterprise_dir": "enterprise"
+        "enterprise_dir": "enterprise",
+        "default_tab": "tab-create",
+        "ignored_versions": [],
+        "ignored_suffixes": []
     }
     if CONFIG_FILE.exists():
         try:
