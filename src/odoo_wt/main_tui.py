@@ -154,8 +154,18 @@ class OdooWtApp(App):
     @on(TabbedContent.TabActivated, "#tabs")
     def on_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         append_log("Tab Changed", {"tab": event.tab.id if event.tab else "unknown"})
-        if event.tab and event.tab.id == "tab-logs":
+        if not event.tab:
+            return
+            
+        if event.tab.id == "tab-create":
+            self.query_one("#desc").focus()
+        elif event.tab.id == "tab-manage":
+            self.query_one("#wt-table").focus()
+        elif event.tab.id == "tab-settings":
+            self.query_one("#set-wt").focus()
+        elif event.tab.id == "tab-logs":
             self.populate_logs_table()
+            self.query_one("#logs-table").focus()
 
     def update_summary(self) -> None:
         try:
