@@ -63,28 +63,7 @@ class DeleteConfirmScreen(ModalScreen[bool]):
         append_log("Delete Cancelled", {"worktree": self.wt_name})
         self.dismiss(False)
 
-class SuccessModal(ModalScreen[bool]):
-    def __init__(self, target_dir):
-        super().__init__()
-        self.target_dir = target_dir
 
-    def compose(self):
-        with Vertical(id="success-dialog"):
-            yield Label(f"SUCCESS! Worktree ready at:\n{self.target_dir}", classes="success-msg")
-            yield Label("Would you like me to take you there now?", classes="success-msg")
-            with Horizontal(classes="success-btn-row"):
-                yield Button("Yes, take me there!", variant="success", id="btn-yes")
-                yield Button("No, just exit", variant="primary", id="btn-no")
-
-    @on(Button.Pressed, "#btn-yes")
-    def on_yes(self):
-        append_log("Success Modal", {"choice": "take_me_there"})
-        self.dismiss(True)
-
-    @on(Button.Pressed, "#btn-no")
-    def on_no(self):
-        append_log("Success Modal", {"choice": "stay"})
-        self.dismiss(False)
 
 class DeployScreen(Screen):
     def __init__(self, data, config):
@@ -107,6 +86,12 @@ class DeployScreen(Screen):
             yield Label("UV Environment", classes="log-title")
             yield ProgressBar(id="prog-uv", show_eta=False)
             yield RichLog(id="log-uv", markup=False, highlight=False)
+            
+        with Vertical(id="success-footer", classes="hidden"):
+            yield Label("", id="success-message", classes="success-msg")
+            with Horizontal(classes="success-btn-row"):
+                yield Button("Yes, take me there!", variant="success", id="btn-take-me-there")
+                yield Button("No, just exit", variant="primary", id="btn-just-exit")
 
     def on_mount(self):
         self.run_deployment()
@@ -199,13 +184,25 @@ class DeployScreen(Screen):
         log_uv.write("✅ Done.")
         append_log("Deployment Success", {"branch": branch_name, "path": str(target_dir)})
 
-        def check_take_me_there(take_me_there: bool):
-            if take_me_there:
-                self.app.exit({"take_me_there": True, "path": str(target_dir)})
-            else:
-                self.app.exit({"refresh": True})
+        self.target_dir = target_dir
+        self.app.call_from_thread(self.show_success_footer)
 
-        self.app.push_screen(SuccessModal(target_dir), check_take_me_there)
+
+    def show_success_footer(self):
+        msg = self.query_one("#success-message", Label)
+        msg.update(f"SUCCESS! Worktree ready at: {self.target_dir}\nWould you like me to take you there now?")
+        self.query_one("#success-footer").remove_class("hidden")
+        self.query_one("#btn-take-me-there").focus()
+
+    @on(Button.Pressed, "#btn-take-me-there")
+    def on_take_me_there(self):
+        append_log("Deployment Complete", {"choice": "take_me_there"})
+        self.app.exit({"take_me_there": True, "path": str(self.target_dir)})
+
+    @on(Button.Pressed, "#btn-just-exit")
+    def on_just_exit(self):
+        append_log("Deployment Complete", {"choice": "stay"})
+        self.app.exit({"refresh": True})
 
 class LogDetailScreen(ModalScreen[None]):
     def __init__(self, ts, action, details):
