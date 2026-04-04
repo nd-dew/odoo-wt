@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 from textual.app import App
 from textual import on, work
+from textual.binding import Binding
 from textual.widgets import Select, Input, Label, Button, ProgressBar, Footer
 from textual.containers import Vertical, Horizontal
 
@@ -13,8 +14,8 @@ class WizardApp(App):
     CSS_PATH = "stylesheet.tcss"
     
     BINDINGS = [
-        ("escape", "quit", "Cancel"),
-        ("ctrl+c", "quit", "Quit"),
+        Binding("escape", "quit", "", show=False),
+        Binding("ctrl+c", "quit", "Close", key_display="^c"),
     ]
 
     def compose(self):
