@@ -1,0 +1,391 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "textual>=0.52.1",
+#     "rich>=13.7.1",
+# ]
+# ///
+
+import os
+import sys
+import json
+import subprocess
+from pathlib import Path
+from rich.console import Console
+from rich.status import Status
+from rich.text import Text as RichText
+
+from textual.app import App, ComposeResult
+from textual.containers import Horizontal, Vertical, Center, Container
+from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane
+from textual import on, widgets
+
+# --- CONFIGURATION ---
+CONFIG_FILE = Path.home() / ".config" / "odoo-wt.json"
+
+def load_config():
+    default_config = {
+        "wt_root": str(Path.home() / "repos" / "Odoo" / "wt"),
+        "env_root": str(Path.home() / ".envs"),
+        "suffix": "pian"
+    }
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                default_config.update(json.load(f))
+        except:
+            pass
+    return default_config
+
+def save_config(config):
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=4)
+
+# --- SCANNING ---
+def scan_worktrees(wt_root, default_suffix):
+    versions = set()
+    suffixes = set([default_suffix, "test", "none"])
+    
+    wt_path = Path(wt_root)
+    if wt_path.exists():
+        for entry in wt_path.iterdir():
+            if entry.is_dir():
+                name = entry.name
+                # Parse Version
+                if name.startswith("saas-"):
+                    parts = name.split("-")
+                    v = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 else name
+                else:
+                    v = name.split("-")[0]
+                
+                if v == "master" or v.startswith("saas-") or (v and v[0].isdigit()):
+                    versions.add(v)
+                
+                # Parse Suffix
+                if "-" in name:
+                    s = name.rsplit("-", 1)[-1]
+                    if s and len(s) <= 12 and " " not in s:
+                        suffixes.add(s)
+
+    v_list = sorted(list(versions))
+    if "master" in v_list: v_list.remove("master")
+    v_list.insert(0, "master")
+    v_list.append("none")
+    v_list.append("custom...")
+
+    s_list = sorted(list(suffixes))
+    if default_suffix in s_list: s_list.remove(default_suffix)
+    if "none" in s_list: s_list.remove("none")
+    s_list.insert(0, default_suffix)
+    s_list.append("none")
+    s_list.append("custom...")
+    
+    return v_list, s_list
+
+# --- TEXTUAL UI ---
+class OdooWtApp(App):
+    CSS = """
+    Screen {
+        align: center middle;
+        background: transparent;
+    }
+    #dialog {
+        width: 100;
+        height: auto;
+        padding: 1 2;
+        border: thick $accent;
+        background: $surface;
+    }
+    .main-row {
+        height: auto;
+        margin: 1 0;
+        align: center middle;
+    }
+    .dash {
+        padding: 1 1;
+        color: $text-muted;
+        text-style: bold;
+    }
+    .input-col {
+        width: 1fr;
+        height: auto;
+    }
+    .custom-field {
+        display: none;
+        margin-top: 1;
+        border: solid $accent;
+    }
+    .custom-field.visible {
+        display: block;
+    }
+    .title {
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+        margin: 1 0;
+    }
+    .info-box {
+        background: $boost;
+        padding: 1 2;
+        margin: 1 0;
+        border-left: thick $accent;
+    }
+    .setting-item {
+        margin: 1 0;
+    }
+    #btn-row {
+        align: center middle;
+        margin-top: 1;
+    }
+    Button {
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS = [
+        ("ctrl+s", "submit", "Deploy Environment"),
+        ("escape", "quit", "Exit"),
+    ]
+
+    def __init__(self, config, v_list, s_list):
+        super().__init__()
+        self.config = config
+        self.v_list = v_list
+        self.s_list = s_list
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            yield Label("🏗️  Odoo Worktree Assistant", classes="title")
+            
+            with TabbedContent():
+                with TabPane("Creation", id="tab-create"):
+                    with Vertical(classes="info-box"):
+                        yield Label("[bold underline]Branch Naming Convention:[/bold underline]")
+                        yield Label("[bold cyan]VERSION[/bold cyan]-[italic]description[/italic]-[bold magenta]SUFFIX[/bold magenta]")
+                        yield Label("• Version: Target Odoo release (17.0, master...)")
+                        yield Label("• Description: Short info (Spaces → underscores)")
+                        yield Label("• Suffix: Your dev ID (pian, test...)")
+
+                    with Horizontal(classes="main-row"):
+                        # Version Column
+                        with Vertical(classes="input-col"):
+                            yield Select(((v, v) for v in self.v_list), value=self.v_list[0], id="version", prompt="Version")
+                            yield Input(placeholder="Type version...", id="custom_version", classes="custom-field")
+                        
+                        yield Label("-", classes="dash")
+                        
+                        # Description Column
+                        with Vertical(classes="input-col"):
+                            yield Input(placeholder="e.g. fix mail bug", id="desc")
+                        
+                        yield Label("-", classes="dash")
+                        
+                        # Suffix Column
+                        with Vertical(classes="input-col"):
+                            yield Select(((s, s) for s in self.s_list), value=self.s_list[0], id="suffix", prompt="Suffix")
+                            yield Input(placeholder="Type suffix...", id="custom_suffix", classes="custom-field")
+
+                    with Horizontal(id="btn-row"):
+                        yield Button("Create (Ctrl+S)", variant="success", id="submit-btn")
+                        yield Button("Cancel", variant="error", id="cancel-btn")
+
+                with TabPane("Settings", id="tab-settings"):
+                    with Vertical(classes="setting-item"):
+                        yield Label("Worktree Root Path:")
+                        yield Input(value=self.config["wt_root"], id="set-wt")
+                    with Vertical(classes="setting-item"):
+                        yield Label("Global UV Envs Path:")
+                        yield Input(value=self.config["env_root"], id="set-env")
+                    with Vertical(classes="setting-item"):
+                        yield Label("Default Suffix:")
+                        yield Input(value=self.config["suffix"], id="set-suffix")
+                    
+                    with Center():
+                        yield Button("Save Configuration", variant="primary", id="save-settings")
+
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one("#desc").focus()
+
+    @on(Select.Changed, "#version")
+    def version_changed(self, event: Select.Changed) -> None:
+        custom = self.query_one("#custom_version")
+        if event.value == "custom...":
+            custom.add_class("visible")
+            custom.focus()
+        else:
+            custom.remove_class("visible")
+
+    @on(Select.Changed, "#suffix")
+    def suffix_changed(self, event: Select.Changed) -> None:
+        custom = self.query_one("#custom_suffix")
+        if event.value == "custom...":
+            custom.add_class("visible")
+            custom.focus()
+        else:
+            custom.remove_class("visible")
+
+    @on(Button.Pressed, "#save-settings")
+    def save_settings(self) -> None:
+        self.config["wt_root"] = self.query_one("#set-wt").value
+        self.config["env_root"] = self.query_one("#set-env").value
+        self.config["suffix"] = self.query_one("#set-suffix").value
+        save_config(self.config)
+        self.notify("Settings saved! Paths will update next time you run the tool.")
+
+    @on(Button.Pressed, "#submit-btn")
+    def on_submit_btn(self) -> None:
+        self.action_submit()
+
+    @on(Button.Pressed, "#cancel-btn")
+    def on_cancel_btn(self) -> None:
+        self.exit()
+
+    def action_submit(self) -> None:
+        v_sel = self.query_one("#version").value
+        version = self.query_one("#custom_version").value if v_sel == "custom..." else v_sel
+        
+        desc = self.query_one("#desc").value
+        
+        s_sel = self.query_one("#suffix").value
+        suffix = self.query_one("#custom_suffix").value if s_sel == "custom..." else s_sel
+
+        if version == "none": version = ""
+        if suffix == "none": suffix = ""
+
+        self.exit({
+            "version": version,
+            "desc": desc,
+            "suffix": suffix
+        })
+
+# --- DEPLOYMENT LOGIC ---
+def run_git(args, cwd=None, capture=False):
+    cmd = ["git"] + args
+    if capture:
+        res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+        return res.returncode == 0, res.stdout
+    else:
+        res = subprocess.run(cmd, cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return res.returncode == 0
+
+def check_remote(repo, branch):
+    success, out = run_git(["ls-remote", "--heads", "odoo-dev", branch], cwd=repo, capture=True)
+    return success and f"refs/heads/{branch}" in out
+
+def check_local(repo, branch):
+    return run_git(["rev-parse", "--verify", branch], cwd=repo)
+
+def get_remote(repo):
+    success, out = run_git(["remote"], cwd=repo, capture=True)
+    if success and "odoo\n" in out:
+        return "odoo"
+    return "origin"
+
+def deploy(data, config):
+    console = Console()
+    wt_root = Path(config["wt_root"])
+    
+    clean_desc = data["desc"].strip().replace(" ", "_")
+    parts = [p for p in [data["version"], clean_desc, data["suffix"]] if p]
+    branch_name = "-".join(parts)
+
+    if not branch_name:
+        console.print("[red]Error: Branch name cannot be entirely empty.[/red]")
+        return
+
+    target_dir = wt_root / branch_name
+    base_odoo = wt_root / "master" / "odoo"
+    base_ent = wt_root / "master" / "enterprise"
+
+    console.print(f"\n🔍 Checking status for [bold yellow]{branch_name}[/bold yellow]...")
+
+    local_exists = check_local(base_odoo, branch_name)
+    remote_exists = check_remote(base_odoo, branch_name) if not local_exists else False
+    
+    base_v = data["version"] or "master"
+
+    if local_exists:
+        status_msg = "[bold green]🔄 Existing (Local)[/bold green] - Will use local branch"
+    elif remote_exists:
+        status_msg = "[bold blue]☁️  Existing (Remote)[/bold blue] - Will fetch from odoo-dev"
+    else:
+        status_msg = f"[bold magenta]✨ New Branch[/bold magenta] - Will create from origin/{base_v}"
+
+    console.print(f"\n[cyan bold]PLAN SUMMARY[/cyan bold]")
+    console.print(f"  - Branch:  [yellow]{branch_name}[/yellow]")
+    console.print(f"  - Status:  {status_msg}")
+    console.print(f"  - Path:    [yellow]{target_dir}[/yellow]\n")
+
+    confirm = console.input("Proceed with creation? [Y/n] ")
+    if confirm.lower() == 'n':
+        console.print("Aborted.")
+        return
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    with Status("[bold blue]Deploying Odoo Environment...", console=console, spinner="dots") as status:
+        
+        for repo, dest, label in [(base_odoo, "odoo", "Community"), (base_ent, "enterprise", "Enterprise")]:
+            status.update(f"[bold blue]Setting up {label}...")
+            remote = get_remote(repo)
+
+            if run_git(["fetch", "odoo-dev", f"{branch_name}:{branch_name}", "--force"], cwd=repo):
+                run_git(["worktree", "add", str(target_dir / dest), branch_name], cwd=repo)
+            else:
+                run_git(["fetch", remote, base_v], cwd=repo)
+                if check_local(repo, branch_name):
+                    run_git(["worktree", "add", str(target_dir / dest), branch_name], cwd=repo)
+                else:
+                    run_git(["worktree", "add", "-b", branch_name, str(target_dir / dest), f"{remote}/{base_v}"], cwd=repo)
+                    run_git(["branch", "--set-upstream-to", f"{remote}/{base_v}", branch_name], cwd=repo)
+
+        # UV Environment
+        status.update("[bold blue]Setting up UV Python Environment...")
+        env_root = Path(config["env_root"])
+        env_root.mkdir(parents=True, exist_ok=True)
+        
+        target_env = env_root / base_v
+        if not target_env.exists():
+            console.print(f"✨ Initializing new UV environment for [yellow]{base_v}[/yellow]...")
+            subprocess.run(["uv", "venv", str(target_env), "--python", "3.12"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            req_path = target_dir / "odoo" / "requirements.txt"
+            if req_path.exists():
+                console.print("📦 Installing Odoo requirements...")
+                subprocess.run([
+                    "uv", "pip", "install", "-r", str(req_path),
+                    "--python", str(target_env / "bin" / "python")
+                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        venv_symlink = target_dir / ".venv"
+        if not venv_symlink.exists():
+            try:
+                os.symlink(target_env, venv_symlink)
+            except:
+                pass
+
+    console.print(f"\n🚀 [bold green]SUCCESS![/bold green] Env ready at [cyan]{target_dir}[/cyan]")
+    console.print(f"Tip: Run 'occ {branch_name}' to jump in.\n")
+
+def main():
+    config = load_config()
+    
+    if len(sys.argv) > 1:
+        # Fast mode
+        branch = sys.argv[1]
+        v = branch.split("-")[0] if "-" in branch else "master"
+        data = {"version": v, "desc": branch, "suffix": ""}
+    else:
+        # Textual TUI
+        v_list, s_list = scan_worktrees(config["wt_root"], config["suffix"])
+        app = OdooWtApp(config, v_list, s_list)
+        data = app.run()
+
+    if data:
+        deploy(data, load_config())
+
+if __name__ == "__main__":
+    main()
