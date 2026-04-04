@@ -43,6 +43,86 @@ def save_config(config):
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=4)
 
+def run_first_time_wizard():
+    from rich.prompt import Prompt, Confirm
+    import time
+    
+    console = Console()
+    console.clear()
+    console.print("\n[bold cyan]👋 Welcome to Odoo WorkTree Tool![/bold cyan]")
+    console.print("This is a [bold yellow]highly opinionated[/bold yellow] tool for Odoo development.")
+    console.print("\n[bold underline]Requirements:[/bold underline]")
+    console.print("1. You must have a [cyan]Worktree Root[/cyan] directory.")
+    console.print("2. Inside that root, you must have at least one 'base' folder (e.g., [cyan]master/[/cyan]).")
+    console.print("3. That base folder must contain [cyan]odoo/[/cyan] and [cyan]enterprise/[/cyan] worktrees.")
+    console.print("\nThis tool will create new feature folders alongside your base folder.\n")
+    
+    with Status("[bold green]Scanning your home directory for Odoo worktree roots...", console=console):
+        home_path = Path.home()
+        home_str = str(home_path)
+        found_roots = []
+        ignore = {".cache", ".local", ".cargo", ".rustup", ".npm", ".mozilla", ".config", "node_modules", ".vscode"}
+        
+        for dirpath, dirnames, filenames in os.walk(home_str):
+            if dirpath.count(os.sep) - home_str.count(os.sep) > 5:
+                dirnames.clear()
+                continue
+            dirnames[:] = [d for d in dirnames if not d.startswith(".") and d not in ignore]
+            
+            # Heuristic: Check if any subfolder here is an Odoo base (has odoo/.git and enterprise/.git)
+            for d in dirnames:
+                base_candidate = Path(dirpath) / d
+                if (base_candidate / "odoo" / ".git").exists() and (base_candidate / "enterprise" / ".git").exists():
+                    if dirpath not in found_roots:
+                        found_roots.append(dirpath)
+                    break
+                    
+    console.print("[bold yellow]--- 1. Worktree Root ---[/bold yellow]")
+    if found_roots:
+        console.print(f"I found [bold cyan]{len(found_roots)}[/bold cyan] directory structure(s) that match my requirements:")
+        for i, root in enumerate(found_roots, 1):
+            console.print(f"  {i}. [cyan]{root}[/cyan]")
+            
+        choices = [str(i) for i in range(1, len(found_roots) + 1)] + ["C", "c"]
+        choice = Prompt.ask("\nWhich one should I use? (Type 'C' for custom path)", choices=choices, default="1")
+        
+        if choice.lower() == "c":
+            wt_root = Prompt.ask("Enter the absolute path to your worktree root")
+        else:
+            wt_root = found_roots[int(choice) - 1]
+    else:
+        console.print("[red]I couldn't automatically find any directory containing Odoo base worktrees.[/red]")
+        wt_root = Prompt.ask("Please enter the absolute path to your worktree root", default=str(home_path / "repos/Odoo/wt"))
+
+    console.print(f"✅ Worktree root set to: [bold green]{wt_root}[/bold green]\n")
+    
+    console.print("[bold yellow]--- 2. UV Environments Path ---[/bold yellow]")
+    console.print("This tool uses `uv` to manage Python environments (one per Odoo version).")
+    env_root = Prompt.ask("Where should I store these shared environments?", default=str(home_path / ".envs"))
+    
+    if not Path(env_root).exists():
+        if Confirm.ask(f"Directory '{env_root}' doesn't exist. Should I create it now?"):
+            Path(env_root).mkdir(parents=True, exist_ok=True)
+            console.print(f"✨ Created [cyan]{env_root}[/cyan]")
+    console.print(f"✅ UV Environments path set to: [bold green]{env_root}[/bold green]\n")
+    
+    console.print("[bold yellow]--- 3. Developer Suffix ---[/bold yellow]")
+    console.print("What is your developer identifier? This gets appended to new branches.")
+    suffix = Prompt.ask("Developer Suffix", default="pian")
+    
+    # Generate and save the new config
+    config = {
+        "wt_root": wt_root,
+        "env_root": env_root,
+        "suffix": suffix,
+        "remote_name": "odoo-dev"
+    }
+    save_config(config)
+    
+    console.print("\n🎉 [bold green]Setup Complete![/bold green] Launching the tool...")
+    time.sleep(1.5)
+    return config
+
 # --- SYSTEM DISCOVERY ---
 def parse_branch_name(name):
     if name.startswith("saas-"):
@@ -237,6 +317,18 @@ class OdooWtApp(App):
         border-left: thick $accent;
         height: auto;
     }
+    .warning-box {
+        display: none;
+        background: $error-muted;
+        color: $text;
+        padding: 1 2;
+        margin: 1 0;
+        border: thick $error;
+        height: auto;
+    }
+    .warning-box.visible {
+        display: block;
+    }
     .summary-box {
         background: $surface-lighten-1;
         padding: 1 2;
@@ -313,6 +405,13 @@ class OdooWtApp(App):
             
             with TabbedContent(id="tabs"):
                 with TabPane("[green]Creation[/green]", id="tab-create"):
+                    yield Label(
+                        "⚠️ [bold]Worktree Root not found![/bold]\n"
+                        "The path configured in Settings does not exist.\n"
+                        "Please update it in the [bold]Settings[/bold] tab.",
+                        id="root-warning",
+                        classes="warning-box"
+                    )
                     with Vertical(classes="info-box"):
                         yield Label("Format: [bold cyan]VERSION[/bold cyan]-[italic]description[/italic]-[bold magenta]SUFFIX[/bold magenta]")
 
@@ -351,14 +450,6 @@ class OdooWtApp(App):
 
                 with TabPane("Settings", id="tab-settings"):
                     with VerticalScroll(classes="settings-container"):
-                        yield Label(
-                            "Worktree Root: Where new environments are built and scanned.\n"
-                            "UV Envs Path: Where shared Python environments (one per version) are stored.\n"
-                            "Default Suffix: Your developer ID (quadrigram) used for new branches.\n"
-                            "Remote Name: Your personal fork where we check for existing branches.",
-                            classes="tab-description"
-                        )
-                        
                         with Horizontal(classes="setting-item"):
                             yield Label("Worktree Root:", classes="setting-label")
                             yield Input(value=self.config.get("wt_root", ""), id="set-wt", classes="setting-input")
@@ -375,6 +466,14 @@ class OdooWtApp(App):
                             yield Label("Remote Name:", classes="setting-label")
                             yield Input(value=self.config.get("remote_name", "odoo-dev"), id="set-remote", classes="setting-input")
                         
+                        yield Label(
+                            "Worktree Root: Base directory where worktree folders are created.\n"
+                            "UV Envs Path: Directory storing shared Python virtual environments.\n"
+                            "Default Suffix: Developer quadrigram appended to new branches.\n"
+                            "Remote Name: Personal fork remote used to push/pull branches.",
+                            classes="tab-description"
+                        )
+
                         with Center(classes="btn-row"):
                             yield Button("Save", variant="primary", id="save-settings")
 
@@ -649,7 +748,10 @@ def deploy(data, config):
     console.print(f"Tip: Run 'occ {branch_name}' to jump in.\n")
 
 def main():
-    config = load_config()
+    if not CONFIG_FILE.exists():
+        config = run_first_time_wizard()
+    else:
+        config = load_config()
     
     if len(sys.argv) > 1:
         branch = sys.argv[1]
