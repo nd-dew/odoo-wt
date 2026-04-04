@@ -1,8 +1,9 @@
 [project]
 name = "odoo-wt"
-version = "1.1.0"
+version = "1.2.0"
 description = "Modern TUI-driven Odoo Worktree Manager"
 readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.11"
 dependencies = ["textual>=0.52.1", "rich>=13.7.1", "pyspellchecker>=0.8.1"]
 
