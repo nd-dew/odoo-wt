@@ -96,9 +96,9 @@ Button {
 #dialog {
     width: 100%;
     height: 100%;
-    margin: 1 4;
+    margin: 1 1;
     padding: 1 2;
-    border: thick $accent;
+    border: thick #2d1a47;
     background: $surface;
 }
 
@@ -118,9 +118,32 @@ Button {
     text-style: bold;
 }
 
-#version-col { width: 2fr; height: auto; }
-#desc-col { width: 3fr; height: auto; }
-#suffix-col { width: 2fr; height: auto; }
+#version-col { width: 25; height: auto; }
+#desc-col { width: 1fr; height: auto; }
+#suffix-col { width: 25; height: auto; }
+
+.select-row {
+    height: auto;
+    width: 100%;
+}
+
+.select-row Select {
+    width: 1fr;
+}
+
+.rm-btn {
+    min-width: 3;
+    width: 3;
+    height: 3;
+    padding: 0;
+    margin: 0 0 0 1;
+    background: $error-muted;
+    color: white;
+}
+
+.rm-btn:hover {
+    background: $error;
+}
 
 .custom-field {
     display: none;
@@ -162,7 +185,7 @@ Tab {
 /* Settings */
 .settings-container {
     padding: 0 1;
-    height: auto;
+    height: 1fr;
 }
 
 .setting-item {
