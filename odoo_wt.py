@@ -490,6 +490,38 @@ class DeployScreen(Screen):
 
         self.app.push_screen(SuccessModal(target_dir), check_take_me_there)
 
+
+class LogDetailScreen(ModalScreen[None]):
+    CSS = """
+    LogDetailScreen { align: center middle; background: rgba(0, 0, 0, 0.7); }
+    #log-detail-dialog { width: 80; height: auto; max-height: 80vh; padding: 2 4; border: thick $accent; background: $surface; }
+    .log-detail-title { text-align: left; text-style: bold; color: $accent; margin-bottom: 1; }
+    .log-detail-text { margin-bottom: 1; }
+    .log-detail-btn-row { align: center middle; margin-top: 1; height: 3; }
+    """
+    def __init__(self, ts, action, details):
+        super().__init__()
+        self.ts = ts
+        self.action = action
+        self.details = details
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="log-detail-dialog"):
+            yield Label(f"[{self.ts}] {self.action}", classes="log-detail-title")
+            try:
+                parsed = json.loads(self.details)
+                pretty_details = json.dumps(parsed, indent=4)
+            except:
+                pretty_details = str(self.details)
+            with VerticalScroll():
+                yield Label(pretty_details, classes="log-detail-text")
+            with Horizontal(classes="log-detail-btn-row"):
+                yield Button("Close", variant="primary", id="btn-close-log")
+
+    @on(Button.Pressed, "#btn-close-log")
+    def on_close(self):
+        self.dismiss()
+
 # --- MAIN APP ---
 class OdooWtApp(App):
     ENABLE_COMMAND_PALETTE = False
@@ -608,6 +640,7 @@ class OdooWtApp(App):
         base_odoo = wt_root / "master" / "odoo"
         base_ent = wt_root / "master" / "enterprise"
         if not base_odoo.exists(): return
+        append_log("Background Fetch Started", {"version": version})
         def fetch_task(repo):
             try:
                 remote = get_remote(repo)
@@ -616,7 +649,7 @@ class OdooWtApp(App):
         with ThreadPoolExecutor(max_workers=2) as executor:
             list(executor.map(fetch_task, [base_odoo, base_ent]))
         self.fetched_versions.add(version)
-        append_log("Background Fetch", {"version": version})
+        append_log("Background Fetch Finished", {"version": version})
         self.notify(f"Prefetched {version} updates in background.")
 
     def update_summary(self) -> None:
@@ -672,6 +705,12 @@ class OdooWtApp(App):
     def on_refresh_logs(self):
         self.populate_logs_table()
         self.notify("Logs refreshed!")
+
+
+    @on(DataTable.RowSelected, "#logs-table")
+    def on_log_row_selected(self, event: DataTable.RowSelected) -> None:
+        row = event.data_table.get_row(event.row_key)
+        self.app.push_screen(LogDetailScreen(row[0], row[1], row[2]))
 
     @on(Button.Pressed, "#clear-logs-btn")
     def on_clear_logs(self):
