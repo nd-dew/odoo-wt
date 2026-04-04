@@ -61,6 +61,13 @@ class OdooWtApp(App):
                             yield Select(((s, s) for s in self.s_list), value=self.s_list[0], id="suffix", prompt="Suf")
                             yield Input(placeholder="Suf...", id="custom_suffix", classes="custom-field")
 
+                    yield Label(
+                        "Deployment Strategy (Surgical Safety):\n"
+                        "1. Remote Check: Tries to pull the exact branch from your remote (e.g., odoo-dev).\n"
+                        "2. Local Check: If it's not on your remote, it checks your local .git folder.\n"
+                        "3. Fresh Start: If neither exist, creates a new branch from the official base version.",
+                        classes="strategy-desc"
+                    )
                     yield Label("", id="dynamic-summary", classes="summary-box")
                     with Horizontal(classes="btn-row"):
                         yield Button("Create", variant="success", id="submit-btn")
