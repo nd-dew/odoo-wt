@@ -11,6 +11,7 @@ import sys
 import json
 import subprocess
 import asyncio
+import datetime
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from rich.console import Console
@@ -24,6 +25,16 @@ from textual import on, work
 
 # --- CONFIGURATION ---
 CONFIG_FILE = Path.home() / ".config" / "odoo-wt.json"
+LOG_FILE = Path.home() / ".config" / "odoo-wt-logs.jsonl"
+
+def append_log(action: str, details: dict = None):
+    if details is None: details = {}
+    entry = {"timestamp": datetime.datetime.now().isoformat(), "action": action, "details": details}
+    try:
+        with open(LOG_FILE, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except: pass
+
 
 def load_config():
     default_config = {
@@ -390,7 +401,7 @@ class DeployScreen(Screen):
         clean_desc = self.data["desc"].strip().replace(" ", "_")
         parts = [p for p in [self.data["version"], clean_desc, self.data["suffix"]] if p]
         branch_name = "-".join(parts)
-        
+        append_log("Deployment Started", {"branch": branch_name, "version": self.data["version"]})
         target_dir = wt_root / branch_name
         base_odoo = wt_root / "master" / "odoo"
         base_ent = wt_root / "master" / "enterprise"
@@ -469,6 +480,7 @@ class DeployScreen(Screen):
                 log_uv.write(f"Failed to create symlink: {e}")
         prog_uv.advance(1)
         log_uv.write("✅ Done.")
+        append_log("Deployment Success", {"branch": branch_name, "path": str(target_dir)})
 
         def check_take_me_there(take_me_there: bool):
             if take_me_there:
@@ -568,14 +580,21 @@ class OdooWtApp(App):
                         with Horizontal(classes="setting-item"):
                             yield Label("Remote Name:", classes="setting-label")
                             yield Input(value=self.config.get("remote_name", "odoo-dev"), id="set-remote", classes="setting-input")
-                        yield Label("Worktree Root: Base directory where worktree folders are created.\nUV Envs Path: Directory storing shared Python virtual environments.\nDefault Suffix: Developer quadrigram appended to new branches.\nRemote Name: Personal fork remote used to push/pull branches.", classes="tab-description")
+                        yield Label("Worktree Root: Base directory where worktree folders are created.\\nUV Envs Path: Directory storing shared Python virtual environments.\\nDefault Suffix: Developer quadrigram appended to new branches.\\nRemote Name: Personal fork remote used to push/pull branches.", classes="tab-description")
                         with Center(classes="btn-row"):
                             yield Button("Save", variant="primary", id="save-settings")
+                with TabPane("Logs", id="tab-logs"):
+                    yield Label("System Logs (Newest first)", classes="tab-description")
+                    yield DataTable(id="logs-table", cursor_type="row")
+                    with Horizontal(classes="btn-row"):
+                        yield Button("Refresh", id="refresh-logs-btn")
+                        yield Button("Clear Logs", variant="error", id="clear-logs-btn")
         yield Footer()
 
     def on_mount(self) -> None:
         self.query_one("#desc").focus()
         self.populate_table()
+        self.populate_logs_table()
         self.update_summary()
         v_sel = self.query_one("#version", Select).value
         if v_sel and str(v_sel) != "custom...":
@@ -597,6 +616,7 @@ class OdooWtApp(App):
         with ThreadPoolExecutor(max_workers=2) as executor:
             list(executor.map(fetch_task, [base_odoo, base_ent]))
         self.fetched_versions.add(version)
+        append_log("Background Fetch", {"version": version})
         self.notify(f"Prefetched {version} updates in background.")
 
     def update_summary(self) -> None:
@@ -632,6 +652,34 @@ class OdooWtApp(App):
     @on(Input.Changed, "#custom_suffix")
     def on_text_changed(self, event) -> None: self.update_summary()
 
+
+    def populate_logs_table(self) -> None:
+        table = self.query_one("#logs-table", DataTable)
+        table.clear(columns=True)
+        table.add_columns("Time", "Action", "Details")
+        if LOG_FILE.exists():
+            try:
+                with open(LOG_FILE, "r") as f:
+                    lines = f.readlines()
+                for line in reversed(lines):
+                    if not line.strip(): continue
+                    data = json.loads(line)
+                    ts = data.get("timestamp", "")[:19].replace("T", " ")
+                    table.add_row(ts, data.get("action", ""), json.dumps(data.get("details", {})))
+            except: pass
+
+    @on(Button.Pressed, "#refresh-logs-btn")
+    def on_refresh_logs(self):
+        self.populate_logs_table()
+        self.notify("Logs refreshed!")
+
+    @on(Button.Pressed, "#clear-logs-btn")
+    def on_clear_logs(self):
+        if LOG_FILE.exists():
+            LOG_FILE.unlink()
+        self.populate_logs_table()
+        self.notify("Logs cleared!")
+
     def populate_table(self):
         table = self.query_one("#wt-table")
         table.clear(columns=True)
@@ -651,6 +699,7 @@ class OdooWtApp(App):
         tabs = self.query_one("#tabs")
         if tabs.active == "tab-create": tabs.active = "tab-manage"
         elif tabs.active == "tab-manage": tabs.active = "tab-settings"
+        elif tabs.active == "tab-settings": tabs.active = "tab-logs"
         else: tabs.active = "tab-create"
 
     @on(Select.Changed, "#version")
@@ -679,6 +728,7 @@ class OdooWtApp(App):
         self.config["suffix"] = self.query_one("#set-suffix").value
         self.config["remote_name"] = self.query_one("#set-remote").value
         save_config(self.config)
+        append_log("Settings Saved", self.config)
         self.notify("Settings saved!")
 
     @on(Button.Pressed, "#submit-btn")
@@ -709,6 +759,7 @@ class OdooWtApp(App):
         if (target_path / "enterprise").exists():
             subprocess.run(["git", "worktree", "remove", "-f", str(target_path / "enterprise")], cwd=base_ent, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(["rm", "-rf", str(target_path)])
+        append_log("Deleted Worktree", {"name": name, "path": target_path_str})
         self.notify(f"Deleted {name} successfully!")
         self.action_refresh_wts()
 
