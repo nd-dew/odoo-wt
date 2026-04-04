@@ -517,6 +517,7 @@ class OdooWtApp(App):
         self.v_list = v_list
         self.s_list = s_list
         self.worktrees = worktrees
+        self.fetched_versions = set()
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
@@ -576,6 +577,27 @@ class OdooWtApp(App):
         self.query_one("#desc").focus()
         self.populate_table()
         self.update_summary()
+        v_sel = self.query_one("#version", Select).value
+        if v_sel and str(v_sel) != "custom...":
+            self.background_fetch(str(v_sel))
+
+    @work(exclusive=True, thread=True)
+    async def background_fetch(self, version: str) -> None:
+        if not version or version == "none" or version in self.fetched_versions:
+            return
+        wt_root = Path(self.config["wt_root"])
+        base_odoo = wt_root / "master" / "odoo"
+        base_ent = wt_root / "master" / "enterprise"
+        if not base_odoo.exists(): return
+        def fetch_task(repo):
+            try:
+                remote = get_remote(repo)
+                run_git(["fetch", remote, version], cwd=repo)
+            except: pass
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            list(executor.map(fetch_task, [base_odoo, base_ent]))
+        self.fetched_versions.add(version)
+        self.notify(f"Prefetched {version} updates in background.")
 
     def update_summary(self) -> None:
         try:
@@ -634,8 +656,13 @@ class OdooWtApp(App):
     @on(Select.Changed, "#version")
     def version_changed(self, event: Select.Changed) -> None:
         custom = self.query_one("#custom_version")
-        if event.value == "custom...": custom.add_class("visible"); custom.focus()
-        else: custom.remove_class("visible")
+        if event.value == "custom...":
+            custom.add_class("visible")
+            custom.focus()
+        else:
+            custom.remove_class("visible")
+            if event.value and event.value != "none":
+                self.background_fetch(str(event.value))
         self.update_summary()
 
     @on(Select.Changed, "#suffix")
