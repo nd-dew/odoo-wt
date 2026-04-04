@@ -43,19 +43,32 @@ The tool creates and manages a standardized folder structure that looks like thi
 
 ## Installation
 
-`odoo-wt` is officially published on PyPI. The recommended way to install it globally is using `uv tool`:
+### 1. From PyPI (Recommended)
+`odoo-wt` is officially published on PyPI. The easiest way to install it globally is using `uv tool`:
 
 ```bash
 uv tool install odoo-wt
 ```
 
-This creates an isolated, globally available environment for the tool and places an `odoo-wt` executable in your `~/.local/bin/`.
+To update to the latest release:
+```bash
+uv tool upgrade odoo-wt
+```
 
-*(Note: If you already installed a previous version locally, you can upgrade to the latest PyPI release by running `uv tool upgrade odoo-wt` or `uv tool install odoo-wt --force`).*
+### 2. From Source (For Contributors)
+If you want to run the latest unreleased version or contribute to the project:
+
+```bash
+git clone https://github.com/nd-dew/odoo-wt.git
+cd odoo-wt
+uv tool install . --force
+```
+
+*(Tip: For active development, use `uv tool install --editable . --force` to see code changes instantly without re-installing.)*
 
 ## Configuration
 
-The tool saves its configuration to ~/.config/odoo-wt.json. You can edit paths directly in the Settings tab within the application.
+The tool saves its configuration to `~/.config/odoo-wt.json`. You can edit paths directly in the Settings tab within the application.
 
 - wt_root: Where your worktree folders live (e.g., ~/repos/Odoo/wt).
 - env_root: Where your centralized global Python environments are stored (e.g., ~/.envs).
@@ -77,6 +90,25 @@ odoo-wt
 If you already have a full branch name ready:
 ```bash
 odoo-wt 17.0-fix-account-bug-pian
+```
+
+## Development Guide
+
+### Running Tests
+We use `pytest` for our modern test suite. It covers core logic, file management, and UI rendering via Textual's headless pilot.
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run tests with detailed output
+uv run pytest -v
+```
+
+### Applying Changes
+If you modify the source code, you can apply your changes to your local installation using:
+```bash
+uv tool install . --force
 ```
 
 ## Known Limitations
