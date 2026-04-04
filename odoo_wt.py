@@ -18,8 +18,8 @@ from rich.status import Status
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll, Center
-from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable, LoadingIndicator, ProgressBar
-from textual.screen import ModalScreen
+from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable, LoadingIndicator, ProgressBar, RichLog
+from textual.screen import ModalScreen, Screen
 from textual import on, work
 
 # --- CONFIGURATION ---
@@ -305,6 +305,179 @@ class DeleteConfirmScreen(ModalScreen[bool]):
     def on_cancel(self):
         self.dismiss(False)
 
+
+# --- DEPLOYMENT TUI ---
+async def run_cmd_stream(cmd, cwd, log_widget, prefix=""):
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        cwd=cwd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT
+    )
+    while True:
+        line = await process.stdout.readline()
+        if not line:
+            break
+        text = line.decode('utf-8', errors='replace').rstrip()
+        log_widget.write(f"{prefix}{text}")
+    await process.wait()
+    return process.returncode == 0
+
+class SuccessModal(ModalScreen[bool]):
+    CSS = """
+    SuccessModal { align: center middle; background: rgba(0, 0, 0, 0.7); }
+    #success-dialog { width: 60; height: auto; padding: 2 4; border: thick $success; background: $surface; }
+    .success-btn-row { align: center middle; margin-top: 1; height: 3; }
+    .success-msg { text-align: center; text-style: bold; color: $success; width: 100%; margin-bottom: 1; }
+    """
+    def __init__(self, target_dir):
+        super().__init__()
+        self.target_dir = target_dir
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="success-dialog"):
+            yield Label(f"SUCCESS! Worktree ready at:\n{self.target_dir}", classes="success-msg")
+            yield Label("Would you like me to take you there now?", classes="success-msg")
+            with Horizontal(classes="success-btn-row"):
+                yield Button("Yes, take me there!", variant="success", id="btn-yes")
+                yield Button("No, just exit", variant="primary", id="btn-no")
+
+    @on(Button.Pressed, "#btn-yes")
+    def on_yes(self):
+        self.dismiss(True)
+
+    @on(Button.Pressed, "#btn-no")
+    def on_no(self):
+        self.dismiss(False)
+
+class DeployScreen(Screen):
+    CSS = """
+    DeployScreen { padding: 1 2; }
+    .deploy-title { text-align: center; text-style: bold; color: $accent; margin-bottom: 1; }
+    .logs-container { height: 1fr; border: solid $secondary; }
+    .log-box { height: 1fr; width: 1fr; border: solid $surface; }
+    .log-title { text-style: bold; background: $boost; padding: 0 1; }
+    #prog-odoo, #prog-ent, #prog-uv { margin-bottom: 1; }
+    """
+    def __init__(self, data, config):
+        super().__init__()
+        self.data = data
+        self.config = config
+
+    def compose(self) -> ComposeResult:
+        yield Label("🚀 Deploying Worktree Environment...", classes="deploy-title")
+        with Horizontal(classes="logs-container"):
+            with Vertical(classes="log-box"):
+                yield Label("Community", classes="log-title")
+                yield ProgressBar(id="prog-odoo", show_eta=False)
+                yield RichLog(id="log-odoo", markup=False, highlight=False)
+            with Vertical(classes="log-box"):
+                yield Label("Enterprise", classes="log-title")
+                yield ProgressBar(id="prog-ent", show_eta=False)
+                yield RichLog(id="log-ent", markup=False, highlight=False)
+        with Vertical(classes="log-box", id="uv-box"):
+            yield Label("UV Environment", classes="log-title")
+            yield ProgressBar(id="prog-uv", show_eta=False)
+            yield RichLog(id="log-uv", markup=False, highlight=False)
+
+    def on_mount(self) -> None:
+        self.run_deployment()
+
+    @work(exclusive=True)
+    async def run_deployment(self) -> None:
+        wt_root = Path(self.config["wt_root"])
+        dev_remote = self.config.get("remote_name", "odoo-dev")
+        clean_desc = self.data["desc"].strip().replace(" ", "_")
+        parts = [p for p in [self.data["version"], clean_desc, self.data["suffix"]] if p]
+        branch_name = "-".join(parts)
+        
+        target_dir = wt_root / branch_name
+        base_odoo = wt_root / "master" / "odoo"
+        base_ent = wt_root / "master" / "enterprise"
+        base_v = self.data["version"] or "master"
+        
+        target_dir.mkdir(parents=True, exist_ok=True)
+        
+        async def deploy_repo(repo, dest, log_id, prog_id):
+            log = self.query_one(f"#{log_id}", RichLog)
+            prog = self.query_one(f"#{prog_id}", ProgressBar)
+            prog.update(total=3)
+            
+            remote = await asyncio.to_thread(get_remote, repo)
+            log.write(f"Detected base remote: {remote}")
+            prog.advance(1)
+
+            log.write(f"Fetching '{branch_name}' from '{dev_remote}'...")
+            success = await run_cmd_stream(["git", "fetch", dev_remote, f"{branch_name}:{branch_name}", "--force"], repo, log)
+            prog.advance(1)
+
+            if success:
+                log.write("Fetch successful. Creating worktree...")
+                await run_cmd_stream(["git", "worktree", "add", str(target_dir / dest), branch_name], repo, log)
+            else:
+                log.write(f"Branch not found on '{dev_remote}'. Fetching '{base_v}' from '{remote}'...")
+                await run_cmd_stream(["git", "fetch", remote, base_v], repo, log)
+                
+                is_local = await asyncio.to_thread(check_local, repo, branch_name)
+                if is_local:
+                    log.write("Branch exists locally. Creating worktree...")
+                    await run_cmd_stream(["git", "worktree", "add", str(target_dir / dest), branch_name], repo, log)
+                else:
+                    log.write(f"Creating new branch from {remote}/{base_v}...")
+                    await run_cmd_stream(["git", "worktree", "add", "-b", branch_name, str(target_dir / dest), f"{remote}/{base_v}"], repo, log)
+                    await run_cmd_stream(["git", "branch", "--set-upstream-to", f"{remote}/{base_v}", branch_name], repo, log)
+            
+            prog.advance(1)
+            log.write("✅ Done.")
+
+        await asyncio.gather(
+            deploy_repo(base_odoo, "odoo", "log-odoo", "prog-odoo"),
+            deploy_repo(base_ent, "enterprise", "log-ent", "prog-ent")
+        )
+
+        log_uv = self.query_one("#log-uv", RichLog)
+        prog_uv = self.query_one("#prog-uv", ProgressBar)
+        prog_uv.update(total=3)
+        
+        env_root = Path(self.config["env_root"])
+        env_root.mkdir(parents=True, exist_ok=True)
+        target_env = env_root / base_v
+        
+        if not target_env.exists():
+            log_uv.write(f"Initializing UV environment for {base_v}...")
+            await run_cmd_stream(["uv", "venv", str(target_env), "--python", "3.12"], env_root, log_uv)
+            prog_uv.advance(1)
+            
+            req_path = target_dir / "odoo" / "requirements.txt"
+            if req_path.exists():
+                log_uv.write("Installing requirements...")
+                await run_cmd_stream([
+                    "uv", "pip", "install", "-r", str(req_path), 
+                    "--python", str(target_env / "bin" / "python")
+                ], env_root, log_uv)
+            prog_uv.advance(1)
+        else:
+            log_uv.write(f"UV environment {base_v} already exists. Skipping build.")
+            prog_uv.advance(2)
+
+        venv_symlink = target_dir / ".venv"
+        if not venv_symlink.exists():
+            try:
+                os.symlink(target_env, venv_symlink)
+                log_uv.write("Created .venv symlink.")
+            except Exception as e:
+                log_uv.write(f"Failed to create symlink: {e}")
+        prog_uv.advance(1)
+        log_uv.write("✅ Done.")
+
+        def check_take_me_there(take_me_there: bool):
+            if take_me_there:
+                self.app.exit({"take_me_there": True, "path": str(target_dir)})
+            else:
+                self.app.exit({"refresh": True})
+
+        self.app.push_screen(SuccessModal(target_dir), check_take_me_there)
+
 # --- MAIN APP ---
 class OdooWtApp(App):
     ENABLE_COMMAND_PALETTE = False
@@ -524,7 +697,7 @@ class OdooWtApp(App):
         if s_sel == "custom..." and suffix and suffix != "none":
             self.config["suffix"] = suffix
             save_config(self.config)
-        self.exit({"action": "create", "version": version, "desc": desc, "suffix": suffix})
+        self.app.push_screen(DeployScreen({"action": "create", "version": version, "desc": desc, "suffix": suffix}, self.config))
 
 # --- DEPLOYMENT LOGIC ---
 def run_git(args, cwd=None, capture=False):
@@ -544,75 +717,6 @@ def get_remote(repo):
     success, out = run_git(["remote"], cwd=repo, capture=True)
     return "odoo" if (success and "odoo\n" in out) else "origin"
 
-def deploy(data, config):
-    console = Console()
-    wt_root = Path(config["wt_root"])
-    dev_remote = config.get("remote_name", "odoo-dev")
-    clean_desc = data["desc"].strip().replace(" ", "_")
-    parts = [p for p in [data["version"], clean_desc, data["suffix"]] if p]
-    branch_name = "-".join(parts)
-    if not branch_name:
-        console.print("[red]Error: Branch name cannot be entirely empty.[/red]"); return
-    target_dir = wt_root / branch_name
-    base_odoo = wt_root / "master" / "odoo"
-    base_ent = wt_root / "master" / "enterprise"
-    console.print(f"\n🔍 Checking status for [bold yellow]{branch_name}[/bold yellow]...")
-    local_exists = check_local(base_odoo, branch_name)
-    remote_exists = check_remote(base_odoo, branch_name, dev_remote) if not local_exists else False
-    base_v = data["version"] or "master"
-    if local_exists: status_msg = "[bold green]🔄 Existing (Local)[/bold green]"
-    elif remote_exists: status_msg = f"[bold blue]☁️  Existing (Remote)[/bold blue] from {dev_remote}"
-    else: status_msg = f"[bold magenta]✨ New Branch[/bold magenta] from origin/{base_v}"
-    console.print(f"\n[cyan bold]PLAN SUMMARY[/cyan bold]\n  - Branch: [yellow]{branch_name}[/yellow]\n  - Status: {status_msg}\n  - Path:   [yellow]{target_dir}[/yellow]\n")
-    if console.input("Proceed? [Y/n] ").lower() == 'n': return
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    def setup_repo_task(repo, dest, label):
-        remote = get_remote(repo)
-        if run_git(["fetch", dev_remote, f"{branch_name}:{branch_name}", "--force"], cwd=repo):
-            run_git(["worktree", "add", str(target_dir / dest), branch_name], cwd=repo)
-        else:
-            run_git(["fetch", remote, base_v], cwd=repo)
-            if check_local(repo, branch_name):
-                run_git(["worktree", "add", str(target_dir / dest), branch_name], cwd=repo)
-            else:
-                run_git(["worktree", "add", "-b", branch_name, str(target_dir / dest), f"{remote}/{base_v}"], cwd=repo)
-                run_git(["branch", "--set-upstream-to", f"{remote}/{base_v}", branch_name], cwd=repo)
-
-    with Status("[bold blue]Deploying Odoo Environments (Parallel)...", console=console, spinner="dots") as status:
-        tasks = [
-            (base_odoo, "odoo", "Community"),
-            (base_ent, "enterprise", "Enterprise")
-        ]
-        
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            list(executor.map(lambda p: setup_repo_task(*p), tasks))
-
-        status.update("[bold blue]Setting up UV Python Environment...")
-        env_root = Path(config["env_root"])
-        env_root.mkdir(parents=True, exist_ok=True)
-        
-        target_env = env_root / base_v
-        if not target_env.exists():
-            console.print(f"✨ Initializing UV for [yellow]{base_v}[/yellow]...")
-            subprocess.run(["uv", "venv", str(target_env), "--python", "3.12"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-            req_path = target_dir / "odoo" / "requirements.txt"
-            if req_path.exists():
-                subprocess.run([
-                    "uv", "pip", "install", "-r", str(req_path), 
-                    "--python", str(target_env / "bin" / "python")
-                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        venv_symlink = target_dir / ".venv"
-        if not venv_symlink.exists():
-            try:
-                os.symlink(target_env, venv_symlink)
-            except:
-                pass
-
-    console.print(f"\n🚀 [bold green]SUCCESS![/bold green] ready at [cyan]{target_dir}[/cyan]\n")
-
 def main():
     if not CONFIG_FILE.exists():
         config = WizardApp().run()
@@ -624,7 +728,14 @@ def main():
     else:
         v_list, s_list, worktrees = discover_system_data(config["wt_root"], config["suffix"])
         data = OdooWtApp(config, v_list, s_list, worktrees).run()
-    if data and data.get("action") == "create": deploy(data, load_config())
+
+    if data and isinstance(data, dict):
+        if data.get("take_me_there"):
+            target = data["path"]
+            os.chdir(target)
+            shell = os.environ.get("SHELL", "/bin/bash")
+            os.execv(shell, [shell])
+
 
 if __name__ == "__main__":
     main()
