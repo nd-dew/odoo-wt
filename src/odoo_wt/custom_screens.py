@@ -184,8 +184,7 @@ class DeployScreen(Screen):
         append_log("Deployment Success", {"branch": branch_name, "path": str(target_dir)})
 
         self.target_dir = target_dir
-        self.app.call_from_thread(self.show_success_footer)
-
+        self.show_success_footer()
 
     def show_success_footer(self):
         msg = self.query_one("#success-message", Label)
