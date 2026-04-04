@@ -57,6 +57,38 @@ async def test_app_mount():
         print("\n🚀 MAIN APP MOUNT SUCCESSFUL!")
 
 @pytest.mark.asyncio
+async def test_app_mount_with_worktrees():
+    # Regression test for AttributeError: 'OdooWtApp' object has no attribute 'deleting_paths'
+    mock_worktrees = [
+        {"name": "saas-19.1-test", "path": "/tmp/wt/saas-19.1-test", "version": "saas-19.1", "suffix": "test"}
+    ]
+    app = OdooWtApp({"wt_root": "/tmp"}, ["master"], ["pian"], mock_worktrees)
+    
+    # Assert that the attribute exists right after initialization
+    assert hasattr(app, "deleting_paths")
+    assert isinstance(app.deleting_paths, set)
+    
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.query_one(".title")
+        # Ensure the table is populated correctly
+        table = pilot.app.query_one("#wt-table")
+        assert table.row_count == 1
+
+@pytest.mark.asyncio
+async def test_spell_check():
+    from odoo_wt.main_tui import spell
+    assert "odoo" in spell
+    assert "saas" in spell
+    assert "erp" in spell
+    assert "pos" in spell
+    
+    # Check that a typo is identified
+    words = "fix_bug_in_oddo".split("_")
+    unknown = spell.unknown(words)
+    assert "oddo" in unknown
+
+@pytest.mark.asyncio
 async def test_wizard_mount():
     app = WizardApp()
     async with app.run_test() as pilot:
