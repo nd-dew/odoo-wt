@@ -175,7 +175,7 @@ Tab {
     width: 22;
     height: 3;
     content-align: left middle;
-    color: $secondary;
+    color: white;
     text-style: bold;
 }
 
@@ -300,4 +300,36 @@ LogDetailScreen {
     align: center middle;
     margin-top: 1;
     height: 3;
+}
+
+#top-bar {
+    width: 100%;
+    height: auto;
+    layout: horizontal;
+}
+
+#title-container {
+    width: 1fr;
+    height: auto;
+}
+
+.close-btn {
+    min-width: 5;
+    width: 5;
+    height: 3;
+    border: none;
+    background: transparent;
+    color: $error;
+    text-style: bold;
+}
+.close-btn:hover {
+    background: $error-muted;
+}
+
+.textual-toast {
+    background: $surface;
+    color: $text-muted;
+    border: none;
+    padding: 1 2;
+    max-width: 40;
 }
