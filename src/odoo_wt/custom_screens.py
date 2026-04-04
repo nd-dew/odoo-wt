@@ -10,22 +10,7 @@ from textual.containers import Vertical, Horizontal, VerticalScroll
 
 from .app_config import append_log
 from .system_discovery import get_remote, check_local
-
-async def run_cmd_stream(cmd, cwd, log_widget, prefix=""):
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        cwd=cwd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT
-    )
-    while True:
-        line = await process.stdout.readline()
-        if not line:
-            break
-        text = line.decode('utf-8', errors='replace').rstrip()
-        log_widget.write(f"{prefix}{text}")
-    await process.wait()
-    return process.returncode == 0
+from .deployment_engine import DeployEngine, DeployUpdate
 
 class DeleteConfirmScreen(ModalScreen[bool]):
     def __init__(self, wt_name: str):
@@ -72,8 +57,6 @@ class DeleteConfirmScreen(ModalScreen[bool]):
         self.dismiss(False)
 
 
-
-from textual.binding import Binding
 class DeployScreen(Screen):
     BINDINGS = [
         Binding("t", "terminal", "Terminal", show=False),
@@ -102,6 +85,7 @@ class DeployScreen(Screen):
         super().__init__()
         self.data = data
         self.config = config
+        self.engine = DeployEngine(config, data)
 
     def compose(self):
         with VerticalScroll(id="deploy-logs-scroll"):
@@ -136,124 +120,45 @@ class DeployScreen(Screen):
 
     @work(exclusive=True)
     async def run_deployment(self):
-        wt_root = Path(self.config["wt_root"])
-        dev_remote = self.config.get("remote_name", "odoo-dev")
-        comm_dir = self.config.get("community_dir", "odoo")
-        ent_dir = self.config.get("enterprise_dir", "enterprise")
+        append_log("Deployment Started", {"branch": self.engine.branch_name, "version": self.data["version"]})
+        self.engine.target_dir.mkdir(parents=True, exist_ok=True)
         
-        clean_desc = self.data["desc"].strip().replace(" ", "_")
-        parts = [p for p in [self.data["version"], clean_desc, self.data["suffix"]] if p]
-        branch_name = "-".join(parts)
-        append_log("Deployment Started", {"branch": branch_name, "version": self.data["version"]})
-        target_dir = wt_root / branch_name
-        base_odoo = wt_root / "master" / comm_dir
-        base_ent = wt_root / "master" / ent_dir
-        base_v = self.data["version"] or "master"
-        
-        target_dir.mkdir(parents=True, exist_ok=True)
-        
-        async def deploy_repo(repo, dest, log_id, prog_id):
-            log = self.query_one(f"#{log_id}", RichLog)
-            prog = self.query_one(f"#{prog_id}", ProgressBar)
-            prog.update(total=3)
-            
-            remote = await asyncio.to_thread(get_remote, repo)
-            log.write(f"Detected base remote: {remote}")
-            prog.advance(1)
+        base_odoo = self.engine.wt_root / "master" / self.engine.comm_dir
+        base_ent = self.engine.wt_root / "master" / self.engine.ent_dir
 
-            log.write(f"Fetching '{branch_name}' from '{dev_remote}'...")
-            success = await run_cmd_stream(["git", "fetch", dev_remote, f"{branch_name}:{branch_name}", "--force"], repo, log)
-            prog.advance(1)
-
-            if success:
-                log.write("Fetch successful. Creating worktree...")
-                append_log("Branch Strategy Selected", {"repo": dest, "strategy": "remote_pull", "remote": dev_remote, "branch": branch_name})
-                await run_cmd_stream(["git", "worktree", "add", str(target_dir / dest), branch_name], repo, log)
-            else:
-                log.write(f"Branch not found on '{dev_remote}'. Fetching '{base_v}' from '{remote}'...")
-                await run_cmd_stream(["git", "fetch", remote, base_v], repo, log)
-                
-                is_local = await asyncio.to_thread(check_local, repo, branch_name)
-                if is_local:
-                    log.write("Branch exists locally. Creating worktree...")
-                    append_log("Branch Strategy Selected", {"repo": dest, "strategy": "local_checkout", "branch": branch_name})
-                    await run_cmd_stream(["git", "worktree", "add", str(target_dir / dest), branch_name], repo, log)
-                else:
-                    log.write(f"Creating new branch from {remote}/{base_v}...")
-                    append_log("Branch Strategy Selected", {"repo": dest, "strategy": "new_branch", "base": f"{remote}/{base_v}", "branch": branch_name})
-                    await run_cmd_stream(["git", "worktree", "add", "-b", branch_name, str(target_dir / dest), f"{remote}/{base_v}"], repo, log)
-                    await run_cmd_stream(["git", "branch", "--set-upstream-to", f"{remote}/{base_v}", branch_name], repo, log)
-            
-            prog.advance(1)
-            log.write("✅ Done.")
-
-        async def setup_uv():
-            log_uv = self.query_one("#log-uv", RichLog)
-            prog_uv = self.query_one("#prog-uv", ProgressBar)
-            prog_uv.update(total=4)
-            
-            env_root = Path(self.config["env_root"])
-            env_root.mkdir(parents=True, exist_ok=True)
-            target_env = env_root / base_v
-            
-            if not target_env.exists():
-                log_uv.write(f"Initializing UV environment for {base_v}...")
-                await run_cmd_stream(["uv", "venv", str(target_env), "--python", "3.12"], env_root, log_uv)
-                prog_uv.advance(1)
-                
-                # Use base folder requirements to avoid waiting for worktree creation
-                base_req = wt_root / "master" / comm_dir / "requirements.txt"
-                if base_req.exists():
-                    log_uv.write(f"Installing requirements from base '{comm_dir}'...")
-                    await run_cmd_stream([
-                        "uv", "pip", "install", "-r", str(base_req), 
-                        "--python", str(target_env / "bin" / "python")
-                    ], env_root, log_uv)
-                prog_uv.advance(1)
-            else:
-                log_uv.write(f"UV environment '{base_v}' already exists.")
-                prog_uv.advance(2)
-
-            # Wait for target_dir to definitely exist (though we create it at start)
-            # but more importantly, we need to wait for odoo/enterprise worktrees 
-            # to finish before we can reliably symlink .venv into the target_dir
-            # actually target_dir is just a folder, we can symlink now!
-            venv_symlink = target_dir / ".venv"
-            if not venv_symlink.exists():
-                try:
-                    os.symlink(target_env, venv_symlink)
-                    log_uv.write("Created .venv symlink.")
-                except Exception as e:
-                    log_uv.write(f"Failed to create symlink: {e}")
-            prog_uv.advance(1)
-            log_uv.write("✅ Done.")
-            return True
+        async def handle_updates(gen):
+            async for update in gen:
+                if update.total is not None:
+                    self.query_one(f"#prog-{update.category}", ProgressBar).update(total=update.total)
+                if update.advance:
+                    self.query_one(f"#prog-{update.category}", ProgressBar).advance(update.advance)
+                if update.log_line:
+                    self.query_one(f"#log-{update.category}", RichLog).write(update.log_line)
 
         await asyncio.gather(
-            deploy_repo(base_odoo, comm_dir, "log-odoo", "prog-odoo"),
-            deploy_repo(base_ent, ent_dir, "log-ent", "prog-ent"),
-            setup_uv()
+            handle_updates(self.engine.deploy_repo(base_odoo, self.engine.comm_dir, "odoo")),
+            handle_updates(self.engine.deploy_repo(base_ent, self.engine.ent_dir, "ent")),
+            handle_updates(self.engine.setup_uv())
         )
 
-        append_log("Deployment Success", {"branch": branch_name, "path": str(target_dir)})
-        self.target_dir = target_dir
+        append_log("Deployment Success", {"branch": self.engine.branch_name, "path": str(self.engine.target_dir)})
         self.show_success_footer()
 
     def show_success_footer(self):
         msg = self.query_one("#success-message", Label)
-        msg.update(f"SUCCESS! Worktree ready at: {self.target_dir}\nWhat would you like to do next?")
+        msg.update(f"SUCCESS! Worktree ready at: {self.engine.target_dir}\nWhat would you like to do next?")
         self.query_one("#success-footer").remove_class("hidden")
         self.query_one("#btn-terminal").focus()
 
     @on(Button.Pressed, "#btn-terminal")
     def on_terminal(self):
         append_log("Deployment Complete", {"choice": "terminal"})
-        self.app.exit({"action": "terminal", "path": str(self.target_dir)})
+        self.app.exit({"action": "terminal", "path": str(self.engine.target_dir)})
 
     @on(Button.Pressed, "#btn-vscode")
     def on_vscode(self):
         append_log("Deployment Complete", {"choice": "vscode"})
-        self.app.exit({"action": "vscode", "path": str(self.target_dir)})
+        self.app.exit({"action": "vscode", "path": str(self.engine.target_dir)})
 
     @on(Button.Pressed, "#btn-back")
     def on_back(self):
@@ -278,7 +183,7 @@ class LogDetailScreen(ModalScreen[None]):
             try:
                 parsed = json.loads(self.details)
                 pretty_details = json.dumps(parsed, indent=4)
-            except:
+            except json.JSONDecodeError:
                 pretty_details = str(self.details)
             with VerticalScroll():
                 yield Label(pretty_details, classes="log-detail-text")

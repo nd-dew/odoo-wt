@@ -1,54 +1,76 @@
-# Odoo Worktree Assistant (`odoo-wt`)
+# Odoo Worktree Assistant (odoo-wt)
 
-A professional, modern TUI-driven Git worktree manager explicitly designed for Odoo developers. Built with Python, [Textual](https://textual.textualize.io/), and [uv](https://github.com/astral-sh/uv).
+A professional, modern TUI-driven Git worktree manager explicitly designed for Odoo developers. Built with Python, Textual, and uv.
 
-![Python](https://img.shields.io/badge/Language-Python-blue) ![TUI](https://img.shields.io/badge/UI-Textual-green) ![Package Manager](https://img.shields.io/badge/Manager-uv-orange)
+## The Pitch
 
-## 🚀 Overview
+I work with Odoo using Git Worktrees every single day. Every time I start a new feature or need to check out a colleague's code, I find myself doing the same tedious dance: creating a new folder, fetching branches from the remote, adding the community worktree, adding the enterprise worktree, and then setting up the Python environment.
 
-`odoo-wt` streamlines the process of spinning up new Odoo development environments. It handles the complex "handshake" between Git worktrees and Python virtual environments so you can focus on code.
+If you also work like this, I built this tool for you. It handles that entire handshake between Git and your virtual environments in seconds through a fast Terminal UI, so you can just focus on the code.
+
+### The Structure
+
+The tool creates and manages a standardized folder structure that looks like this:
+
+```text
+~/repos/Odoo/wt/                    <-- Your Worktree Root
+│
+├── master/                         <-- Your base repositories
+│   ├── odoo/                       (Main clone of community)
+│   └── enterprise/                 (Main clone of enterprise)
+│
+├── 17.0-fix-account-bug-pian/      <-- A new task
+│   ├── .venv/                      <-- Auto-linked shared UV environment
+│   ├── odoo/                       <-- Checked out to the task branch
+│   └── enterprise/                 <-- Checked out to the task branch
+│
+└── saas-17.4-feature-xyz-mate/    <-- Checking a colleague's code
+    ├── .venv/
+    ├── odoo/
+    └── enterprise/
+```
 
 ### Key Features
 
--   **Modern TUI:** A sleek, reactive "All-in-One" form built with Textual.
--   **Smart Branching:** Follows the Odoo standard: `[VERSION]-[description]-[SUFFIX]`.
--   **Dual Repo Support:** Simultaneously creates worktrees for both `odoo` (Community) and `enterprise`.
--   **Automated UV Environments:** 
-    -   Centralizes environments in `~/.envs/[VERSION]`.
-    -   Automatically runs `uv venv` and `uv pip install` if the environment is missing.
-    -   Instantly symlinks `.venv` into your new worktree folder for automatic VS Code detection.
--   **Proactive Status Checks:** Checks `odoo-dev` and local remotes to detect if branches already exist before creation.
+- Modern TUI: A sleek, reactive All-in-One form built with Textual.
+- Smart Branching: Follows the Odoo standard: [VERSION]-[description]-[SUFFIX].
+- Dual Repo Support: Simultaneously creates worktrees for both odoo (Community) and enterprise.
+- Automated UV Environments:
+    - Centralizes environments in ~/.envs/[VERSION].
+    - Automatically runs uv venv and uv pip install if the environment is missing.
+    - Instantly symlinks .venv into your new worktree folder for automatic VS Code detection.
+- Proactive Status Checks: Checks odoo-dev and local remotes to detect if branches already exist before creation.
 
-## 🛠️ Installation
+## Installation
 
-The recommended way to install `odoo-wt` is using `uv tool`:
+The recommended way to install odoo-wt is using uv tool:
 
 ```bash
 # From the project directory
 uv tool install . --force
 ```
 
-This creates an isolated environment for the tool and places an `odoo-wt` executable in your `~/.local/bin/`.
+This creates an isolated environment for the tool and places an odoo-wt executable in your ~/.local/bin/.
 
-## ⚙️ Configuration
+## Configuration
 
-The tool saves its configuration to `~/.config/odoo-wt.json`. You can edit paths directly in the **Settings** tab within the application.
+The tool saves its configuration to ~/.config/odoo-wt.json. You can edit paths directly in the Settings tab within the application.
 
--   **`wt_root`**: Where your worktree folders live (e.g., `~/repos/Odoo/wt`).
--   **`env_root`**: Where your centralized global Python environments are stored (e.g., `~/.envs`).
--   **`suffix`**: Your default developer quadrigram (e.g., `pian`).
+- wt_root: Where your worktree folders live (e.g., ~/repos/Odoo/wt).
+- env_root: Where your centralized global Python environments are stored (e.g., ~/.envs).
+- suffix: Your default developer quadrigram (e.g., pian).
 
-## 📖 Usage
+## Usage
 
-### Interactive Mode (The Guide)
+### Interactive Mode
 Simply run the command with no arguments:
 ```bash
 odoo-wt
 ```
--   Use **`Tab`** to switch between Version, Description, and Suffix.
--   Type **`custom...`** in any dropdown to reveal a custom input field.
--   Press **`Ctrl+S`** to instantly submit and deploy.
--   Press **`Esc`** to cancel and exit.
+- Use Tab to switch between Version, Description, and Suffix.
+- Type custom... in any dropdown to reveal a custom input field.
+- Press Ctrl+S to instantly submit and deploy.
+- Press Esc to cancel and exit.
 
 ### Fast Mode
 If you already have a full branch name ready:
@@ -56,20 +78,18 @@ If you already have a full branch name ready:
 odoo-wt 17.0-fix-account-bug-pian
 ```
 
-## ⚠️ Known Limitations
+## Known Limitations
 
-- **Clipboard Interactions (Copy/Paste):** Because `odoo-wt` uses mouse-capture to enable clickable buttons and scrollbars in the terminal, your terminal emulator's native click-to-highlight features are disabled by default. 
-    - **To copy text manually:** Hold the `Shift` key while clicking and dragging over the text to bypass the app and use your terminal's native selection, then use `Ctrl+Shift+C`.
-    - **To paste text:** Sometimes native terminal paste (`Ctrl+Shift+V` or middle-click) events are intercepted unreliably by the underlying framework. If pasting into an input field fails, you may need to type the branch name manually.
+- Clipboard Interactions (Copy/Paste): Because odoo-wt uses mouse-capture to enable clickable buttons and scrollbars in the terminal, your terminal emulator's native click-to-highlight features are disabled by default.
+    - To copy text manually: Hold the Shift key while clicking and dragging over the text to bypass the app and use your terminal's native selection, then use Ctrl+Shift+C.
+    - To paste text: Sometimes native terminal paste (Ctrl+Shift+V or middle-click) events are intercepted unreliably by the underlying framework. If pasting into an input field fails, you may need to type the branch name manually.
 
-## 📝 Development
-
-The source code is located at `/home/odoo/repos/Scripts/odoo-wt/`.
+## Development
 
 To apply changes made to the source:
 ```bash
 uv tool install . --force
 ```
 
-## 📜 License
+## License
 MIT
