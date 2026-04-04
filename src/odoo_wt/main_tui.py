@@ -177,6 +177,13 @@ class OdooWtApp(App):
     @on(Input.Changed, "#custom_suffix")
     def on_text_changed(self, event) -> None: self.update_summary()
 
+    @on(Input.Submitted, "#desc")
+    @on(Input.Submitted, "#custom_version")
+    @on(Input.Submitted, "#custom_suffix")
+    def on_input_submitted(self, event) -> None:
+        append_log("Enter Key Pressed", {"input": event.control.id})
+        self.action_submit()
+
     def populate_logs_table(self) -> None:
         import datetime
         table = self.query_one("#logs-table", DataTable)
