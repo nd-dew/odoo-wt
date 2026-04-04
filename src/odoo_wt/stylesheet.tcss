@@ -317,3 +317,10 @@ LogDetailScreen {
 #success-footer.hidden {
     display: none;
 }
+
+.strategy-desc {
+    color: $text-muted;
+    height: auto;
+    width: 100%;
+    margin: 1 0 0 0;
+}
