@@ -6,7 +6,7 @@ from textual.binding import Binding
 from textual.widgets import Select, Input, Label, Button, ProgressBar, Footer
 from textual.containers import Vertical, Horizontal, VerticalScroll
 
-from .app_config import append_log, save_config
+from .app_config import config_mgr
 from .system_discovery import fast_scan, expand_path
 
 class WizardApp(App):
@@ -89,11 +89,11 @@ class WizardApp(App):
         yield Footer()
 
     def action_quit(self):
-        append_log("Wizard Quit")
+        config_mgr.append_log("Wizard Quit")
         self.exit()
 
     def on_mount(self):
-        append_log("Wizard Started")
+        config_mgr.append_log("Wizard Started")
         self.run_scanner()
 
     @work(exclusive=True)
@@ -124,7 +124,7 @@ class WizardApp(App):
 
     @on(Select.Changed, "#root-select")
     def on_root_change(self, event):
-        append_log("Wizard Root Selected", {"value": str(event.value)})
+        config_mgr.append_log("Wizard Root Selected", {"value": str(event.value)})
         custom = self.query_one("#custom-root")
         if event.value == "custom":
             custom.remove_class("hidden")
@@ -164,6 +164,6 @@ class WizardApp(App):
             "community_dir": "odoo",
             "enterprise_dir": "enterprise"
         }
-        save_config(config)
+        config_mgr.save(config)
         self.notify("Settings saved to ~/.config/odoo-wt.json")
         self.exit(config)
