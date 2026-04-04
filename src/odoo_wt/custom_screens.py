@@ -125,6 +125,7 @@ class DeployScreen(Screen):
 
             if success:
                 log.write("Fetch successful. Creating worktree...")
+                append_log("Branch Strategy Selected", {"repo": dest, "strategy": "remote_pull", "remote": dev_remote, "branch": branch_name})
                 await run_cmd_stream(["git", "worktree", "add", str(target_dir / dest), branch_name], repo, log)
             else:
                 log.write(f"Branch not found on '{dev_remote}'. Fetching '{base_v}' from '{remote}'...")
@@ -133,9 +134,11 @@ class DeployScreen(Screen):
                 is_local = await asyncio.to_thread(check_local, repo, branch_name)
                 if is_local:
                     log.write("Branch exists locally. Creating worktree...")
+                    append_log("Branch Strategy Selected", {"repo": dest, "strategy": "local_checkout", "branch": branch_name})
                     await run_cmd_stream(["git", "worktree", "add", str(target_dir / dest), branch_name], repo, log)
                 else:
                     log.write(f"Creating new branch from {remote}/{base_v}...")
+                    append_log("Branch Strategy Selected", {"repo": dest, "strategy": "new_branch", "base": f"{remote}/{base_v}", "branch": branch_name})
                     await run_cmd_stream(["git", "worktree", "add", "-b", branch_name, str(target_dir / dest), f"{remote}/{base_v}"], repo, log)
                     await run_cmd_stream(["git", "branch", "--set-upstream-to", f"{remote}/{base_v}", branch_name], repo, log)
             
