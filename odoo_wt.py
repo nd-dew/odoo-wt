@@ -11,6 +11,7 @@ import sys
 import json
 import subprocess
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from rich.console import Console
 from rich.status import Status
@@ -86,13 +87,14 @@ class WizardApp(App):
     Screen { align: center middle; background: transparent; }
     #wizard-dialog {
         width: 85; height: auto; padding: 2 4;
-        border: thick $accent; background: $surface;
+        border: thick white; background: $surface;
     }
-    .title { text-align: left; text-style: bold; color: $accent; margin-bottom: 1; }
-    .req { color: $text; margin-bottom: 0; text-align: left; }
-    .tree-box { background: $boost; padding: 1 2; margin-bottom: 0; border-left: thick $secondary; height: auto; }
-    .step-title { text-style: bold; color: $secondary; margin-top: 1; }
-    #scanner-status { margin: 1 0; text-align: center; color: $success; }
+    .title { text-align: left; text-style: bold; margin-bottom: 1; }
+    .req { margin-bottom: 0; text-align: left; width: 100%; height: auto; color: $text-muted; }
+    .tree-box { background: $boost; padding: 1 2; margin-bottom: 0; border-left: thick white; height: auto; width: 100%; }
+    .step-title { text-style: bold; margin-top: 1; }
+    .step-desc { color: $text-muted; margin-bottom: 1; height: auto; width: 100%; }
+    #scanner-status { margin: 1 0; text-align: center; }
     .hidden { display: none; }
     .btn-row { align: center middle; margin-top: 2; height: auto; }
     Select, Input { margin-bottom: 1; }
@@ -108,20 +110,23 @@ class WizardApp(App):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="wizard-dialog"):
-            yield Label("[bold cyan]Welcome to Odoo WorkTree Tool[/bold cyan]", classes="title")
-            yield Label("This tool will create new directories with Community and Enterprise worktrees.", classes="req")
+            yield Label("[bold]Welcome to Odoo WorkTree Tool[/bold]", classes="title")
+            yield Label(
+                "This tool will create new directories with Community and Enterprise worktrees.\n"
+                "You should have a structure like this somewhere on your PC:",
+                classes="req"
+            )
             
             with Vertical(classes="tree-box"):
-                yield Label("You should have a structure like this somewhere on your PC:")
                 yield Label(
-                    "[cyan]Worktree Root/[/cyan]\n"
-                    " ├── [yellow]master/[/yellow]       (Base Folder)\n"
+                    "[bold magenta]Worktree Root/[/bold magenta]\n"
+                    " ├── master/       (Base Folder)\n"
                     " │    ├── odoo/       (Community clone)\n"
                     " │    └── enterprise/ (Enterprise clone)\n"
-                    "[dim] └── ...           (Tool creates new ones here)[/dim]"
+                    " └── ...           (Tool creates new ones here)"
                 )
             
-            yield Label("Step 1: Tell me where that 'Worktree Root' is:", classes="step-title")
+            yield Label("Step 1: Tell me where that '[bold magenta]Worktree Root[/bold magenta]' is:", classes="step-title")
             yield ProgressBar(id="scanner-progress")
             yield Label("", id="scanner-status")
             yield Select([], id="root-select", classes="hidden", prompt="Select discovered root")
@@ -129,11 +134,24 @@ class WizardApp(App):
             
             with Vertical(id="final-steps", classes="hidden"):
                 yield Label("Step 2: UV Environments Path", classes="step-title")
+                yield Label(
+                    "This tool uses `uv` to manage your Python dependencies.\n"
+                    "It builds one central virtual environment per Odoo version, "
+                    "so they can be instantly reused across all your worktrees without re-downloading packages.",
+                    classes="step-desc"
+                )
                 yield Input(value="~/.envs", id="env-path")
                 
                 yield Label("Step 3: Developer Suffix", classes="step-title")
+                yield Label(
+                    "Your personal identifier (e.g. 'pian' or 'test').\n"
+                    "This gets automatically appended to the end of your new branch names.",
+                    classes="step-desc"
+                )
                 yield Input(value="pian", id="suffix-input")
                 
+                yield Label("\nDon't worry, you can change all of these later in the Settings tab!", classes="step-desc")
+
                 with Horizontal(classes="btn-row"):
                     yield Button("Finish Setup", variant="success", id="btn-finish")
         yield Footer()
@@ -154,7 +172,7 @@ class WizardApp(App):
         
         if roots:
             status = self.query_one("#scanner-status")
-            status.update(f"✨ Found {len(roots)} potential root(s)!")
+            status.update(f"Found {len(roots)} potential root(s)!")
             
             select = self.query_one("#root-select")
             options = [(r, r) for r in roots] + [("Custom Path", "custom")]
@@ -162,7 +180,7 @@ class WizardApp(App):
             select.value = roots[0]
             select.remove_class("hidden")
         else:
-            self.query_one("#scanner-status").update("❌ No standard roots found. Please specify manually:")
+            self.query_one("#scanner-status").update("No standard roots found. Please specify manually:")
             self.query_one("#custom-root").remove_class("hidden")
             self.query_one("#custom-root").focus()
 
@@ -180,7 +198,7 @@ class WizardApp(App):
     @on(Button.Pressed, "#btn-finish")
     def on_finish(self):
         root_sel = self.query_one("#root-select").value
-        wt_root_raw = self.query_one("#custom-root").value if (root_sel == "custom" or root_sel == Select.BLANK) or not root_sel else root_sel
+        wt_root_raw = self.query_one("#custom-root").value if (root_sel == "custom" or str(root_sel) == "Select.BLANK") or not root_sel else root_sel
         wt_root = expand_path(str(wt_root_raw))
         
         env_path_raw = self.query_one("#env-path").value
@@ -195,6 +213,7 @@ class WizardApp(App):
             "remote_name": "odoo-dev"
         }
         save_config(config)
+        self.notify("Settings saved to ~/.config/odoo-wt.json")
         self.exit(config)
 
 # --- SYSTEM LOGIC ---
@@ -294,13 +313,13 @@ class OdooWtApp(App):
     #dialog { width: 80; height: auto; max-height: 98vh; padding: 1 2; border: thick $accent; background: $surface; }
     .main-row { height: auto; margin: 1 0; align: center middle; }
     .dash { padding: 1 0; color: $text-muted; text-style: bold; }
-    #version-col { width: 15; height: auto; }
-    #desc-col { width: 35; height: auto; }
+    #version-col { width: 17; height: auto; }
+    #desc-col { width: 33; height: auto; }
     #suffix-col { width: 15; height: auto; }
     .custom-field { display: none; margin-top: 0; border: solid $accent; }
     .custom-field.visible { display: block; }
-    .title { text-align: left; text-style: bold; color: $accent; margin: 0 0 1 0; height: auto; }
-    .description { text-align: left; margin-bottom: 0; height: auto; width: 100%; }
+    .title { text-align: left; text-style: bold; color: $text-muted; margin: 0 0 1 0; height: auto; }
+    .description { text-align: left; margin-bottom: 0; height: auto; width: 100%; color: $text-muted; }
     .tab-description { margin: 1 0; color: $text-muted; text-style: italic; height: auto; width: 100%; }
     .info-box { background: $boost; padding: 1 2; margin: 1 0; border-left: thick $accent; height: auto; }
     .summary-box { background: $surface-lighten-1; padding: 1 2; margin: 1 0; border-left: thick $success; height: auto; width: 100%; }
@@ -328,30 +347,34 @@ class OdooWtApp(App):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
-            yield Label("[bold cyan]Odoo WorkTree Tool[/bold cyan]", classes="title")
+            yield Label("Odoo WorkTree Tool", classes="title")
             yield Label("Opinionated tool for Odoo development. Creates/removes WorkTrees\nreusing UV environments per Odoo version.", classes="description")
             yield Label("")
             with TabbedContent(id="tabs"):
-                with TabPane("[green]Creation[/green]", id="tab-create"):
-                    yield Label("✨ Builder: Configure your branch name and deployment path below.", classes="tab-description")
-                    with Vertical(classes="info-box"):
-                        yield Label("Format: [bold cyan]VERSION[/bold cyan]-[italic]description[/italic]-[bold magenta]SUFFIX[/bold magenta]")
+                with TabPane("Creation", id="tab-create"):
+                    yield Label("What branch do you need?", classes="tab-description")
+
                     with Horizontal(classes="main-row"):
                         with Vertical(id="version-col"):
                             yield Select(((v, v) for v in self.v_list), value=self.v_list[0], id="version", prompt="Ver")
                             yield Input(placeholder="Ver...", id="custom_version", classes="custom-field")
+
                         yield Label("-", classes="dash")
+
                         with Vertical(id="desc-col"):
                             yield Input(placeholder="fix_bug", id="desc")
+
                         yield Label("-", classes="dash")
+
                         with Vertical(id="suffix-col"):
                             yield Select(((s, s) for s in self.s_list), value=self.s_list[0], id="suffix", prompt="Suf")
                             yield Input(placeholder="Suf...", id="custom_suffix", classes="custom-field")
+
                     yield Label("", id="dynamic-summary", classes="summary-box")
                     with Horizontal(classes="btn-row"):
                         yield Button("Create", variant="success", id="submit-btn")
                         yield Button("Cancel", variant="error", id="cancel-btn")
-                with TabPane("[white]Existing[/white] / [red]Removal[/red]", id="tab-manage"):
+                with TabPane("Existing / Removal", id="tab-manage"):
                     yield Label("Discovery: Scans 'Worktree Root Path' (in Settings)\nfor 'odoo/.git' folders.", classes="tab-description")
                     yield DataTable(id="wt-table", cursor_type="row")
                     with Horizontal(classes="btn-row"):
@@ -397,12 +420,15 @@ class OdooWtApp(App):
             wt_root = self.config.get("wt_root", "")
             remote = self.config.get("remote_name", "odoo-dev")
             base_v = version if version else "master"
-            summary = (f"I will create a new directory at [bold cyan]{wt_root}/{branch_name}[/bold cyan]:\n"
-                       f"  ├── odoo/       (Community worktree)\n"
-                       f"  └── enterprise/ (Enterprise worktree)\n\n"
-                       f"I will pull [bold green]{branch_name}[/bold green] from '{remote}' if it exists.\n"
-                       f"Otherwise, I will create new worktrees based on 'origin/{base_v}'.\n"
-                       f"I will use or create the [bold magenta]{base_v}[/bold magenta] UV environment and link it as '.venv'.")
+            summary = (
+                f"[bold]Outcome:[/bold]\n"
+                f"1. I will create a new directory at [bold green]{wt_root}/{branch_name}[/bold green]:\n"
+                f"   ├── odoo/       (Community worktree)\n"
+                f"   └── enterprise/ (Enterprise worktree)\n"
+                f"2a. I will pull [bold green]{branch_name}[/bold green] from '{remote}' if it exists.\n"
+                f"2b. Otherwise, I will create new worktrees based on 'origin/[bold magenta]{base_v}[/bold magenta]'.\n"
+                f"3. I will use or create the [bold magenta]{base_v}[/bold magenta] UV environment and link it as '.venv'."
+            )
             self.query_one("#dynamic-summary", Label).update(summary)
         except Exception: pass
 
@@ -540,30 +566,51 @@ def deploy(data, config):
     console.print(f"\n[cyan bold]PLAN SUMMARY[/cyan bold]\n  - Branch: [yellow]{branch_name}[/yellow]\n  - Status: {status_msg}\n  - Path:   [yellow]{target_dir}[/yellow]\n")
     if console.input("Proceed? [Y/n] ").lower() == 'n': return
     target_dir.mkdir(parents=True, exist_ok=True)
-    with Status("[bold blue]Deploying Odoo Environment...", console=console, spinner="dots") as status:
-        for repo, dest, label in [(base_odoo, "odoo", "Community"), (base_ent, "enterprise", "Enterprise")]:
-            status.update(f"[bold blue]Setting up {label}...")
-            remote = get_remote(repo)
-            if run_git(["fetch", dev_remote, f"{branch_name}:{branch_name}", "--force"], cwd=repo):
+
+    def setup_repo_task(repo, dest, label):
+        remote = get_remote(repo)
+        if run_git(["fetch", dev_remote, f"{branch_name}:{branch_name}", "--force"], cwd=repo):
+            run_git(["worktree", "add", str(target_dir / dest), branch_name], cwd=repo)
+        else:
+            run_git(["fetch", remote, base_v], cwd=repo)
+            if check_local(repo, branch_name):
                 run_git(["worktree", "add", str(target_dir / dest), branch_name], cwd=repo)
             else:
-                run_git(["fetch", remote, base_v], cwd=repo)
-                if check_local(repo, branch_name): run_git(["worktree", "add", str(target_dir / dest), branch_name], cwd=repo)
-                else:
-                    run_git(["worktree", "add", "-b", branch_name, str(target_dir / dest), f"{remote}/{base_v}"], cwd=repo)
-                    run_git(["branch", "--set-upstream-to", f"{remote}/{base_v}", branch_name], cwd=repo)
-        env_root = Path(config["env_root"]); env_root.mkdir(parents=True, exist_ok=True)
+                run_git(["worktree", "add", "-b", branch_name, str(target_dir / dest), f"{remote}/{base_v}"], cwd=repo)
+                run_git(["branch", "--set-upstream-to", f"{remote}/{base_v}", branch_name], cwd=repo)
+
+    with Status("[bold blue]Deploying Odoo Environments (Parallel)...", console=console, spinner="dots") as status:
+        tasks = [
+            (base_odoo, "odoo", "Community"),
+            (base_ent, "enterprise", "Enterprise")
+        ]
+        
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            list(executor.map(lambda p: setup_repo_task(*p), tasks))
+
+        status.update("[bold blue]Setting up UV Python Environment...")
+        env_root = Path(config["env_root"])
+        env_root.mkdir(parents=True, exist_ok=True)
+        
         target_env = env_root / base_v
         if not target_env.exists():
             console.print(f"✨ Initializing UV for [yellow]{base_v}[/yellow]...")
             subprocess.run(["uv", "venv", str(target_env), "--python", "3.12"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
             req_path = target_dir / "odoo" / "requirements.txt"
             if req_path.exists():
-                subprocess.run(["uv", "pip", "install", "-r", str(req_path), "--python", str(target_env / "bin" / "python")], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run([
+                    "uv", "pip", "install", "-r", str(req_path), 
+                    "--python", str(target_env / "bin" / "python")
+                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
         venv_symlink = target_dir / ".venv"
         if not venv_symlink.exists():
-            try: os.symlink(target_env, venv_symlink)
-            except: pass
+            try:
+                os.symlink(target_env, venv_symlink)
+            except:
+                pass
+
     console.print(f"\n🚀 [bold green]SUCCESS![/bold green] ready at [cyan]{target_dir}[/cyan]\n")
 
 def main():
