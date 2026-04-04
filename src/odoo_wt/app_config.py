@@ -20,7 +20,9 @@ def load_config():
         "wt_root": str(Path.home() / "repos" / "Odoo" / "wt"),
         "env_root": str(Path.home() / ".envs"),
         "suffix": "pian",
-        "remote_name": "odoo-dev"
+        "remote_name": "odoo-dev",
+        "community_dir": "odoo",
+        "enterprise_dir": "enterprise"
     }
     if CONFIG_FILE.exists():
         try:
