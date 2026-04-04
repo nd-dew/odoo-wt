@@ -150,7 +150,6 @@ class OdooWtApp(App):
             
         self.fetched_versions.add(version)
         append_log("Background Fetch Finished", {"version": version})
-        self.app.call_from_thread(self.notify, f"Prefetched {version} updates in background.")
 
     @on(TabbedContent.TabActivated, "#tabs")
     def on_tab_activated(self, event: TabbedContent.TabActivated) -> None:
