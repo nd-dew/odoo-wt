@@ -123,7 +123,9 @@ class WizardApp(App):
             "wt_root": wt_root,
             "env_root": str(env_path),
             "suffix": self.query_one("#suffix-input").value,
-            "remote_name": "odoo-dev"
+            "remote_name": "odoo-dev",
+            "community_dir": "odoo",
+            "enterprise_dir": "enterprise"
         }
         save_config(config)
         self.notify("Settings saved to ~/.config/odoo-wt.json")
