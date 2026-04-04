@@ -6,6 +6,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll, Center
 from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable
 from textual import on, work
+from textual.binding import Binding
 
 from .app_config import append_log, LOG_FILE, save_config
 from .system_discovery import discover_system_data, get_remote, run_git
@@ -16,9 +17,12 @@ class OdooWtApp(App):
     CSS_PATH = "stylesheet.tcss"
     
     BINDINGS = [
-        ("ctrl+s", "submit", "Create"), ("ctrl+d", "delete_wt", "Delete"),
-        ("ctrl+r", "refresh_wts", "Refresh"), ("ctrl+t", "next_tab", "Next Tab"),
-        ("ctrl+c", "quit", "Close"),
+        Binding("ctrl+s", "submit", "Create"),
+        Binding("ctrl+d", "delete_wt", "Delete"),
+        Binding("ctrl+r", "refresh_wts", "Refresh"),
+        Binding("ctrl+t", "next_tab", "Next Tab"),
+        Binding("escape", "quit", "", show=False),
+        Binding("ctrl+c", "quit", "Close", key_display="^c"),
     ]
 
     def __init__(self, config, v_list, s_list, worktrees):
