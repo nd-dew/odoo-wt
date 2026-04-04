@@ -13,7 +13,7 @@ class DeployUpdate:
     total: Optional[int] = None
     log_line: Optional[str] = None
 
-async def run_cmd_stream_gen(cmd: List[str], cwd: Path, category: str, prefix: str = "") -> AsyncGenerator[DeployUpdate, None]:
+async def run_cmd_stream_gen(cmd: List[str], cwd: Path, category: str, prefix: str = "", allow_fail: bool = False) -> AsyncGenerator[DeployUpdate, None]:
     process = await asyncio.create_subprocess_exec(
         *cmd,
         cwd=cwd,
@@ -29,8 +29,9 @@ async def run_cmd_stream_gen(cmd: List[str], cwd: Path, category: str, prefix: s
     
     await process.wait()
     if process.returncode != 0:
-        yield DeployUpdate(category=category, log_line=f"[bold red]❌ Command failed with exit code {process.returncode}[/bold red]")
-        raise RuntimeError(f"Command failed: {' '.join(cmd)}")
+        if not allow_fail:
+            yield DeployUpdate(category=category, log_line=f"[bold red]❌ Command failed with exit code {process.returncode}[/bold red]")
+        raise RuntimeError(f"Command failed with exit code {process.returncode}: {' '.join(cmd)}")
 
 class DeployEngine:
     def __init__(self, config: dict, data: dict):
@@ -58,7 +59,7 @@ class DeployEngine:
         
         fetch_success = True
         try:
-            async for update in run_cmd_stream_gen(["git", "fetch", self.dev_remote, f"{self.branch_name}:{self.branch_name}", "--force"], repo_path, category):
+            async for update in run_cmd_stream_gen(["git", "fetch", self.dev_remote, f"{self.branch_name}:{self.branch_name}", "--force"], repo_path, category, allow_fail=True):
                 yield update
         except RuntimeError:
             fetch_success = False
@@ -97,12 +98,13 @@ class DeployEngine:
         yield DeployUpdate(category=category, total=4)
         
         self.env_root.mkdir(parents=True, exist_ok=True)
+        py_v = self.config.get("python_version", "3.12")
         target_env = self.env_root / self.base_v
         
         try:
             if not target_env.exists():
-                yield DeployUpdate(category=category, log_line=f"Initializing UV environment for {self.base_v}...", advance=1)
-                async for update in run_cmd_stream_gen(["uv", "venv", str(target_env), "--python", "3.12"], self.env_root, category):
+                yield DeployUpdate(category=category, log_line=f"Initializing UV environment ({py_v}) for {self.base_v}...", advance=1)
+                async for update in run_cmd_stream_gen(["uv", "venv", str(target_env), "--python", py_v], self.env_root, category):
                     yield update
                 
                 base_req = self.wt_root / "master" / self.comm_dir / "requirements.txt"
