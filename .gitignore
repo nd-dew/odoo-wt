@@ -5,3 +5,5 @@ __pycache__/
 .env
 .pytest_cache/
 .vscode/
+odoo-wt.json
+odoo-wt-logs.jsonl
