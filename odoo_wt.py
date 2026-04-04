@@ -641,16 +641,23 @@ class OdooWtApp(App):
         base_ent = wt_root / "master" / "enterprise"
         if not base_odoo.exists(): return
         append_log("Background Fetch Started", {"version": version})
-        def fetch_task(repo):
+        
+        def fetch_task(args):
+            repo, label = args
             try:
                 remote = get_remote(repo)
+                append_log(f"Prefetch {label} Started", {"version": version, "remote": remote})
                 run_git(["fetch", remote, version], cwd=repo)
-            except: pass
+                append_log(f"Prefetch {label} Finished", {"version": version, "remote": remote})
+            except Exception as e:
+                append_log(f"Prefetch {label} Failed", {"version": version, "error": str(e)})
+
         with ThreadPoolExecutor(max_workers=2) as executor:
-            list(executor.map(fetch_task, [base_odoo, base_ent]))
+            list(executor.map(fetch_task, [(base_odoo, "Community"), (base_ent, "Enterprise")]))
+            
         self.fetched_versions.add(version)
         append_log("Background Fetch Finished", {"version": version})
-        self.notify(f"Prefetched {version} updates in background.")
+        self.app.call_from_thread(self.notify, f"Prefetched {version} updates in background.")
 
     def update_summary(self) -> None:
         try:
