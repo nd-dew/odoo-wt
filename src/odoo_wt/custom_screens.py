@@ -1,4 +1,5 @@
 import asyncio
+import os
 import json
 from pathlib import Path
 from textual import on, work
@@ -75,16 +76,21 @@ class DeployScreen(Screen):
         yield Label("🚀 Deploying Worktree Environment...", classes="deploy-title")
         with VerticalScroll():
             with Vertical(classes="log-box"):
-                yield Label("Community", classes="log-title")
-                yield ProgressBar(id="prog-odoo", show_eta=False)
+                with Horizontal(classes="log-header"):
+                    yield Label("Community", classes="log-title")
+                    yield ProgressBar(id="prog-odoo", show_eta=False)
                 yield RichLog(id="log-odoo", markup=False, highlight=False)
+                
             with Vertical(classes="log-box"):
-                yield Label("Enterprise", classes="log-title")
-                yield ProgressBar(id="prog-ent", show_eta=False)
+                with Horizontal(classes="log-header"):
+                    yield Label("Enterprise", classes="log-title")
+                    yield ProgressBar(id="prog-ent", show_eta=False)
                 yield RichLog(id="log-ent", markup=False, highlight=False)
-            with Vertical(classes="log-box", id="uv-box"):
-                yield Label("UV Environment", classes="log-title")
-                yield ProgressBar(id="prog-uv", show_eta=False)
+                
+            with Vertical(classes="log-uv-box", id="uv-box"):
+                with Horizontal(classes="log-header"):
+                    yield Label("UV Env", classes="log-title")
+                    yield ProgressBar(id="prog-uv", show_eta=False)
                 yield RichLog(id="log-uv", markup=False, highlight=False)
                 
             with Vertical(id="success-footer", classes="hidden"):
