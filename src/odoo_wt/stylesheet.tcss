@@ -214,16 +214,9 @@ DeleteConfirmScreen {
 
 
 
-DeployScreen {
-    padding: 1 2;
-}
 
-.deploy-title {
-    text-align: center;
-    text-style: bold;
-    color: $accent;
-    margin-bottom: 1;
-}
+
+
 
 
 
