@@ -56,6 +56,12 @@ If you already have a full branch name ready:
 odoo-wt 17.0-fix-account-bug-pian
 ```
 
+## ⚠️ Known Limitations
+
+- **Clipboard Interactions (Copy/Paste):** Because `odoo-wt` uses mouse-capture to enable clickable buttons and scrollbars in the terminal, your terminal emulator's native click-to-highlight features are disabled by default. 
+    - **To copy text manually:** Hold the `Shift` key while clicking and dragging over the text to bypass the app and use your terminal's native selection, then use `Ctrl+Shift+C`.
+    - **To paste text:** Sometimes native terminal paste (`Ctrl+Shift+V` or middle-click) events are intercepted unreliably by the underlying framework. If pasting into an input field fails, you may need to type the branch name manually.
+
 ## 📝 Development
 
 The source code is located at `/home/odoo/repos/Scripts/odoo-wt/`.
