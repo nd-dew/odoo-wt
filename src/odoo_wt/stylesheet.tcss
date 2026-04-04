@@ -221,8 +221,8 @@ DeleteConfirmScreen {
 
 
 .log-box {
-    height: auto;
-    max-height: 15;
+    height: 1fr;
+    min-height: 10;
     width: 1fr;
     border: solid $surface;
 }
