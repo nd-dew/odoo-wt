@@ -6,9 +6,14 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll, Center
 from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable
 from textual import on, work
+from textual.events import Paste
 from textual.binding import Binding
+from spellchecker import SpellChecker
 
-from .app_config import append_log, LOG_FILE, save_config, load_config
+spell = SpellChecker()
+spell.word_frequency.load_words(['odoo', 'saas', 'erp', 'mrp', 'pos', 'crm', 'wt', 'api', 'ui', 'ux', 'db', 'sql', 'backend', 'frontend', 'js', 'py', 'xml', 'owl', 'mac', 'linux', 'windows', 'repo'])
+
+from .app_config import append_log, LOG_FILE, save_config, load_config, CONFIG_FILE
 from .system_discovery import discover_system_data, get_remote, run_git
 from .custom_screens import DeleteConfirmScreen, DeployScreen, LogDetailScreen
 
@@ -22,18 +27,31 @@ class OdooWtApp(App):
         Binding("ctrl+d", "delete_wt", "Delete", key_display="Ctrl+D"),
         Binding("ctrl+r", "refresh", "Refresh/Reset", key_display="Ctrl+R"),
         Binding("ctrl+t", "next_tab", "Tab", key_display="Ctrl+T"),
+        Binding("c", "copy_text", "Copy", key_display="C"),
         Binding("escape", "quit", "", show=False),
-        Binding("ctrl+c", "quit", "Close", key_display="Ctrl+C"),
+        Binding("ctrl+q", "quit", "Quit", show=True, key_display="Ctrl+Q"),
+        Binding("ctrl+c", "quit", "Quit", show=False),
     ]
 
 
     def __init__(self, config, v_list, s_list, worktrees):
         super().__init__()
         self.config = config
-        self.v_list = v_list
-        self.s_list = s_list
+        
+        ig_v = set(config.get("ignored_versions", []))
+        ig_s = set(config.get("ignored_suffixes", []))
+        
+        self.v_list = [v for v in v_list if v not in ig_v or v in ("none", "custom...")]
+        if not self.v_list: self.v_list = ["custom..."]
+        
+        self.s_list = [s for s in s_list if s not in ig_s or s in ("none", "custom...")]
+        if not self.s_list: self.s_list = ["custom..."]
+        
         self.worktrees = worktrees
         self.fetched_versions = set()
+        self.deleting_paths = set()
+        self.branch_status = ""
+        self.save_timer = None
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
@@ -49,8 +67,8 @@ class OdooWtApp(App):
 
                     with Horizontal(classes="main-row"):
                         with Vertical(id="version-col"):
-                            yield Select(((v, v) for v in self.v_list), value=self.v_list[0], id="version", prompt="Ver")
-                            yield Input(placeholder="Ver...", id="custom_version", classes="custom-field")
+                            yield Select(((v, v) for v in self.v_list), value=self.v_list[0] if self.v_list else None, id="version")
+                            yield Input(id="custom_version", classes="custom-field")
 
                         yield Label("-", classes="dash")
 
@@ -60,8 +78,8 @@ class OdooWtApp(App):
                         yield Label("-", classes="dash")
 
                         with Vertical(id="suffix-col"):
-                            yield Select(((s, s) for s in self.s_list), value=self.s_list[0], id="suffix", prompt="Suf")
-                            yield Input(placeholder="Suf...", id="custom_suffix", classes="custom-field")
+                            yield Select(((s, s) for s in self.s_list), value=self.s_list[0] if self.s_list else None, id="suffix")
+                            yield Input(id="custom_suffix", classes="custom-field")
 
                     yield Label(
                         "Deployment Strategy (Surgical Safety):\n"
@@ -72,9 +90,9 @@ class OdooWtApp(App):
                     )
                     yield Label("", id="dynamic-summary", classes="summary-box")
                     with Horizontal(classes="btn-row"):
-                        yield Button("Create", variant="success", id="submit-btn")
+                        yield Button("Create ⏎", variant="success", id="submit-btn")
                 with TabPane("Existing / Removal", id="tab-manage"):
-                    yield Label("Discovery: Scans 'Worktree Root Path' (in Settings)\nfor 'odoo/.git' folders.", classes="tab-description")
+                    yield Label("Discovery: Scans 'Worktree Root Path' (in Settings)\nfor 'odoo/.git' folders. [bold cyan]Hint: Double-click or press Enter on a row to open in terminal.[/bold cyan]", classes="tab-description")
                     yield DataTable(id="wt-table", cursor_type="row")
                     with Horizontal(classes="btn-row"):
                         yield Button("Refresh", id="refresh-btn")
@@ -99,16 +117,30 @@ class OdooWtApp(App):
                         with Horizontal(classes="setting-item"):
                             yield Label("Enterprise Dir:", classes="setting-label")
                             yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Default Tab:", classes="setting-label")
+                            yield Select(
+                                [("Creation", "tab-create"), ("Existing", "tab-manage")],
+                                value=self.config.get("default_tab", "tab-create"),
+                                id="set-default-tab",
+                                classes="setting-input"
+                            )
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Removed Versions:", classes="setting-label")
+                            yield Input(value=",".join(self.config.get("ignored_versions", [])), id="set-ig-v", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Removed Suffixes:", classes="setting-label")
+                            yield Input(value=",".join(self.config.get("ignored_suffixes", [])), id="set-ig-s", classes="setting-input")
                         yield Label(
+                            f"[bold]Config File:[/bold] {CONFIG_FILE}\n\n"
                             "Worktree Root: Base directory where worktree folders are created.\n"
                             "UV Envs Path: Directory storing shared Python virtual environments.\n"
                             "Default Suffix: Developer quadrigram appended to new branches.\n"
                             "Dev Remote: Your personal fork (e.g. 'odoo-dev'). Used to push your features for PRs, and fetch colleagues' branches.\n"
-                            "Repo Dirs: Names of the subfolders created inside each worktree.",
+                            "Repo Dirs: Names of the subfolders created inside each worktree.\n"
+                            "Removed Items: Comma-separated lists of auto-discovered versions/suffixes to hide from the creation dropdowns.",
                             classes="tab-description"
                         )
-                        with Center(classes="btn-row"):
-                            yield Button("Save", variant="primary", id="save-settings")
                 with TabPane("Logs", id="tab-logs"):
                     yield Label("System Logs (Newest first)", classes="tab-description")
                     yield DataTable(id="logs-table", cursor_type="row")
@@ -119,7 +151,17 @@ class OdooWtApp(App):
 
     def on_mount(self) -> None:
         append_log("App Started")
-        self.query_one("#desc").focus()
+        
+        default_tab = self.config.get("default_tab", "tab-create")
+        try:
+            self.query_one("#tabs", TabbedContent).active = default_tab
+            if default_tab == "tab-manage":
+                self.query_one("#wt-table").focus()
+            else:
+                self.query_one("#desc").focus()
+        except:
+            self.query_one("#desc").focus()
+
         self.populate_table()
         self.populate_logs_table()
         self.update_summary()
@@ -152,6 +194,17 @@ class OdooWtApp(App):
             
         self.fetched_versions.add(version)
         append_log("Background Fetch Finished", {"version": version})
+
+    @on(Paste)
+    def on_paste(self, event: Paste) -> None:
+        try:
+            focused = self.focused
+            if focused and focused.id == "desc":
+                self.query_one("#version", Select).value = "none"
+                self.query_one("#suffix", Select).value = "none"
+                self.notify("Paste detected: Version and Suffix unset.", timeout=3)
+        except Exception:
+            pass
 
     @on(TabbedContent.TabActivated, "#tabs")
     def on_tab_activated(self, event: TabbedContent.TabActivated) -> None:
@@ -203,11 +256,10 @@ class OdooWtApp(App):
             base_v = version if version else "master"
             summary = (
                 f"[bold]Outcome:[/bold]\n"
-                f"1. I will create a new directory at [bold green]{wt_root}/{branch_name}[/bold green]:\n"
+                f"1. [bold cyan]Branch Status:[/bold cyan] {self.branch_status or 'Ready...'}\n"
+                f"2. I will create a new directory at [bold green]{wt_root}/{branch_name}[/bold green]:\n"
                 f"   ├── odoo/       (Community worktree)\n"
                 f"   └── enterprise/ (Enterprise worktree)\n"
-                f"2a. I will pull [bold green]{branch_name}[/bold green] from '{remote}' if it exists.\n"
-                f"2b. Otherwise, I will create new worktrees based on 'origin/[bold magenta]{base_v}[/bold magenta]'.\n"
                 f"3. I will use or create the [bold magenta]{base_v}[/bold magenta] UV environment and link it as '.venv'."
             )
             self.query_one("#dynamic-summary", Label).update(summary)
@@ -216,7 +268,64 @@ class OdooWtApp(App):
     @on(Input.Changed, "#desc")
     @on(Input.Changed, "#custom_version")
     @on(Input.Changed, "#custom_suffix")
-    def on_text_changed(self, event) -> None: self.update_summary()
+    def on_text_changed(self, event) -> None: 
+        self.update_summary()
+        self.check_branch_existence_task()
+
+    @work(exclusive=True)
+    async def check_branch_existence_task(self) -> None:
+        try:
+            v_sel = self.query_one("#version", Select).value
+            version = self.query_one("#custom_version", Input).value if str(v_sel) == "custom..." else str(v_sel)
+            desc = self.query_one("#desc", Input).value
+            s_sel = self.query_one("#suffix", Select).value
+            suffix = self.query_one("#custom_suffix", Input).value if str(s_sel) == "custom..." else str(s_sel)
+            
+            if not desc:
+                self.branch_status = ""
+                self.update_summary()
+                return
+
+            clean_desc = str(desc).strip().replace(" ", "_")
+            parts = [p for p in [version if version != "none" else "", clean_desc, suffix if suffix != "none" else ""] if p]
+            branch_name = "-".join(parts)
+            
+            # Spell Check the description
+            words = clean_desc.replace("-", "_").split("_")
+            unknown = spell.unknown(words)
+            unknown = {w for w in unknown if not w.isnumeric() and len(w) > 2}
+            spell_warning = f" [bold red](Typo? {', '.join(unknown)})[/bold red]" if unknown else ""
+            
+            if any(w['name'] == branch_name for w in self.worktrees):
+                self.branch_status = f"[bold red]A WORKTREE WITH THIS NAME ALREADY EXISTS![/bold red]{spell_warning}"
+                self.update_summary()
+                return
+            
+            self.branch_status = "Checking..."
+            self.update_summary()
+            
+            await asyncio.sleep(0.5) # Debounce
+            
+            wt_root = Path(self.config["wt_root"])
+            base_odoo = wt_root / "master" / "odoo"
+            dev_remote = self.config.get("remote_name", "odoo-dev")
+            
+            # Check local git
+            from .system_discovery import check_local, check_remote
+            is_local = await asyncio.to_thread(check_local, base_odoo, branch_name)
+            if is_local:
+                self.branch_status = f"[bold yellow]Found branch '{branch_name}' locally.[/bold yellow]{spell_warning}"
+            else:
+                # Check remote
+                is_remote = await asyncio.to_thread(check_remote, base_odoo, branch_name, dev_remote)
+                if is_remote:
+                    self.branch_status = f"[bold green]Found branch on '{dev_remote}'.[/bold green]{spell_warning}"
+                else:
+                    self.branch_status = f"[bold white]New branch will be created.[/bold white]{spell_warning}"
+            
+            self.update_summary()
+        except Exception:
+            pass
 
     @on(Input.Submitted, "#desc")
     @on(Input.Submitted, "#custom_version")
@@ -277,12 +386,21 @@ class OdooWtApp(App):
         self.notify("Logs cleared!")
 
     def populate_table(self):
-        table = self.query_one("#wt-table")
+        table = self.query_one("#wt-table", DataTable)
         table.clear(columns=True)
         table.add_columns("Branch Name", "Version", "Suffix")
         for wt in self.worktrees:
-            table.add_row(wt["name"], wt["version"], wt["suffix"], key=wt["path"])
+            name = wt["name"]
+            path = wt["path"]
+            if path in self.deleting_paths:
+                name = f"[strike]{name}[/strike] [bold red](Deleting...)[/bold red]"
+            table.add_row(name, wt["version"], wt["suffix"], key=path)
 
+    @on(DataTable.RowSelected, "#wt-table")
+    def on_wt_row_selected(self, event: DataTable.RowSelected) -> None:
+        path = str(event.row_key.value)
+        append_log("Worktree Selected (Action)", {"path": path})
+        self.exit({"action": "terminal", "path": path})
 
     def action_reset_settings(self) -> None:
         self.config = load_config()
@@ -292,6 +410,9 @@ class OdooWtApp(App):
         self.query_one("#set-remote", Input).value = self.config.get("remote_name", "odoo-dev")
         self.query_one("#set-comm", Input).value = self.config.get("community_dir", "odoo")
         self.query_one("#set-ent", Input).value = self.config.get("enterprise_dir", "enterprise")
+        self.query_one("#set-default-tab", Select).value = self.config.get("default_tab", "tab-create")
+        self.query_one("#set-ig-v", Input).value = ",".join(self.config.get("ignored_versions", []))
+        self.query_one("#set-ig-s", Input).value = ",".join(self.config.get("ignored_suffixes", []))
         self.notify("Settings reset to last saved state.")
 
     def action_refresh(self) -> None:
@@ -309,6 +430,55 @@ class OdooWtApp(App):
         self.populate_table()
         self.notify("Worktrees refreshed!")
 
+    def action_copy_text(self) -> None:
+        try:
+            active_pane = self.query_one("#tabs").active
+        except Exception:
+            return
+            
+        if active_pane == "tab-manage":
+            table = self.query_one("#wt-table", DataTable)
+            try:
+                row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value
+                path = str(row_key)
+                self.app.copy_to_clipboard(path)
+                self.notify(f"Copied to clipboard: {path}")
+                append_log("Clipboard Copy", {"type": "worktree_path", "value": path})
+            except Exception:
+                self.notify("No worktree selected to copy.", severity="warning")
+                
+        elif active_pane == "tab-logs":
+            table = self.query_one("#logs-table", DataTable)
+            try:
+                row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+                row = table.get_row(row_key)
+                text = f"[{row[0]}] {row[1]}: {row[2]}"
+                self.app.copy_to_clipboard(text)
+                self.notify("Copied log entry to clipboard")
+                append_log("Clipboard Copy", {"type": "log_entry"})
+            except Exception:
+                self.notify("No log selected to copy.", severity="warning")
+                
+        elif active_pane == "tab-create":
+            v_sel = self.query_one("#version").value
+            version = self.query_one("#custom_version").value if v_sel == "custom..." else v_sel
+            desc = self.query_one("#desc").value
+            s_sel = self.query_one("#suffix").value
+            suffix = self.query_one("#custom_suffix").value if s_sel == "custom..." else s_sel
+            
+            if version == "none" or version == Select.BLANK: version = ""
+            if suffix == "none" or suffix == Select.BLANK: suffix = ""
+            clean_desc = str(desc).strip().replace(" ", "_")
+            parts = [p for p in [version, clean_desc, suffix] if p]
+            branch_name = "-".join(parts)
+            
+            if branch_name:
+                self.app.copy_to_clipboard(branch_name)
+                self.notify(f"Copied branch name: {branch_name}")
+                append_log("Clipboard Copy", {"type": "branch_name", "value": branch_name})
+            else:
+                self.notify("No branch name to copy.", severity="warning")
+
     def action_quit(self) -> None:
         append_log("App Quit")
         self.exit()
@@ -320,6 +490,44 @@ class OdooWtApp(App):
         elif tabs.active == "tab-manage": tabs.active = "tab-settings"
         elif tabs.active == "tab-settings": tabs.active = "tab-logs"
         else: tabs.active = "tab-create"
+
+    @on(Button.Pressed, "#rm-version")
+    def rm_version(self) -> None:
+        sel = self.query_one("#version", Select)
+        val = sel.value
+        if val in ("none", "custom...", Select.BLANK) or not val:
+            self.notify("Cannot remove this item", severity="warning")
+            return
+            
+        ig_v = self.config.get("ignored_versions", [])
+        if val not in ig_v:
+            ig_v.append(val)
+            self.config["ignored_versions"] = ig_v
+            save_config(self.config)
+            
+        self.v_list = [v for v in self.v_list if v != val]
+        sel.set_options((v, v) for v in self.v_list)
+        sel.value = self.v_list[0] if self.v_list else None
+        self.notify(f"Removed '{val}' from versions")
+
+    @on(Button.Pressed, "#rm-suffix")
+    def rm_suffix(self) -> None:
+        sel = self.query_one("#suffix", Select)
+        val = sel.value
+        if val in ("none", "custom...", Select.BLANK) or not val:
+            self.notify("Cannot remove this item", severity="warning")
+            return
+            
+        ig_s = self.config.get("ignored_suffixes", [])
+        if val not in ig_s:
+            ig_s.append(val)
+            self.config["ignored_suffixes"] = ig_s
+            save_config(self.config)
+            
+        self.s_list = [s for s in self.s_list if s != val]
+        sel.set_options((s, s) for s in self.s_list)
+        sel.value = self.s_list[0] if self.s_list else None
+        self.notify(f"Removed '{val}' from suffixes")
 
     @on(Select.Changed, "#version")
     def version_changed(self, event: Select.Changed) -> None:
@@ -342,17 +550,53 @@ class OdooWtApp(App):
         else: custom.remove_class("visible")
         self.update_summary()
 
-    @on(Button.Pressed, "#save-settings")
-    def save_settings(self) -> None:
-        self.config["wt_root"] = self.query_one("#set-wt").value
-        self.config["env_root"] = self.query_one("#set-env").value
-        self.config["suffix"] = self.query_one("#set-suffix").value
-        self.config["remote_name"] = self.query_one("#set-remote").value
-        self.config["community_dir"] = self.query_one("#set-comm").value
-        self.config["enterprise_dir"] = self.query_one("#set-ent").value
+    @on(Input.Changed, "#set-wt")
+    @on(Input.Changed, "#set-env")
+    @on(Input.Changed, "#set-suffix")
+    @on(Input.Changed, "#set-remote")
+    @on(Input.Changed, "#set-comm")
+    @on(Input.Changed, "#set-ent")
+    @on(Input.Changed, "#set-ig-v")
+    @on(Input.Changed, "#set-ig-s")
+    @on(Select.Changed, "#set-default-tab")
+    def on_setting_changed(self, event) -> None:
+        if self.is_mounted:
+            if self.save_timer:
+                self.save_timer.stop()
+            self.save_timer = self.set_timer(0.5, self.save_settings_auto)
+
+    def save_settings_auto(self) -> None:
+        self.config["wt_root"] = self.query_one("#set-wt", Input).value
+        self.config["env_root"] = self.query_one("#set-env", Input).value
+        self.config["suffix"] = self.query_one("#set-suffix", Input).value
+        self.config["remote_name"] = self.query_one("#set-remote", Input).value
+        self.config["community_dir"] = self.query_one("#set-comm", Input).value
+        self.config["enterprise_dir"] = self.query_one("#set-ent", Input).value
+        self.config["default_tab"] = self.query_one("#set-default-tab", Select).value
+        
+        ig_v = [v.strip() for v in self.query_one("#set-ig-v", Input).value.split(",") if v.strip()]
+        ig_s = [s.strip() for s in self.query_one("#set-ig-s", Input).value.split(",") if s.strip()]
+        self.config["ignored_versions"] = ig_v
+        self.config["ignored_suffixes"] = ig_s
+        
         save_config(self.config)
-        append_log("Settings Saved", self.config)
-        self.notify("Settings saved!")
+        append_log("Settings Auto-Saved", self.config)
+        
+        v_list, s_list, _ = discover_system_data(self.config["wt_root"], self.config["suffix"])
+        self.v_list = [v for v in v_list if v not in ig_v or v in ("none", "custom...")]
+        if not self.v_list: self.v_list = ["custom..."]
+        self.s_list = [s for s in s_list if s not in ig_s or s in ("none", "custom...")]
+        if not self.s_list: self.s_list = ["custom..."]
+        
+        v_sel = self.query_one("#version", Select)
+        curr_v = v_sel.value
+        v_sel.set_options((v, v) for v in self.v_list)
+        v_sel.value = curr_v if curr_v in self.v_list else (self.v_list[0] if self.v_list else None)
+        
+        s_sel = self.query_one("#suffix", Select)
+        curr_s = s_sel.value
+        s_sel.set_options((s, s) for s in self.s_list)
+        s_sel.value = curr_s if curr_s in self.s_list else (self.s_list[0] if self.s_list else None)
 
     @on(Button.Pressed, "#submit-btn")
     def on_submit_btn(self) -> None: self.action_submit()
@@ -382,22 +626,62 @@ class OdooWtApp(App):
             self.app.push_screen(DeleteConfirmScreen(wt_name), check_delete)
         except Exception: self.notify("Select a worktree first!", severity="error")
 
-    def execute_deletion(self, target_path_str, name):
-        target_path = Path(target_path_str)
-        base_odoo = target_path.parent / "master" / "odoo"
-        base_ent = target_path.parent / "master" / "enterprise"
-        if (target_path / "odoo").exists():
-            run_git(["worktree", "remove", "-f", str(target_path / "odoo")], cwd=base_odoo)
-        if (target_path / "enterprise").exists():
-            run_git(["worktree", "remove", "-f", str(target_path / "enterprise")], cwd=base_ent)
-        import shutil
+    @work(exclusive=False)
+    async def execute_deletion(self, target_path_str, name):
+        # 1. Track deletion in-progress
+        self.deleting_paths.add(target_path_str)
+        self.populate_table()
+        self.notify(f"Queued deletion for '{name}'...", timeout=2)
+
         try:
-            shutil.rmtree(target_path)
-        except:
-            pass
-        append_log("Deleted Worktree", {"name": name, "path": target_path_str})
-        self.notify(f"Deleted {name} successfully!")
-        self.action_refresh_wts()
+            target_path = Path(target_path_str)
+            base_odoo = target_path.parent / "master" / "odoo"
+            base_ent = target_path.parent / "master" / "enterprise"
+
+            # 2. Parallel Git operations (removes worktrees simultaneously)
+            async def remove_wt(sub_dir, base_dir):
+                wt_path = target_path / sub_dir
+                if wt_path.exists():
+                    process = await asyncio.create_subprocess_exec(
+                        "git", "worktree", "remove", "-f", str(wt_path),
+                        cwd=base_dir,
+                        stdout=asyncio.subprocess.DEVNULL,
+                        stderr=asyncio.subprocess.DEVNULL
+                    )
+                    await process.wait()
+
+            await asyncio.gather(
+                remove_wt("odoo", base_odoo),
+                remove_wt("enterprise", base_ent)
+            )
+
+            # 3. Clean up orphaned git references (Prune)
+            async def prune_wt(base_dir):
+                process = await asyncio.create_subprocess_exec(
+                    "git", "worktree", "prune",
+                    cwd=base_dir,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL
+                )
+                await process.wait()
+
+            await asyncio.gather(
+                prune_wt(base_odoo),
+                prune_wt(base_ent)
+            )
+
+            # 4. Background folder deletion (avoids blocking the async event loop)
+            import shutil
+            await asyncio.to_thread(shutil.rmtree, target_path, ignore_errors=True)
+
+            append_log("Deleted Worktree", {"name": name, "path": target_path_str})
+            self.notify(f"Successfully deleted '{name}'!", severity="success")
+        finally:
+            # 5. Cleanup tracking and final UI refresh
+            self.deleting_paths.remove(target_path_str)
+            # Remove from local list as well so it's gone from table
+            self.worktrees = [w for w in self.worktrees if w["path"] != target_path_str]
+            self.populate_table()
 
     def action_submit(self) -> None:
         if self.query_one("#tabs").active != "tab-create": return

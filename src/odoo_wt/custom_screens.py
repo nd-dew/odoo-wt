@@ -3,6 +3,7 @@ import os
 import json
 from pathlib import Path
 from textual import on, work
+from textual.binding import Binding
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Label, Button, ProgressBar, RichLog
 from textual.containers import Vertical, Horizontal, VerticalScroll
@@ -31,6 +32,12 @@ class DeleteConfirmScreen(ModalScreen[bool]):
         super().__init__()
         self.wt_name = wt_name
         self.step = 1
+
+    def on_key(self, event) -> None:
+        if event.key == "left":
+            self.focus_previous()
+        elif event.key == "right":
+            self.focus_next()
 
     def compose(self):
         with Vertical(id="delete-dialog"):
