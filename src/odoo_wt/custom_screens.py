@@ -106,13 +106,16 @@ class DeployScreen(Screen):
     async def run_deployment(self):
         wt_root = Path(self.config["wt_root"])
         dev_remote = self.config.get("remote_name", "odoo-dev")
+        comm_dir = self.config.get("community_dir", "odoo")
+        ent_dir = self.config.get("enterprise_dir", "enterprise")
+        
         clean_desc = self.data["desc"].strip().replace(" ", "_")
         parts = [p for p in [self.data["version"], clean_desc, self.data["suffix"]] if p]
         branch_name = "-".join(parts)
         append_log("Deployment Started", {"branch": branch_name, "version": self.data["version"]})
         target_dir = wt_root / branch_name
-        base_odoo = wt_root / "master" / "odoo"
-        base_ent = wt_root / "master" / "enterprise"
+        base_odoo = wt_root / "master" / comm_dir
+        base_ent = wt_root / "master" / ent_dir
         base_v = self.data["version"] or "master"
         
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -153,8 +156,8 @@ class DeployScreen(Screen):
             log.write("✅ Done.")
 
         await asyncio.gather(
-            deploy_repo(base_odoo, "odoo", "log-odoo", "prog-odoo"),
-            deploy_repo(base_ent, "enterprise", "log-ent", "prog-ent")
+            deploy_repo(base_odoo, comm_dir, "log-odoo", "prog-odoo"),
+            deploy_repo(base_ent, ent_dir, "log-ent", "prog-ent")
         )
 
         log_uv = self.query_one("#log-uv", RichLog)
@@ -170,7 +173,7 @@ class DeployScreen(Screen):
             await run_cmd_stream(["uv", "venv", str(target_env), "--python", "3.12"], env_root, log_uv)
             prog_uv.advance(1)
             
-            req_path = target_dir / "odoo" / "requirements.txt"
+            req_path = target_dir / comm_dir / "requirements.txt"
             if req_path.exists():
                 log_uv.write("Installing requirements...")
                 await run_cmd_stream([
