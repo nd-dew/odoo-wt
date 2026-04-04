@@ -154,47 +154,55 @@ class DeployScreen(Screen):
             prog.advance(1)
             log.write("✅ Done.")
 
+        async def setup_uv():
+            log_uv = self.query_one("#log-uv", RichLog)
+            prog_uv = self.query_one("#prog-uv", ProgressBar)
+            prog_uv.update(total=4)
+            
+            env_root = Path(self.config["env_root"])
+            env_root.mkdir(parents=True, exist_ok=True)
+            target_env = env_root / base_v
+            
+            if not target_env.exists():
+                log_uv.write(f"Initializing UV environment for {base_v}...")
+                await run_cmd_stream(["uv", "venv", str(target_env), "--python", "3.12"], env_root, log_uv)
+                prog_uv.advance(1)
+                
+                # Use base folder requirements to avoid waiting for worktree creation
+                base_req = wt_root / "master" / comm_dir / "requirements.txt"
+                if base_req.exists():
+                    log_uv.write(f"Installing requirements from base '{comm_dir}'...")
+                    await run_cmd_stream([
+                        "uv", "pip", "install", "-r", str(base_req), 
+                        "--python", str(target_env / "bin" / "python")
+                    ], env_root, log_uv)
+                prog_uv.advance(1)
+            else:
+                log_uv.write(f"UV environment '{base_v}' already exists.")
+                prog_uv.advance(2)
+
+            # Wait for target_dir to definitely exist (though we create it at start)
+            # but more importantly, we need to wait for odoo/enterprise worktrees 
+            # to finish before we can reliably symlink .venv into the target_dir
+            # actually target_dir is just a folder, we can symlink now!
+            venv_symlink = target_dir / ".venv"
+            if not venv_symlink.exists():
+                try:
+                    os.symlink(target_env, venv_symlink)
+                    log_uv.write("Created .venv symlink.")
+                except Exception as e:
+                    log_uv.write(f"Failed to create symlink: {e}")
+            prog_uv.advance(1)
+            log_uv.write("✅ Done.")
+            return True
+
         await asyncio.gather(
             deploy_repo(base_odoo, comm_dir, "log-odoo", "prog-odoo"),
-            deploy_repo(base_ent, ent_dir, "log-ent", "prog-ent")
+            deploy_repo(base_ent, ent_dir, "log-ent", "prog-ent"),
+            setup_uv()
         )
 
-        log_uv = self.query_one("#log-uv", RichLog)
-        prog_uv = self.query_one("#prog-uv", ProgressBar)
-        prog_uv.update(total=3)
-        
-        env_root = Path(self.config["env_root"])
-        env_root.mkdir(parents=True, exist_ok=True)
-        target_env = env_root / base_v
-        
-        if not target_env.exists():
-            log_uv.write(f"Initializing UV environment for {base_v}...")
-            await run_cmd_stream(["uv", "venv", str(target_env), "--python", "3.12"], env_root, log_uv)
-            prog_uv.advance(1)
-            
-            req_path = target_dir / comm_dir / "requirements.txt"
-            if req_path.exists():
-                log_uv.write("Installing requirements...")
-                await run_cmd_stream([
-                    "uv", "pip", "install", "-r", str(req_path), 
-                    "--python", str(target_env / "bin" / "python")
-                ], env_root, log_uv)
-            prog_uv.advance(1)
-        else:
-            log_uv.write(f"UV environment {base_v} already exists. Skipping build.")
-            prog_uv.advance(2)
-
-        venv_symlink = target_dir / ".venv"
-        if not venv_symlink.exists():
-            try:
-                os.symlink(target_env, venv_symlink)
-                log_uv.write("Created .venv symlink.")
-            except Exception as e:
-                log_uv.write(f"Failed to create symlink: {e}")
-        prog_uv.advance(1)
-        log_uv.write("✅ Done.")
         append_log("Deployment Success", {"branch": branch_name, "path": str(target_dir)})
-
         self.target_dir = target_dir
         self.show_success_footer()
 
