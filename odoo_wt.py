@@ -17,7 +17,7 @@ from rich.status import Status
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll, Center
-from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable, LoadingIndicator
+from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable, LoadingIndicator, ProgressBar
 from textual.screen import ModalScreen
 from textual import on, work
 
@@ -45,6 +45,17 @@ def save_config(config):
         json.dump(config, f, indent=4)
 
 # --- SYSTEM DISCOVERY LOGIC ---
+def shorten_path(path_str):
+    home = str(Path.home())
+    if path_str.startswith(home):
+        return path_str.replace(home, "~", 1)
+    return path_str
+
+def expand_path(path_str):
+    if path_str.startswith("~/"):
+        return str(Path.home() / path_str[2:])
+    return path_str
+
 def fast_scan():
     home_str = str(Path.home())
     found_roots = []
@@ -58,60 +69,77 @@ def fast_scan():
         
         for d in dirnames:
             base_candidate = Path(dirpath) / d
-            if (base_candidate / "odoo" / ".git").exists() and (base_candidate / "enterprise" / ".git").exists():
-                if dirpath not in found_roots:
-                    found_roots.append(dirpath)
-                break
-    return found_roots
+            try:
+                git_dirs = [sub for sub in base_candidate.iterdir() if sub.is_dir() and (sub / ".git").exists()]
+                if len(git_dirs) == 2:
+                    if dirpath != home_str and dirpath not in found_roots:
+                        found_roots.append(dirpath)
+                    break
+            except Exception:
+                pass
+    return [shorten_path(p) for p in found_roots]
 
 # --- WIZARD TUI ---
 class WizardApp(App):
+    ENABLE_COMMAND_PALETTE = False
     CSS = """
     Screen { align: center middle; background: transparent; }
     #wizard-dialog {
         width: 85; height: auto; padding: 2 4;
         border: thick $accent; background: $surface;
     }
-    .title { text-align: center; text-style: bold; color: $accent; margin-bottom: 1; }
-    .req { color: $text; margin-bottom: 1; text-align: left; }
+    .title { text-align: left; text-style: bold; color: $accent; margin-bottom: 1; }
+    .req { color: $text; margin-bottom: 0; text-align: left; }
+    .tree-box { background: $boost; padding: 1 2; margin-bottom: 0; border-left: thick $secondary; height: auto; }
     .step-title { text-style: bold; color: $secondary; margin-top: 1; }
-    .step-desc { color: $text-muted; margin-bottom: 1; }
     #scanner-status { margin: 1 0; text-align: center; color: $success; }
     .hidden { display: none; }
     .btn-row { align: center middle; margin-top: 2; height: auto; }
     Select, Input { margin-bottom: 1; }
+    #scanner-progress {
+        margin: 1 0;
+    }
     """
+
+    BINDINGS = [
+        ("escape", "quit", "Cancel"),
+        ("ctrl+c", "quit", "Quit"),
+    ]
 
     def compose(self) -> ComposeResult:
         with Vertical(id="wizard-dialog"):
             yield Label("[bold cyan]Welcome to Odoo WorkTree Tool[/bold cyan]", classes="title")
-            yield Label(
-                "This is a [bold yellow]highly opinionated[/bold yellow] tool for Odoo development.\n\n"
-                "[bold underline]Requirements:[/bold underline]\n"
-                "1. You must have a [cyan]Worktree Root[/cyan] directory.\n"
-                "2. Inside that root, you must have at least one 'base' folder (e.g., [cyan]master/[/cyan]).\n"
-                "3. That base folder must contain [cyan]odoo/[/cyan] and [cyan]enterprise/[/cyan] worktrees.",
-                classes="req"
-            )
+            yield Label("This tool will create new directories with Community and Enterprise worktrees.", classes="req")
             
-            yield Label("Step 1: Discovering Worktree Root...", classes="step-title")
-            yield LoadingIndicator(id="scanner-loading")
+            with Vertical(classes="tree-box"):
+                yield Label("You should have a structure like this somewhere on your PC:")
+                yield Label(
+                    "[cyan]Worktree Root/[/cyan]\n"
+                    " ├── [yellow]master/[/yellow]       (Base Folder)\n"
+                    " │    ├── odoo/       (Community clone)\n"
+                    " │    └── enterprise/ (Enterprise clone)\n"
+                    "[dim] └── ...           (Tool creates new ones here)[/dim]"
+                )
+            
+            yield Label("Step 1: Tell me where that 'Worktree Root' is:", classes="step-title")
+            yield ProgressBar(id="scanner-progress")
             yield Label("", id="scanner-status")
             yield Select([], id="root-select", classes="hidden", prompt="Select discovered root")
-            yield Input(placeholder="Or enter custom path...", id="custom-root", classes="hidden")
+            yield Input(placeholder="Or enter path manually (~/ allowed)...", id="custom-root", classes="hidden")
             
             with Vertical(id="final-steps", classes="hidden"):
                 yield Label("Step 2: UV Environments Path", classes="step-title")
-                yield Label("Shared Python environments (one per version) will live here:", classes="step-desc")
-                yield Input(value=str(Path.home() / ".envs"), id="env-path")
+                yield Input(value="~/.envs", id="env-path")
                 
                 yield Label("Step 3: Developer Suffix", classes="step-title")
-                yield Label("Your unique ID for branch names (quadrigram):", classes="step-desc")
                 yield Input(value="pian", id="suffix-input")
                 
                 with Horizontal(classes="btn-row"):
                     yield Button("Finish Setup", variant="success", id="btn-finish")
         yield Footer()
+
+    def action_quit(self) -> None:
+        self.exit()
 
     def on_mount(self) -> None:
         self.run_scanner()
@@ -120,7 +148,7 @@ class WizardApp(App):
     async def run_scanner(self) -> None:
         roots = await asyncio.to_thread(fast_scan)
         try:
-            self.query_one("#scanner-loading").remove()
+            self.query_one("#scanner-progress").remove()
         except:
             pass
         
@@ -152,14 +180,16 @@ class WizardApp(App):
     @on(Button.Pressed, "#btn-finish")
     def on_finish(self):
         root_sel = self.query_one("#root-select").value
-        wt_root = self.query_one("#custom-root").value if (root_sel == "custom" or root_sel == Select.BLANK) or not root_sel else root_sel
+        wt_root_raw = self.query_one("#custom-root").value if (root_sel == "custom" or root_sel == Select.BLANK) or not root_sel else root_sel
+        wt_root = expand_path(str(wt_root_raw))
         
-        env_path = Path(self.query_one("#env-path").value)
+        env_path_raw = self.query_one("#env-path").value
+        env_path = Path(expand_path(str(env_path_raw)))
         if not env_path.exists():
             env_path.mkdir(parents=True, exist_ok=True)
 
         config = {
-            "wt_root": str(wt_root),
+            "wt_root": wt_root,
             "env_root": str(env_path),
             "suffix": self.query_one("#suffix-input").value,
             "remote_name": "odoo-dev"
@@ -168,19 +198,6 @@ class WizardApp(App):
         self.exit(config)
 
 # --- SYSTEM LOGIC ---
-def parse_branch_name(name):
-    if name.startswith("saas-"):
-        parts = name.split("-")
-        v = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 else name
-    else:
-        v = name.split("-")[0]
-    s = ""
-    if "-" in name:
-        s_candidate = name.rsplit("-", 1)[-1]
-        if s_candidate and len(s_candidate) <= 12 and " " not in s_candidate:
-            s = s_candidate
-    return v, s
-
 def discover_system_data(wt_root, default_suffix):
     versions = set()
     suffixes = set([default_suffix, "test", "none"])
@@ -190,7 +207,12 @@ def discover_system_data(wt_root, default_suffix):
         for entry in wt_path.iterdir():
             if entry.is_dir() and not entry.name.startswith("."):
                 v, s = parse_branch_name(entry.name)
-                if (entry / "odoo" / ".git").exists() and entry.name != "master":
+                try:
+                    is_wt = sum(1 for sub in entry.iterdir() if sub.is_dir() and (sub / ".git").exists()) >= 1
+                except Exception:
+                    is_wt = False
+                    
+                if is_wt and entry.name != "master":
                     worktrees.append({"name": entry.name, "path": str(entry), "version": v, "suffix": s})
                 if v == "master" or v.startswith("saas-") or (v and v[0].isdigit()):
                     versions.add(v)
@@ -207,6 +229,19 @@ def discover_system_data(wt_root, default_suffix):
     s_list.append("none")
     s_list.append("custom...")
     return v_list, s_list, worktrees
+
+def parse_branch_name(name):
+    if name.startswith("saas-"):
+        parts = name.split("-")
+        v = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 else name
+    else:
+        v = name.split("-")[0]
+    s = ""
+    if "-" in name:
+        s_candidate = name.rsplit("-", 1)[-1]
+        if s_candidate and len(s_candidate) <= 12 and " " not in s_candidate:
+            s = s_candidate
+    return v, s
 
 # --- DELETE MODAL ---
 class DeleteConfirmScreen(ModalScreen[bool]):
@@ -265,7 +300,7 @@ class OdooWtApp(App):
     .custom-field { display: none; margin-top: 0; border: solid $accent; }
     .custom-field.visible { display: block; }
     .title { text-align: left; text-style: bold; color: $accent; margin: 0 0 1 0; height: auto; }
-    .description { text-align: left; margin-bottom: 1; height: auto; width: 100%; }
+    .description { text-align: left; margin-bottom: 0; height: auto; width: 100%; }
     .tab-description { margin: 1 0; color: $text-muted; text-style: italic; height: auto; width: 100%; }
     .info-box { background: $boost; padding: 1 2; margin: 1 0; border-left: thick $accent; height: auto; }
     .summary-box { background: $surface-lighten-1; padding: 1 2; margin: 1 0; border-left: thick $success; height: auto; width: 100%; }
@@ -353,8 +388,8 @@ class OdooWtApp(App):
             desc = self.query_one("#desc", Input).value
             s_sel = self.query_one("#suffix", Select).value
             suffix = self.query_one("#custom_suffix", Input).value if str(s_sel) == "custom..." else str(s_sel)
-            if version == "none" or version == "Select.BLANK": version = ""
-            if suffix == "none" or suffix == "Select.BLANK": suffix = ""
+            if version == "none" or version == Select.BLANK: version = ""
+            if suffix == "none" or suffix == Select.BLANK: suffix = ""
             clean_desc = str(desc).strip().replace(" ", "_")
             parts = [p for p in [version, clean_desc, suffix] if p]
             branch_name = "-".join(parts)
@@ -387,6 +422,9 @@ class OdooWtApp(App):
         _, _, self.worktrees = discover_system_data(self.config["wt_root"], self.config["suffix"])
         self.populate_table()
         self.notify("Worktrees refreshed!")
+
+    def action_quit(self) -> None:
+        self.exit()
 
     def action_next_tab(self) -> None:
         tabs = self.query_one("#tabs")
