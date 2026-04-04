@@ -66,7 +66,31 @@ class DeleteConfirmScreen(ModalScreen[bool]):
 
 
 
+from textual.binding import Binding
 class DeployScreen(Screen):
+    BINDINGS = [
+        Binding("t", "terminal", "Terminal", show=False),
+        Binding("v", "vscode", "VS Code", show=False),
+        Binding("b", "back", "Back", show=False),
+        Binding("x", "exit", "Exit", show=False),
+    ]
+
+    def action_terminal(self):
+        if not self.query_one("#success-footer").has_class("hidden"):
+            self.on_terminal()
+            
+    def action_vscode(self):
+        if not self.query_one("#success-footer").has_class("hidden"):
+            self.on_vscode()
+            
+    def action_back(self):
+        if not self.query_one("#success-footer").has_class("hidden"):
+            self.on_back()
+            
+    def action_exit(self):
+        if not self.query_one("#success-footer").has_class("hidden"):
+            self.on_exit()
+
     def __init__(self, data, config):
         super().__init__()
         self.data = data
@@ -95,10 +119,10 @@ class DeployScreen(Screen):
         with Vertical(id="success-footer", classes="hidden"):
             yield Label("", id="success-message", classes="success-msg")
             with Horizontal(classes="success-btn-row"):
-                yield Button("Terminal", variant="success", id="btn-terminal")
-                yield Button("VS Code", variant="primary", id="btn-vscode")
-                yield Button("Back to Tool", variant="warning", id="btn-back")
-                yield Button("Exit", variant="error", id="btn-exit")
+                yield Button("(T)erminal", variant="success", id="btn-terminal")
+                yield Button("(V)S Code", variant="primary", id="btn-vscode")
+                yield Button("(B)ack to Tool", variant="warning", id="btn-back")
+                yield Button("E(x)it", variant="error", id="btn-exit")
 
     def on_mount(self):
         self.run_deployment()
@@ -227,7 +251,7 @@ class DeployScreen(Screen):
     @on(Button.Pressed, "#btn-back")
     def on_back(self):
         append_log("Deployment Complete", {"choice": "back"})
-        self.app.exit({"refresh": True})
+        self.dismiss()
 
     @on(Button.Pressed, "#btn-exit")
     def on_exit(self):
