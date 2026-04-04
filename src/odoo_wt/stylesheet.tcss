@@ -212,32 +212,7 @@ DeleteConfirmScreen {
     margin-bottom: 1;
 }
 
-SuccessModal {
-    align: center middle;
-    background: rgba(0, 0, 0, 0.7);
-}
 
-#success-dialog {
-    width: 60;
-    height: auto;
-    padding: 2 4;
-    border: thick $success;
-    background: $surface;
-}
-
-.success-btn-row {
-    align: center middle;
-    margin-top: 1;
-    height: 3;
-}
-
-.success-msg {
-    text-align: center;
-    text-style: bold;
-    color: $success;
-    width: 100%;
-    margin-bottom: 1;
-}
 
 DeployScreen {
     padding: 1 2;
@@ -332,4 +307,16 @@ LogDetailScreen {
     border: none;
     padding: 1 2;
     max-width: 40;
+}
+
+#success-footer {
+    height: auto;
+    padding: 1 2;
+    margin-top: 1;
+    background: $boost;
+    border-top: thick $success;
+}
+
+#success-footer.hidden {
+    display: none;
 }
