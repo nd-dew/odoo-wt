@@ -1,0 +1,14 @@
+[project]
+name = "odoo-wt"
+version = "0.1.0"
+description = "Modern TUI-driven Odoo Worktree Manager"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["textual>=0.52.1", "rich>=13.7.1"]
+
+[project.scripts]
+odoo-wt = "odoo_wt:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
