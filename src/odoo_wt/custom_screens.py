@@ -73,24 +73,25 @@ class DeployScreen(Screen):
 
     def compose(self):
         yield Label("🚀 Deploying Worktree Environment...", classes="deploy-title")
-        with Vertical(classes="log-box"):
-            yield Label("Community", classes="log-title")
-            yield ProgressBar(id="prog-odoo", show_eta=False)
-            yield RichLog(id="log-odoo", markup=False, highlight=False)
-        with Vertical(classes="log-box"):
-            yield Label("Enterprise", classes="log-title")
-            yield ProgressBar(id="prog-ent", show_eta=False)
-            yield RichLog(id="log-ent", markup=False, highlight=False)
-        with Vertical(classes="log-box", id="uv-box"):
-            yield Label("UV Environment", classes="log-title")
-            yield ProgressBar(id="prog-uv", show_eta=False)
-            yield RichLog(id="log-uv", markup=False, highlight=False)
-            
-        with Vertical(id="success-footer", classes="hidden"):
-            yield Label("", id="success-message", classes="success-msg")
-            with Horizontal(classes="success-btn-row"):
-                yield Button("Yes, take me there!", variant="success", id="btn-take-me-there")
-                yield Button("No, just exit", variant="primary", id="btn-just-exit")
+        with VerticalScroll():
+            with Vertical(classes="log-box"):
+                yield Label("Community", classes="log-title")
+                yield ProgressBar(id="prog-odoo", show_eta=False)
+                yield RichLog(id="log-odoo", markup=False, highlight=False)
+            with Vertical(classes="log-box"):
+                yield Label("Enterprise", classes="log-title")
+                yield ProgressBar(id="prog-ent", show_eta=False)
+                yield RichLog(id="log-ent", markup=False, highlight=False)
+            with Vertical(classes="log-box", id="uv-box"):
+                yield Label("UV Environment", classes="log-title")
+                yield ProgressBar(id="prog-uv", show_eta=False)
+                yield RichLog(id="log-uv", markup=False, highlight=False)
+                
+            with Vertical(id="success-footer", classes="hidden"):
+                yield Label("", id="success-message", classes="success-msg")
+                with Horizontal(classes="success-btn-row"):
+                    yield Button("Yes, take me there!", variant="success", id="btn-take-me-there")
+                    yield Button("No, just exit", variant="primary", id="btn-just-exit")
 
     def on_mount(self):
         self.run_deployment()
