@@ -15,7 +15,7 @@ class WizardApp(App):
     
     BINDINGS = [
         Binding("escape", "quit", "", show=False),
-        Binding("ctrl+c", "quit", "Close", key_display="^c"),
+        Binding("ctrl+c", "quit", "Close", key_display="Ctrl+C"),
     ]
 
     def compose(self):
