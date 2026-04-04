@@ -73,7 +73,6 @@ class DeployScreen(Screen):
         self.config = config
 
     def compose(self):
-        yield Label("🚀 Deploying Worktree Environment...", classes="deploy-title")
         with VerticalScroll():
             with Vertical(classes="log-box"):
                 with Horizontal(classes="log-header"):
