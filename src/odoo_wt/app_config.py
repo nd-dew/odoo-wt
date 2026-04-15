@@ -29,7 +29,10 @@ class ConfigManager:
             "config_path": str(DEFAULT_CONFIG_FILE),
             "log_path": str(DEFAULT_LOG_FILE),
             "show_prefix": True,
-            "show_suffix": True
+            "show_suffix": True,
+            "show_desc": True,
+            "dark_mode": True,
+            "use_count": 0
         }
 
     def append_log(self, action: str, details: dict = None):
