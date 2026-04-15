@@ -31,6 +31,7 @@ SETTINGS_HELP = {
     "set-show-prefix": "Toggle visibility of the version dropdown in the Creation tab.",
     "set-show-suffix": "Toggle visibility of the suffix dropdown in the Creation tab.",
     "set-show-desc": "Toggle visibility of the app description text at the top.",
+    "set-dark-mode": "Toggle between dark and light themes.",
     "set-config-path": "Moving this will migrate your config file to a new location.",
     "set-log-path": "Moving this will migrate your log file to a new location.",
 }
@@ -55,6 +56,13 @@ class OdooWtApp(App):
         super().__init__()
         self.config = config
         
+        # Track usage and auto-hide description at 18th launch
+        use_count = self.config.get("use_count", 0) + 1
+        self.config["use_count"] = use_count
+        if use_count == 18:
+            self.config["show_desc"] = False
+        config_mgr.save(self.config)
+        
         ig_v = set(config.get("ignored_versions", []))
         ig_s = set(config.get("ignored_suffixes", []))
         
@@ -70,17 +78,27 @@ class OdooWtApp(App):
         self.branch_status = ""
         self.save_timer = None
 
+        # Modern Textual Theme API
+        is_dark = self.config.get("dark_mode", True)
+        self.theme = "textual-dark" if is_dark else "textual-light"
+
+    def get_footer_text(self) -> str:
+        try:
+            active_tab = self.query_one("#tabs").active
+        except Exception:
+            active_tab = "tab-create"
+            
+        parts = ["^S Create", "^D Delete", "^R Refresh", "^T Tab", "^Q Quit"]
+        if active_tab == "tab-manage":
+            parts.append("Enter Open")
+        return "  ".join(parts)
+
     @on(DescendantFocus)
     def on_descendant_focus(self, event: DescendantFocus) -> None:
         try:
             help_bar = self.query_one("#global-help-bar", Static)
             active_tab = self.query_one("#tabs").active
-            
-            base_shortcuts = "[bold]Shortcuts:[/bold] ^S (Create) | ^D (Delete) | ^R (Refresh) | ^T (Next Tab) | ^Q (Quit)"
-            shortcuts = base_shortcuts
-            
-            if active_tab == "tab-manage":
-                shortcuts += " | [bold cyan]Enter[/bold cyan] (Open Terminal)"
+            shortcuts = self.get_footer_text()
             
             if active_tab != "tab-settings":
                 help_bar.update(shortcuts)
@@ -179,7 +197,7 @@ class OdooWtApp(App):
                     yield Label("", id="dynamic-summary", classes="summary-box")
                     with Horizontal(classes="btn-row"):
                         yield Button("Create ⏎", variant="success", id="submit-btn")
-                with TabPane("Existing / Removal", id="tab-manage"):
+                with TabPane("Manage", id="tab-manage"):
                     yield Label("Discovery: Scans 'Worktree Root Path' (in Settings)\nfor 'odoo/.git' folders. [bold cyan]Hint: Double-click or press Enter on a row to open in terminal.[/bold cyan]", classes="tab-description")
                     yield Input(placeholder="Fuzzy search worktrees...", id="wt-search", classes="search-input")
                     yield DataTable(id="wt-table", cursor_type="row")
@@ -228,6 +246,9 @@ class OdooWtApp(App):
                             yield Label("Show Description:", classes="setting-label")
                             yield Switch(value=self.config.get("show_desc", True), id="set-show-desc", classes="setting-input")
                         with Horizontal(classes="setting-item"):
+                            yield Label("Dark Mode:", classes="setting-label")
+                            yield Switch(value=self.config.get("dark_mode", True), id="set-dark-mode", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
                             yield Label("Config Path:", classes="setting-label")
                             yield Input(value=self.config.get("config_path", ""), id="set-config-path", classes="setting-input")
                         with Horizontal(classes="setting-item"):
@@ -241,7 +262,7 @@ class OdooWtApp(App):
                         yield Button("Clear Logs", variant="error", id="clear-logs-btn")
         
         # Replace Footer with our custom global help bar
-        yield Static("[bold]Shortcuts:[/bold] ^S (Create) | ^D (Delete) | ^R (Refresh) | ^T (Next Tab) | ^Q (Quit)", id="global-help-bar", classes="help-bar")
+        yield Static("^S Create  ^D Delete  ^R Refresh  ^T Tab  ^Q Quit", id="global-help-bar", classes="help-bar")
 
     def on_mount(self) -> None:
         config_mgr.append_log("App Started")
@@ -586,6 +607,11 @@ class OdooWtApp(App):
         self.query_one("#set-show-prefix", Switch).value = self.config.get("show_prefix", True)
         self.query_one("#set-show-suffix", Switch).value = self.config.get("show_suffix", True)
         self.query_one("#set-show-desc", Switch).value = self.config.get("show_desc", True)
+        
+        is_dark = self.config.get("dark_mode", True)
+        self.query_one("#set-dark-mode", Switch).value = is_dark
+        self.theme = "textual-dark" if is_dark else "textual-light"
+        
         self.apply_visibility_settings()
         self.notify("Settings reset to last saved state.")
 
@@ -701,8 +727,13 @@ class OdooWtApp(App):
     @on(Switch.Changed, "#set-show-prefix")
     @on(Switch.Changed, "#set-show-suffix")
     @on(Switch.Changed, "#set-show-desc")
+    @on(Switch.Changed, "#set-dark-mode")
     def on_setting_changed(self, event) -> None:
         if self.is_mounted:
+            # Immediate theme toggle
+            if hasattr(event, "switch") and event.switch.id == "set-dark-mode":
+                self.theme = "textual-dark" if event.value else "textual-light"
+
             if self.save_timer:
                 self.save_timer.stop()
             self.save_timer = self.set_timer(0.5, self.save_settings_auto)
@@ -724,6 +755,7 @@ class OdooWtApp(App):
         self.config["show_prefix"] = self.query_one("#set-show-prefix", Switch).value
         self.config["show_suffix"] = self.query_one("#set-show-suffix", Switch).value
         self.config["show_desc"] = self.query_one("#set-show-desc", Switch).value
+        self.config["dark_mode"] = self.query_one("#set-dark-mode", Switch).value
 
         ig_v = [v.strip() for v in self.query_one("#set-ig-v", Input).value.split(",") if v.strip()]
         ig_s = [s.strip() for s in self.query_one("#set-ig-s", Input).value.split(",") if s.strip()]
