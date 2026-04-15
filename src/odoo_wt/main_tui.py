@@ -277,6 +277,8 @@ class OdooWtApp(App):
             self.query_one("#tabs", TabbedContent).active = default_tab
             if default_tab == "tab-manage":
                 self.query_one("#wt-search").focus()
+            elif default_tab == "tab-settings":
+                self.query_one("#settings-search").focus()
             else:
                 self.query_one("#desc").focus()
         except Exception as e:
@@ -349,7 +351,7 @@ class OdooWtApp(App):
         elif active_pane == "tab-manage":
             self.query_one("#wt-search").focus()
         elif active_pane == "tab-settings":
-            self.query_one("#set-wt").focus()
+            self.query_one("#settings-search").focus()
         elif active_pane == "tab-logs":
             self.populate_logs_table()
             self.query_one("#logs-table").focus()
@@ -601,7 +603,7 @@ class OdooWtApp(App):
         for item in self.query(".setting-item"):
             try:
                 # Aggregate searchable text
-                labels = " ".join([str(l.renderable).lower() for l in item.query(Label)])
+                labels = " ".join([l.render().plain.lower() if hasattr(l.render(), "plain") else str(l.render()).lower() for l in item.query(Label)])
                 inputs = item.query("Input, Switch, Select, Checkbox")
                 val_text = ""
                 help_text = ""
