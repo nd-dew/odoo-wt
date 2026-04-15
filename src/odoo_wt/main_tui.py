@@ -39,14 +39,14 @@ class OdooWtApp(App):
     CSS_PATH = "stylesheet.tcss"
 
     BINDINGS = [
-        Binding("ctrl+s", "submit", "Create", key_display="Ctrl+S"),
-        Binding("ctrl+d", "delete_wt", "Delete", key_display="Ctrl+D"),
-        Binding("ctrl+r", "refresh", "Refresh/Reset", key_display="Ctrl+R"),
-        Binding("ctrl+t", "next_tab", "Tab", key_display="Ctrl+T"),
+        Binding("ctrl+s", "submit", "Create", key_display="^S"),
+        Binding("ctrl+d", "delete_wt", "Delete", key_display="^D"),
+        Binding("ctrl+r", "refresh", "Refresh/Reset", key_display="^R"),
+        Binding("ctrl+t", "next_tab", "Tab", key_display="^T"),
         Binding("ctrl+tab", "next_tab", "", show=False),
         Binding("c", "copy_text", "Copy", key_display="C"),
         Binding("escape", "quit", "", show=False),
-        Binding("ctrl+q", "quit", "Quit", show=True, key_display="Ctrl+Q"),
+        Binding("ctrl+q", "quit", "Quit", show=True, key_display="^Q"),
         Binding("ctrl+c", "quit", "Quit", show=False),
     ]
 
@@ -75,7 +75,7 @@ class OdooWtApp(App):
             help_bar = self.query_one("#global-help-bar", Static)
             active_tab = self.query_one("#tabs").active
             
-            base_shortcuts = "[bold]Shortcuts:[/bold] Ctrl+S (Create) | Ctrl+D (Delete) | Ctrl+R (Refresh) | Ctrl+T (Next Tab) | Ctrl+Q (Quit)"
+            base_shortcuts = "[bold]Shortcuts:[/bold] ^S (Create) | ^D (Delete) | ^R (Refresh) | ^T (Next Tab) | ^Q (Quit)"
             shortcuts = base_shortcuts
             
             if active_tab == "tab-manage":
@@ -244,7 +244,7 @@ class OdooWtApp(App):
                         yield Button("Clear Logs", variant="error", id="clear-logs-btn")
         
         # Replace Footer with our custom global help bar
-        yield Static("[bold]Shortcuts:[/bold] Ctrl+S (Create) | Ctrl+D (Delete) | Ctrl+R (Refresh) | Ctrl+T (Next Tab) | Ctrl+Q (Quit)", id="global-help-bar", classes="help-bar")
+        yield Static("[bold]Shortcuts:[/bold] ^S (Create) | ^D (Delete) | ^R (Refresh) | ^T (Next Tab) | ^Q (Quit)", id="global-help-bar", classes="help-bar")
 
     def on_mount(self) -> None:
         config_mgr.append_log("App Started")
