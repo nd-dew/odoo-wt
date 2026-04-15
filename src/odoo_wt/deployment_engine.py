@@ -55,14 +55,19 @@ class DeployEngine:
         remote = await asyncio.to_thread(get_remote, repo_path)
         yield DeployUpdate(category=category, log_line=f"Detected base remote: {remote}", advance=1)
 
-        yield DeployUpdate(category=category, log_line=f"Fetching '{self.branch_name}' from '{self.dev_remote}'...")
-        
-        fetch_success = True
-        try:
-            async for update in run_cmd_stream_gen(["git", "fetch", self.dev_remote, f"{self.branch_name}:{self.branch_name}", "--force"], repo_path, category, allow_fail=True):
-                yield update
-        except RuntimeError:
-            fetch_success = False
+        is_base_branch = (self.branch_name == self.base_v)
+        fetch_success = False
+
+        if not is_base_branch:
+            yield DeployUpdate(category=category, log_line=f"Fetching '{self.branch_name}' from '{self.dev_remote}'...")
+            fetch_success = True
+            try:
+                async for update in run_cmd_stream_gen(["git", "fetch", self.dev_remote, f"{self.branch_name}:{self.branch_name}", "--force"], repo_path, category, allow_fail=True):
+                    yield update
+            except RuntimeError:
+                fetch_success = False
+        else:
+            yield DeployUpdate(category=category, log_line=f"Requested base branch '{self.branch_name}'. Skipping dev remote fetch.")
         
         yield DeployUpdate(category=category, advance=1)
 
@@ -72,7 +77,11 @@ class DeployEngine:
                 async for update in run_cmd_stream_gen(["git", "worktree", "add", str(self.target_dir / dest_label), self.branch_name], repo_path, category):
                     yield update
             else:
-                yield DeployUpdate(category=category, log_line=f"Branch not found on '{self.dev_remote}'. Fetching '{self.base_v}' from '{remote}'...")
+                if not is_base_branch:
+                    yield DeployUpdate(category=category, log_line=f"Branch not found on '{self.dev_remote}'. Fetching '{self.base_v}' from '{remote}'...")
+                else:
+                    yield DeployUpdate(category=category, log_line=f"Fetching '{self.base_v}' from '{remote}'...")
+                    
                 async for update in run_cmd_stream_gen(["git", "fetch", remote, self.base_v], repo_path, category):
                     yield update
                 
