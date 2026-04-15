@@ -54,9 +54,46 @@ class OdooWtApp(App):
 
     from textual.events import DescendantFocus
 
-    def on_key(self, event) -> None:
+    @on(DescendantFocus)
+    def on_descendant_focus(self, event: DescendantFocus) -> None:
         try:
-            if self.query_one("#tabs").active == "tab-settings":
+            if self.query_one("#tabs").active != "tab-settings":
+                return
+            
+            # Check the actual top-level focused widget, not the internal descendant
+            focused = self.focused
+            help_bar = self.query_one("#settings-help-bar", Static)
+            
+            if focused and hasattr(focused, "tooltip") and focused.tooltip:
+                # In Textual, tooltip might be a Renderable, cast to string for the Static widget
+                help_bar.update(f"[bold cyan]Info:[/bold cyan] {focused.tooltip}")
+            else:
+                help_bar.update("Navigate inputs to see descriptions.")
+        except Exception: pass
+
+    @on(Key)
+    def handle_global_keys(self, event: Key) -> None:
+        try:
+            active_tab = self.query_one("#tabs").active
+            focused = self.focused
+            
+            # 1. Search Navigation Proxy (Existing Tab)
+            if focused and focused.id == "wt-search" and event.key in ("down", "up", "enter"):
+                table = self.query_one("#wt-table", DataTable)
+                if table.row_count > 0:
+                    if event.key == "down":
+                        table.action_cursor_down()
+                        event.prevent_default()
+                    elif event.key == "up":
+                        table.action_cursor_up()
+                        event.prevent_default()
+                    elif event.key == "enter":
+                        table.action_select_cursor()
+                        event.prevent_default()
+                return
+
+            # 2. Settings Tab Navigation overrides (prevent inputs from swallowing arrows)
+            if active_tab == "tab-settings":
                 if event.key == "up":
                     self.screen.focus_previous()
                     event.prevent_default()
@@ -66,23 +103,11 @@ class OdooWtApp(App):
                 elif event.key == "pageup":
                     container = self.query_one(".settings-container", VerticalScroll)
                     container.scroll_page_up()
+                    event.prevent_default()
                 elif event.key == "pagedown":
                     container = self.query_one(".settings-container", VerticalScroll)
                     container.scroll_page_down()
-        except Exception: pass
-
-    @on(DescendantFocus)
-    def on_descendant_focus(self, event: DescendantFocus) -> None:
-        try:
-            if self.query_one("#tabs").active != "tab-settings":
-                return
-            widget = event.widget
-            
-            help_bar = self.query_one("#settings-help-bar", Static)
-            if hasattr(widget, "tooltip") and widget.tooltip:
-                help_bar.update(f"[bold cyan]Info:[/bold cyan] {widget.tooltip}")
-            else:
-                help_bar.update("Navigate inputs to see descriptions.")
+                    event.prevent_default()
         except Exception: pass
 
     def compose(self) -> ComposeResult:
@@ -132,57 +157,59 @@ class OdooWtApp(App):
                         yield Button("Refresh", id="refresh-btn")
                         yield Button("Delete Selected", variant="error", id="delete-btn")
                 with TabPane("Settings", id="tab-settings"):
-                    with VerticalScroll(classes="settings-container"):
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Worktree Root:", classes="setting-label")
-                            yield Input(value=self.config.get("wt_root", ""), id="set-wt", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("UV Envs Path:", classes="setting-label")
-                            yield Input(value=self.config.get("env_root", ""), id="set-env", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Default Suffix:", classes="setting-label")
-                            yield Input(value=self.config.get("suffix", ""), id="set-suffix", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Dev Remote (Fork):", classes="setting-label")
-                            yield Input(value=self.config.get("remote_name", "odoo-dev"), id="set-remote", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Python Version:", classes="setting-label")
-                            yield Input(value=self.config.get("python_version", "3.12"), id="set-py-v", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Community Dir:", classes="setting-label")
-                            yield Input(value=self.config.get("community_dir", "odoo"), id="set-comm", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Enterprise Dir:", classes="setting-label")
-                            yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Default Tab:", classes="setting-label")
-                            yield Select(
-                                [("Creation", "tab-create"), ("Existing", "tab-manage")],
-                                value=self.config.get("default_tab", "tab-create"),
-                                id="set-default-tab",
-                                classes="setting-input",
-                                tooltip="Which tab to open by default when the app starts."
-                            )
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Removed Versions:", classes="setting-label")
-                            yield Input(value=",".join(self.config.get("ignored_versions", [])), id="set-ig-v", classes="setting-input", tooltip="Comma-separated lists of auto-discovered versions to hide from the creation dropdowns.")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Removed Suffixes:", classes="setting-label")
-                            yield Input(value=",".join(self.config.get("ignored_suffixes", [])), id="set-ig-s", classes="setting-input", tooltip="Comma-separated lists of auto-discovered suffixes to hide from the creation dropdowns.")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Show Prefix (Version):", classes="setting-label")
-                            yield Checkbox(value=self.config.get("show_prefix", True), id="set-show-prefix", classes="setting-input", tooltip="Toggle visibility of the version dropdown in the Creation tab.")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Show Suffix:", classes="setting-label")
-                            yield Checkbox(value=self.config.get("show_suffix", True), id="set-show-suffix", classes="setting-input", tooltip="Toggle visibility of the suffix dropdown in the Creation tab.")
-                        with Horizontal(classes="setting-item full-width"):
-                            yield Label("Config Path:", classes="setting-label")
-                            yield Input(value=self.config.get("config_path", ""), id="set-config-path", classes="setting-input", tooltip="Changing this will automatically move your existing config to the new location.")
-                        with Horizontal(classes="setting-item full-width"):
-                            yield Label("Log Path:", classes="setting-label")
-                            yield Input(value=self.config.get("log_path", ""), id="set-log-path", classes="setting-input", tooltip="Changing this will automatically move your existing logs to the new location.")
+                    with Vertical(classes="settings-outer"):
+                        with VerticalScroll(classes="settings-container"):
+                            with Horizontal(classes="setting-item"):
+                                yield Label("Worktree Root:", classes="setting-label")
+                                yield Input(value=self.config.get("wt_root", ""), id="set-wt", classes="setting-input")
+                            with Horizontal(classes="setting-item"):
+                                yield Label("UV Envs Path:", classes="setting-label")
+                                yield Input(value=self.config.get("env_root", ""), id="set-env", classes="setting-input")
+                            with Horizontal(classes="setting-item"):
+                                yield Label("Default Suffix:", classes="setting-label")
+                                yield Input(value=self.config.get("suffix", ""), id="set-suffix", classes="setting-input")
+                            with Horizontal(classes="setting-item"):
+                                yield Label("Dev Remote (Fork):", classes="setting-label")
+                                yield Input(value=self.config.get("remote_name", "odoo-dev"), id="set-remote", classes="setting-input")
+                            with Horizontal(classes="setting-item"):
+                                yield Label("Python Version:", classes="setting-label")
+                                yield Input(value=self.config.get("python_version", "3.12"), id="set-py-v", classes="setting-input")
+                            with Horizontal(classes="setting-item"):
+                                yield Label("Community Dir:", classes="setting-label")
+                                yield Input(value=self.config.get("community_dir", "odoo"), id="set-comm", classes="setting-input")
+                            with Horizontal(classes="setting-item"):
+                                yield Label("Enterprise Dir:", classes="setting-label")
+                                yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input")
+                            with Horizontal(classes="setting-item"):
+                                yield Label("Default Tab:", classes="setting-label")
+                                yield Select(
+                                    [("Creation", "tab-create"), ("Existing", "tab-manage")],
+                                    value=self.config.get("default_tab", "tab-create"),
+                                    id="set-default-tab",
+                                    classes="setting-input",
+                                    tooltip="Which tab to open by default when the app starts."
+                                )
+                            with Horizontal(classes="setting-item"):
+                                yield Label("Removed Versions:", classes="setting-label")
+                                yield Input(value=",".join(self.config.get("ignored_versions", [])), id="set-ig-v", classes="setting-input", tooltip="Comma-separated lists of auto-discovered versions to hide from the creation dropdowns.")
+                            with Horizontal(classes="setting-item"):
+                                yield Label("Removed Suffixes:", classes="setting-label")
+                                yield Input(value=",".join(self.config.get("ignored_suffixes", [])), id="set-ig-s", classes="setting-input", tooltip="Comma-separated lists of auto-discovered suffixes to hide from the creation dropdowns.")
+                            with Horizontal(classes="setting-item"):
+                                yield Label("Show Prefix (Version):", classes="setting-label")
+                                yield Checkbox(value=self.config.get("show_prefix", True), id="set-show-prefix", classes="setting-input", tooltip="Toggle visibility of the version dropdown in the Creation tab.")
+                            with Horizontal(classes="setting-item"):
+                                yield Label("Show Suffix:", classes="setting-label")
+                                yield Checkbox(value=self.config.get("show_suffix", True), id="set-show-suffix", classes="setting-input", tooltip="Toggle visibility of the suffix dropdown in the Creation tab.")
+                            with Horizontal(classes="setting-item full-width"):
+                                yield Label("Config Path:", classes="setting-label")
+                                yield Input(value=self.config.get("config_path", ""), id="set-config-path", classes="setting-input", tooltip="Changing this will automatically move your existing config to the new location.")
+                            with Horizontal(classes="setting-item full-width"):
+                                yield Label("Log Path:", classes="setting-label")
+                                yield Input(value=self.config.get("log_path", ""), id="set-log-path", classes="setting-input", tooltip="Changing this will automatically move your existing logs to the new location.")
+                            
+                            yield Static(f"[bold]Config File:[/bold] {config_mgr.config_file}\n", classes="tab-description")
                         
-                        yield Static(f"[bold]Config File:[/bold] {config_mgr.config_file}\n", classes="tab-description")
                         yield Static("Navigate inputs to see descriptions.", id="settings-help-bar", classes="help-bar")
                 with TabPane("Logs", id="tab-logs"):
                     yield Label("System Logs (Newest first)", classes="tab-description")
@@ -508,27 +535,6 @@ class OdooWtApp(App):
     @on(Input.Changed, "#wt-search")
     def on_wt_search_changed(self, event: Input.Changed) -> None:
         self.populate_table()
-
-    @on(Key)
-    def handle_search_navigation(self, event: Key) -> None:
-        # Proxy arrow keys and Enter from the search input to the DataTable
-        try:
-            focused = self.focused
-            if focused and focused.id == "wt-search":
-                if event.key in ("down", "up", "enter"):
-                    table = self.query_one("#wt-table", DataTable)
-                    if table.row_count > 0:
-                        if event.key == "down":
-                            table.action_cursor_down()
-                            event.prevent_default()
-                        elif event.key == "up":
-                            table.action_cursor_up()
-                            event.prevent_default()
-                        elif event.key == "enter":
-                            table.action_select_cursor()
-                            event.prevent_default()
-        except Exception:
-            pass
 
     @on(DataTable.RowSelected, "#wt-table")
     def on_wt_row_selected(self, event: DataTable.RowSelected) -> None:
