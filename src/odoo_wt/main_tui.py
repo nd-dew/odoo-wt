@@ -117,7 +117,9 @@ class OdooWtApp(App):
                 help_bar.update(f"[bold cyan]Info:[/bold cyan] {help_text}\n{shortcuts}")
             else:
                 help_bar.update(f"[bold cyan]Info:[/bold cyan] Navigate inputs to see descriptions.\n{shortcuts}")
-        except Exception: pass
+        except Exception as e:
+            import traceback
+            config_mgr.append_log("Non-crashing UI error", {"error": str(e), "trace": traceback.format_exc()})
 
     @on(Key)
     def handle_global_keys(self, event: Key) -> None:
@@ -156,7 +158,9 @@ class OdooWtApp(App):
                     container = self.query_one(".settings-container", VerticalScroll)
                     container.scroll_page_down()
                     event.prevent_default()
-        except Exception: pass
+        except Exception as e:
+            import traceback
+            config_mgr.append_log("Non-crashing UI error", {"error": str(e), "trace": traceback.format_exc()})
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
@@ -205,6 +209,7 @@ class OdooWtApp(App):
                         yield Button("Refresh", id="refresh-btn")
                         yield Button("Delete Selected", variant="error", id="delete-btn")
                 with TabPane("Settings", id="tab-settings"):
+                    yield Input(placeholder="Fuzzy search settings... (e.g. 'log', 'dark', 'path')", id="settings-search", classes="search-input")
                     with VerticalScroll(classes="settings-container"):
                         with Horizontal(classes="setting-item"):
                             yield Label("Worktree Root:", classes="setting-label")
@@ -329,8 +334,9 @@ class OdooWtApp(App):
                 self.query_one("#version", Select).value = "none"
                 self.query_one("#suffix", Select).value = "none"
                 self.notify("Paste detected: Version and Suffix unset.", timeout=3)
-        except Exception:
-            pass
+        except Exception as e:
+            import traceback
+            config_mgr.append_log("Non-crashing UI error", {"error": str(e), "trace": traceback.format_exc()})
 
     @on(TabbedContent.TabActivated, "#tabs")
     def on_tab_activated(self, event: TabbedContent.TabActivated) -> None:
@@ -381,6 +387,8 @@ class OdooWtApp(App):
             wt_root = self.config.get("wt_root", "")
             remote = self.config.get("remote_name", "odoo-dev")
             base_v = version if version else "master"
+            comm_dir = self.config.get("community_dir", "odoo")
+            ent_dir = self.config.get("enterprise_dir", "enterprise")
             
             # Update Strategy Text
             is_base_branch = (branch_name == base_v)
@@ -404,12 +412,14 @@ class OdooWtApp(App):
                 f"[bold]Outcome:[/bold]\n"
                 f"1. [bold cyan]Branch Status:[/bold cyan] {self.branch_status or 'Ready...'}\n"
                 f"2. I will create a new directory at [bold green]{wt_root}/{branch_name}[/bold green]:\n"
-                f"   ├── odoo/       (Community worktree)\n"
-                f"   └── enterprise/ (Enterprise worktree)\n"
+                f"   ├── {comm_dir}/       [bright_black](Community worktree)[/bright_black]\n"
+                f"   └── {ent_dir}/ [bright_black](Enterprise worktree)[/bright_black]\n"
                 f"3. I will use or create the [bold magenta]{base_v}[/bold magenta] UV environment and link it as '.venv'."
             )
             self.query_one("#dynamic-summary", Label).update(summary)
-        except Exception: pass
+        except Exception as e:
+            import traceback
+            config_mgr.append_log("Non-crashing UI error", {"error": str(e), "trace": traceback.format_exc()})
 
     @on(Input.Changed, "#desc")
     @on(Input.Changed, "#custom_version")
@@ -478,8 +488,9 @@ class OdooWtApp(App):
                     self.branch_status = f"[bold white]New branch will be created.[/bold white]{spell_warning}"
             
             self.update_summary()
-        except Exception:
-            pass
+        except Exception as e:
+            import traceback
+            config_mgr.append_log("Non-crashing UI error", {"error": str(e), "trace": traceback.format_exc()})
 
     @on(Input.Submitted, "#desc")
     @on(Input.Submitted, "#custom_version")
@@ -583,6 +594,30 @@ class OdooWtApp(App):
     @on(Input.Changed, "#wt-search")
     def on_wt_search_changed(self, event: Input.Changed) -> None:
         self.populate_table()
+
+    @on(Input.Changed, "#settings-search")
+    def on_settings_search_changed(self, event: Input.Changed) -> None:
+        search_terms = event.value.lower().split()
+        for item in self.query(".setting-item"):
+            try:
+                # Aggregate searchable text
+                labels = " ".join([str(l.renderable).lower() for l in item.query(Label)])
+                inputs = item.query("Input, Switch, Select, Checkbox")
+                val_text = ""
+                help_text = ""
+                
+                if inputs:
+                    first = inputs.first()
+                    if hasattr(first, "value"):
+                        val_text = str(first.value).lower()
+                    if first.id and first.id in SETTINGS_HELP:
+                        help_text = SETTINGS_HELP[first.id].lower()
+                        
+                combined = f"{labels} {val_text} {help_text}"
+                item.display = all(t in combined for t in search_terms)
+            except Exception as e:
+                import traceback
+                config_mgr.append_log("Settings Search Error", {"error": str(e), "traceback": traceback.format_exc()})
 
     @on(DataTable.RowSelected, "#wt-table")
     def on_wt_row_selected(self, event: DataTable.RowSelected) -> None:
