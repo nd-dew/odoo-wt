@@ -30,6 +30,7 @@ SETTINGS_HELP = {
     "set-ig-s": "Comma-separated list of suffixes to hide from the creation dropdowns.",
     "set-show-prefix": "Toggle visibility of the version dropdown in the Creation tab.",
     "set-show-suffix": "Toggle visibility of the suffix dropdown in the Creation tab.",
+    "set-show-desc": "Toggle visibility of the app description text at the top.",
     "set-config-path": "Moving this will migrate your config file to a new location.",
     "set-log-path": "Moving this will migrate your log file to a new location.",
 }
@@ -144,7 +145,7 @@ class OdooWtApp(App):
             with Horizontal(id="top-bar"):
                 with Vertical(id="title-container"):
                     yield Label("Odoo WorkTree Tool", classes="title")
-                    yield Label("Opinionated tool for Odoo development. Creates/removes WorkTrees\nreusing UV environments per Odoo version.", classes="description")
+                    yield Label("Opinionated tool for Odoo development. Creates/removes WorkTrees\nreusing UV environments per Odoo version.", id="app-desc", classes="description")
                 yield Button("X", id="btn-close-app", classes="close-btn")
             yield Label("")
             with TabbedContent(id="tabs"):
@@ -153,7 +154,7 @@ class OdooWtApp(App):
 
                     with Horizontal(classes="main-row"):
                         with Vertical(id="version-col"):
-                            yield Select(((v, v) for v in self.v_list), value=self.v_list[0] if self.v_list else None, id="version")
+                            yield Select(((v, v) for v in self.v_list), value=self.v_list[0] if self.v_list else None, id="version", allow_blank=False)
                             yield Input(id="custom_version", classes="custom-field")
 
                         yield Label("-", classes="dash")
@@ -164,7 +165,7 @@ class OdooWtApp(App):
                         yield Label("-", classes="dash")
 
                         with Vertical(id="suffix-col"):
-                            yield Select(((s, s) for s in self.s_list), value=self.s_list[0] if self.s_list else None, id="suffix")
+                            yield Select(((s, s) for s in self.s_list), value=self.s_list[0] if self.s_list else None, id="suffix", allow_blank=False)
                             yield Input(id="custom_suffix", classes="custom-field")
 
                     yield Label(
@@ -214,7 +215,8 @@ class OdooWtApp(App):
                                 [("Creation", "tab-create"), ("Existing", "tab-manage")],
                                 value=self.config.get("default_tab", "tab-create"),
                                 id="set-default-tab",
-                                classes="setting-input"
+                                classes="setting-input",
+                                allow_blank=False
                             )
                         with Horizontal(classes="setting-item"):
                             yield Label("Removed Versions:", classes="setting-label")
@@ -228,14 +230,15 @@ class OdooWtApp(App):
                         with Horizontal(classes="setting-item"):
                             yield Label("Show Suffix:", classes="setting-label")
                             yield Checkbox(value=self.config.get("show_suffix", True), id="set-show-suffix", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Show Description:", classes="setting-label")
+                            yield Checkbox(value=self.config.get("show_desc", True), id="set-show-desc", classes="setting-input")
                         with Horizontal(classes="setting-item full-width"):
                             yield Label("Config Path:", classes="setting-label")
                             yield Input(value=self.config.get("config_path", ""), id="set-config-path", classes="setting-input")
                         with Horizontal(classes="setting-item full-width"):
                             yield Label("Log Path:", classes="setting-label")
                             yield Input(value=self.config.get("log_path", ""), id="set-log-path", classes="setting-input")
-                        
-                        yield Static(f"[bold]Config File:[/bold] {config_mgr.config_file}\n", classes="tab-description")
                 with TabPane("Logs", id="tab-logs"):
                     yield Label("System Logs (Newest first)", classes="tab-description")
                     yield DataTable(id="logs-table", cursor_type="row")
@@ -271,8 +274,11 @@ class OdooWtApp(App):
     def apply_visibility_settings(self):
         prefix_col = self.query_one("#version-col")
         suffix_col = self.query_one("#suffix-col")
+        app_desc = self.query_one("#app-desc")
+        
         prefix_col.display = self.config.get("show_prefix", True)
         suffix_col.display = self.config.get("show_suffix", True)
+        app_desc.display = self.config.get("show_desc", True)
 
     @work(exclusive=True, thread=True)
     async def background_fetch(self, version: str) -> None:
@@ -570,8 +576,7 @@ class OdooWtApp(App):
         self.exit({"action": "terminal", "path": path})
 
     def action_reset_settings(self) -> None:
-        from .app_config import load_config
-        self.config = load_config()
+        self.config = config_mgr.load()
         self.query_one("#set-wt", Input).value = self.config.get("wt_root", "")
         self.query_one("#set-env", Input).value = self.config.get("env_root", "")
         self.query_one("#set-suffix", Input).value = self.config.get("suffix", "")
@@ -586,6 +591,7 @@ class OdooWtApp(App):
         self.query_one("#set-log-path", Input).value = self.config.get("log_path", "")
         self.query_one("#set-show-prefix", Checkbox).value = self.config.get("show_prefix", True)
         self.query_one("#set-show-suffix", Checkbox).value = self.config.get("show_suffix", True)
+        self.query_one("#set-show-desc", Checkbox).value = self.config.get("show_desc", True)
         self.apply_visibility_settings()
         self.notify("Settings reset to last saved state.")
 
@@ -700,6 +706,7 @@ class OdooWtApp(App):
     @on(Select.Changed, "#set-default-tab")
     @on(Checkbox.Changed, "#set-show-prefix")
     @on(Checkbox.Changed, "#set-show-suffix")
+    @on(Checkbox.Changed, "#set-show-desc")
     def on_setting_changed(self, event) -> None:
         if self.is_mounted:
             if self.save_timer:
@@ -714,11 +721,15 @@ class OdooWtApp(App):
         self.config["python_version"] = self.query_one("#set-py-v", Input).value
         self.config["community_dir"] = self.query_one("#set-comm", Input).value
         self.config["enterprise_dir"] = self.query_one("#set-ent", Input).value
-        self.config["default_tab"] = self.query_one("#set-default-tab", Select).value
+        
+        def_tab = self.query_one("#set-default-tab", Select).value
+        self.config["default_tab"] = def_tab if def_tab != Select.BLANK else "tab-create"
+        
         self.config["config_path"] = self.query_one("#set-config-path", Input).value
         self.config["log_path"] = self.query_one("#set-log-path", Input).value
         self.config["show_prefix"] = self.query_one("#set-show-prefix", Checkbox).value
         self.config["show_suffix"] = self.query_one("#set-show-suffix", Checkbox).value
+        self.config["show_desc"] = self.query_one("#set-show-desc", Checkbox).value
 
         ig_v = [v.strip() for v in self.query_one("#set-ig-v", Input).value.split(",") if v.strip()]
         ig_s = [s.strip() for s in self.query_one("#set-ig-s", Input).value.split(",") if s.strip()]
@@ -843,8 +854,8 @@ class OdooWtApp(App):
         desc = self.query_one("#desc").value
         s_sel = self.query_one("#suffix").value
         suffix = self.query_one("#custom_suffix").value if s_sel == "custom..." else s_sel
-        if version == "none": version = ""
-        if suffix == "none": suffix = ""
+        if version == "none" or version == Select.BLANK: version = ""
+        if suffix == "none" or suffix == Select.BLANK: suffix = ""
         if s_sel == "custom..." and suffix and suffix != "none":
             self.config["suffix"] = suffix
             config_mgr.save(self.config)
