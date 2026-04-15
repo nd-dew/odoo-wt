@@ -4,7 +4,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll, Center
-from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable, Static, Checkbox
+from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable, Static, Checkbox, Switch
 from textual import on, work
 from textual.events import Paste, Key, DescendantFocus
 from textual.binding import Binding
@@ -210,14 +210,8 @@ class OdooWtApp(App):
                             yield Label("Enterprise Dir:", classes="setting-label")
                             yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input")
                         with Horizontal(classes="setting-item"):
-                            yield Label("Default Tab:", classes="setting-label")
-                            yield Select(
-                                [("Creation", "tab-create"), ("Existing", "tab-manage")],
-                                value=self.config.get("default_tab", "tab-create"),
-                                id="set-default-tab",
-                                classes="setting-input",
-                                allow_blank=False
-                            )
+                            yield Label("Start in Manage Tab:", classes="setting-label")
+                            yield Checkbox(value=(self.config.get("default_tab", "tab-create") == "tab-manage"), id="set-default-tab", classes="setting-input")
                         with Horizontal(classes="setting-item"):
                             yield Label("Removed Versions:", classes="setting-label")
                             yield Input(value=",".join(self.config.get("ignored_versions", [])), id="set-ig-v", classes="setting-input")
@@ -584,7 +578,7 @@ class OdooWtApp(App):
         self.query_one("#set-py-v", Input).value = self.config.get("python_version", "3.12")
         self.query_one("#set-comm", Input).value = self.config.get("community_dir", "odoo")
         self.query_one("#set-ent", Input).value = self.config.get("enterprise_dir", "enterprise")
-        self.query_one("#set-default-tab", Select).value = self.config.get("default_tab", "tab-create")
+        self.query_one("#set-default-tab", Checkbox).value = (self.config.get("default_tab", "tab-create") == "tab-manage")
         self.query_one("#set-ig-v", Input).value = ",".join(self.config.get("ignored_versions", []))
         self.query_one("#set-ig-s", Input).value = ",".join(self.config.get("ignored_suffixes", []))
         self.query_one("#set-config-path", Input).value = self.config.get("config_path", "")
@@ -703,7 +697,7 @@ class OdooWtApp(App):
     @on(Input.Changed, "#set-ig-s")
     @on(Input.Changed, "#set-config-path")
     @on(Input.Changed, "#set-log-path")
-    @on(Select.Changed, "#set-default-tab")
+    @on(Checkbox.Changed, "#set-default-tab")
     @on(Checkbox.Changed, "#set-show-prefix")
     @on(Checkbox.Changed, "#set-show-suffix")
     @on(Checkbox.Changed, "#set-show-desc")
@@ -722,8 +716,8 @@ class OdooWtApp(App):
         self.config["community_dir"] = self.query_one("#set-comm", Input).value
         self.config["enterprise_dir"] = self.query_one("#set-ent", Input).value
         
-        def_tab = self.query_one("#set-default-tab", Select).value
-        self.config["default_tab"] = def_tab if def_tab != Select.BLANK else "tab-create"
+        is_manage_tab = self.query_one("#set-default-tab", Checkbox).value
+        self.config["default_tab"] = "tab-manage" if is_manage_tab else "tab-create"
         
         self.config["config_path"] = self.query_one("#set-config-path", Input).value
         self.config["log_path"] = self.query_one("#set-log-path", Input).value
