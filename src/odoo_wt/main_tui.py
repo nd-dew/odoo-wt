@@ -349,6 +349,14 @@ class OdooWtApp(App):
             words = clean_desc.replace("-", "_").split("_")
             unknown = spell.unknown(words)
             unknown = {w for w in unknown if not w.isnumeric() and len(w) > 2}
+            
+            # Ignore configured and active suffixes
+            cfg_suffix = self.config.get("suffix", "")
+            if cfg_suffix:
+                unknown.discard(cfg_suffix)
+            if suffix and suffix != "none":
+                unknown.discard(suffix)
+                
             spell_warning = f" [bold red](Typo? {', '.join(unknown)})[/bold red]" if unknown else ""
 
             if is_local:
