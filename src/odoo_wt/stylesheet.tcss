@@ -45,7 +45,7 @@ Button {
     height: 100%;
     margin: 1 1;
     padding: 1 2;
-    border: thick #2d1a47;
+    border: thick $primary;
     background: $surface;
 }
 
@@ -60,7 +60,7 @@ Button {
 
 #wizard-dialog .title {
     text-align: center;
-    color: white;
+    color: $text;
 }
 
 .req {
@@ -75,7 +75,7 @@ Button {
     background: $boost;
     padding: 1 2;
     margin-bottom: 0;
-    border-left: thick white;
+    border-left: thick;
     height: auto;
     width: 100%;
 }
@@ -109,7 +109,7 @@ Button {
     height: 100%;
     margin: 1 1;
     padding: 1 2;
-    border: thick #2d1a47;
+    border: thick $primary;
     background: $surface;
 }
 
@@ -224,6 +224,12 @@ Tab {
 .setting-input {
     width: 1fr;
     height: 3;
+}
+
+/* Toggles should not stretch */
+Switch.setting-input, Checkbox.setting-input {
+    width: auto;
+    margin-right: 2;
 }
 
 .help-bar {
