@@ -166,7 +166,7 @@ class OdooWtApp(App):
         try:
             self.query_one("#tabs", TabbedContent).active = default_tab
             if default_tab == "tab-manage":
-                self.query_one("#wt-table").focus()
+                self.query_one("#wt-search").focus()
             else:
                 self.query_one("#desc").focus()
         except Exception as e:
@@ -233,7 +233,7 @@ class OdooWtApp(App):
         if active_pane == "tab-create":
             self.query_one("#desc").focus()
         elif active_pane == "tab-manage":
-            self.query_one("#wt-table").focus()
+            self.query_one("#wt-search").focus()
         elif active_pane == "tab-settings":
             self.query_one("#set-wt").focus()
         elif active_pane == "tab-logs":
