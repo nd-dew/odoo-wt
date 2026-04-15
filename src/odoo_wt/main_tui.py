@@ -6,7 +6,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll, Center
 from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable, Static, Checkbox
 from textual import on, work
-from textual.events import Paste
+from textual.events import Paste, Key
 from textual.binding import Binding
 from spellchecker import SpellChecker
 
@@ -475,6 +475,27 @@ class OdooWtApp(App):
     @on(Input.Changed, "#wt-search")
     def on_wt_search_changed(self, event: Input.Changed) -> None:
         self.populate_table()
+
+    @on(Key)
+    def handle_search_navigation(self, event: Key) -> None:
+        # Proxy arrow keys and Enter from the search input to the DataTable
+        try:
+            focused = self.focused
+            if focused and focused.id == "wt-search":
+                if event.key in ("down", "up", "enter"):
+                    table = self.query_one("#wt-table", DataTable)
+                    if table.row_count > 0:
+                        if event.key == "down":
+                            table.action_cursor_down()
+                            event.prevent_default()
+                        elif event.key == "up":
+                            table.action_cursor_up()
+                            event.prevent_default()
+                        elif event.key == "enter":
+                            table.action_select_cursor()
+                            event.prevent_default()
+        except Exception:
+            pass
 
     @on(DataTable.RowSelected, "#wt-table")
     def on_wt_row_selected(self, event: DataTable.RowSelected) -> None:
