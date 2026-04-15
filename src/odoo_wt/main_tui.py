@@ -306,7 +306,7 @@ class OdooWtApp(App):
     async def background_fetch(self, version: str) -> None:
         if not version or version == "none" or version in self.fetched_versions:
             return
-        wt_root = Path(self.config["wt_root"])
+        wt_root = Path(self.config["wt_root"]).expanduser().absolute()
         base_odoo = wt_root / "master" / "odoo"
         base_ent = wt_root / "master" / "enterprise"
         if not base_odoo.exists(): return
@@ -386,7 +386,8 @@ class OdooWtApp(App):
             parts = [p for p in [version, clean_desc, suffix] if p]
             branch_name = "-".join(parts)
             if not branch_name: branch_name = "<empty>"
-            wt_root = self.config.get("wt_root", "")
+            wt_root_raw = self.config.get("wt_root", "")
+            wt_root = str(Path(wt_root_raw).expanduser().absolute())
             remote = self.config.get("remote_name", "odoo-dev")
             base_v = version if version else "master"
             comm_dir = self.config.get("community_dir", "odoo")
@@ -458,7 +459,7 @@ class OdooWtApp(App):
             
             await asyncio.sleep(0.5) # Debounce
             
-            wt_root = Path(self.config["wt_root"])
+            wt_root = Path(self.config["wt_root"]).expanduser().absolute()
             base_odoo = wt_root / "master" / "odoo"
             dev_remote = self.config.get("remote_name", "odoo-dev")
             

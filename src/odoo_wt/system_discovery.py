@@ -62,7 +62,7 @@ def discover_system_data(wt_root, default_suffix):
     versions = set()
     suffixes = set([default_suffix, "test", "none"])
     worktrees = []
-    wt_path = Path(wt_root)
+    wt_path = Path(wt_root).expanduser().absolute()
     if wt_path.exists():
         try:
             for entry in wt_path.iterdir():
