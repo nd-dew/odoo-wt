@@ -52,6 +52,39 @@ class OdooWtApp(App):
         self.branch_status = ""
         self.save_timer = None
 
+    from textual.events import DescendantFocus
+
+    def on_key(self, event) -> None:
+        try:
+            if self.query_one("#tabs").active == "tab-settings":
+                if event.key == "up":
+                    self.screen.focus_previous()
+                    event.prevent_default()
+                elif event.key == "down":
+                    self.screen.focus_next()
+                    event.prevent_default()
+                elif event.key == "pageup":
+                    container = self.query_one(".settings-container", VerticalScroll)
+                    container.scroll_page_up()
+                elif event.key == "pagedown":
+                    container = self.query_one(".settings-container", VerticalScroll)
+                    container.scroll_page_down()
+        except Exception: pass
+
+    @on(DescendantFocus)
+    def on_descendant_focus(self, event: DescendantFocus) -> None:
+        try:
+            if self.query_one("#tabs").active != "tab-settings":
+                return
+            widget = event.widget
+            
+            help_bar = self.query_one("#settings-help-bar", Static)
+            if hasattr(widget, "tooltip") and widget.tooltip:
+                help_bar.update(f"[bold cyan]Info:[/bold cyan] {widget.tooltip}")
+            else:
+                help_bar.update("Navigate inputs to see descriptions.")
+        except Exception: pass
+
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
             with Horizontal(id="top-bar"):
