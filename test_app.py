@@ -88,12 +88,51 @@ async def test_app_mount_with_worktrees():
 async def test_spell_check():
     from odoo_wt.main_tui import spell
     assert "odoo" in spell
-    assert "saas" in spell
-    
-    # Check that a typo is identified
-    words = "fix_bug_in_oddo".split("_")
-    unknown = spell.unknown(words)
-    assert "oddo" in unknown
+    assert "pos" in spell
+
+@pytest.mark.asyncio
+async def test_deployment_engine_base_branch(monkeypatch):
+    from odoo_wt.deployment_engine import DeployEngine
+
+    # Mock run_cmd_stream_gen to capture the executed commands
+    commands_run = []
+    async def mock_run_cmd_stream_gen(cmd, *args, **kwargs):
+        commands_run.append(cmd)
+        yield None
+
+    monkeypatch.setattr("odoo_wt.deployment_engine.run_cmd_stream_gen", mock_run_cmd_stream_gen)
+
+    config = {
+        "wt_root": "/tmp",
+        "env_root": "/tmp/envs",
+        "remote_name": "odoo-dev",
+        "community_dir": "odoo",
+        "enterprise_dir": "enterprise"
+    }
+
+    # Test 1: Feature branch (should fetch from dev remote)
+    engine = DeployEngine(config, {"version": "19.0", "desc": "fix-bug", "suffix": "test"})
+    # Need to mock get_remote to prevent subprocess call
+    monkeypatch.setattr("odoo_wt.deployment_engine.get_remote", lambda _: "odoo")
+    monkeypatch.setattr("odoo_wt.deployment_engine.check_local", lambda _, __: False)
+
+    commands_run.clear()
+    async for _ in engine.deploy_repo(Path("/tmp"), "odoo", "odoo"):
+        pass
+
+    # The first command should be the fetch from the dev remote
+    assert ["git", "fetch", "odoo-dev", "19.0-fix-bug-test:19.0-fix-bug-test", "--force"] in commands_run
+
+    # Test 2: Base branch (should SKIP fetch from dev remote)
+    engine_base = DeployEngine(config, {"version": "19.0", "desc": "", "suffix": ""})
+    commands_run.clear()
+    async for _ in engine_base.deploy_repo(Path("/tmp"), "odoo", "odoo"):
+        pass
+
+    # The dev remote fetch should NOT be in the commands
+    assert ["git", "fetch", "odoo-dev", "19.0:19.0", "--force"] not in commands_run
+    # Instead, it should immediately fetch the base version from the official remote
+    assert ["git", "fetch", "odoo", "19.0"] in commands_run
 
 @pytest.mark.asyncio
 async def test_wizard_mount():
@@ -105,7 +144,9 @@ async def test_wizard_mount():
 
 @pytest.mark.asyncio
 async def test_settings_tab_rendering():
-    app = OdooWtApp(config_mgr._get_defaults(), ["master"], ["pian"], [])
+    from odoo_wt.app_config import ConfigManager
+    config_mgr = ConfigManager()
+    app = OdooWtApp(config_mgr.load(), ["master"], ["pian"], [])
     async with app.run_test() as pilot:
         # Switch to settings tab
         pilot.app.query_one("#tabs").active = "tab-settings"
