@@ -73,9 +73,10 @@ class OdooWtApp(App):
     def on_descendant_focus(self, event: DescendantFocus) -> None:
         try:
             help_bar = self.query_one("#global-help-bar", Static)
+            shortcuts = "[bold]Shortcuts:[/bold] Ctrl+S (Create) | Ctrl+D (Delete) | Ctrl+R (Refresh) | Ctrl+T (Next Tab) | Ctrl+Q (Quit)"
             
             if self.query_one("#tabs").active != "tab-settings":
-                help_bar.update("[bold]Shortcuts:[/bold] Ctrl+S (Create) | Ctrl+D (Delete) | Ctrl+R (Refresh) | Ctrl+T (Next Tab) | Ctrl+Q (Quit)")
+                help_bar.update(shortcuts)
                 return
             
             # Find help text in our global dictionary based on widget ID
@@ -88,9 +89,9 @@ class OdooWtApp(App):
                 curr = curr.parent
             
             if help_text:
-                help_bar.update(f"[bold cyan]Info:[/bold cyan] {help_text}")
+                help_bar.update(f"[bold cyan]Info:[/bold cyan] {help_text}\n{shortcuts}")
             else:
-                help_bar.update("[bold cyan]Info:[/bold cyan] Navigate inputs to see descriptions.")
+                help_bar.update(f"[bold cyan]Info:[/bold cyan] Navigate inputs to see descriptions.\n{shortcuts}")
         except Exception: pass
 
     @on(Key)
