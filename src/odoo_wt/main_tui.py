@@ -73,9 +73,15 @@ class OdooWtApp(App):
     def on_descendant_focus(self, event: DescendantFocus) -> None:
         try:
             help_bar = self.query_one("#global-help-bar", Static)
-            shortcuts = "[bold]Shortcuts:[/bold] Ctrl+S (Create) | Ctrl+D (Delete) | Ctrl+R (Refresh) | Ctrl+T (Next Tab) | Ctrl+Q (Quit)"
+            active_tab = self.query_one("#tabs").active
             
-            if self.query_one("#tabs").active != "tab-settings":
+            base_shortcuts = "[bold]Shortcuts:[/bold] Ctrl+S (Create) | Ctrl+D (Delete) | Ctrl+R (Refresh) | Ctrl+T (Next Tab) | Ctrl+Q (Quit)"
+            shortcuts = base_shortcuts
+            
+            if active_tab == "tab-manage":
+                shortcuts += " | [bold cyan]Enter[/bold cyan] (Open Terminal)"
+            
+            if active_tab != "tab-settings":
                 help_bar.update(shortcuts)
                 return
             
