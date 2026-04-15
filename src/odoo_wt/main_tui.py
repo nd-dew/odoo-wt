@@ -85,7 +85,8 @@ class OdooWtApp(App):
                         "1. Remote Check: Tries to pull the exact branch from your remote (e.g., odoo-dev).\n"
                         "2. Local Check: If it's not on your remote, it checks your local .git folder.\n"
                         "3. Fresh Start: If neither exist, creates a new branch from the official base version.",
-                        classes="strategy-desc"
+                        classes="strategy-desc",
+                        id="strategy-label"
                     )
                     yield Label("", id="dynamic-summary", classes="summary-box")
                     with Horizontal(classes="btn-row"):
@@ -271,6 +272,25 @@ class OdooWtApp(App):
             wt_root = self.config.get("wt_root", "")
             remote = self.config.get("remote_name", "odoo-dev")
             base_v = version if version else "master"
+            
+            # Update Strategy Text
+            is_base_branch = (branch_name == base_v)
+            strategy_label = self.query_one("#strategy-label", Label)
+            if is_base_branch:
+                strategy_label.update(
+                    "[bold magenta]Deployment Strategy (Base Branch Safety):[/bold magenta]\n"
+                    f"You requested a pure base branch ('{base_v}').\n"
+                    "odoo-wt will completely [bold]bypass your dev remote[/bold] to ensure you\n"
+                    "fetch the pristine, official branch directly from the base Odoo repo."
+                )
+            else:
+                strategy_label.update(
+                    "[bold cyan]Deployment Strategy (Surgical Safety):[/bold cyan]\n"
+                    f"1. Remote Check: Tries to pull the exact branch from your remote (e.g., {remote}).\n"
+                    "2. Local Check: If it's not on your remote, it checks your local .git folder.\n"
+                    "3. Fresh Start: If neither exist, creates a new branch from the official base version."
+                )
+
             summary = (
                 f"[bold]Outcome:[/bold]\n"
                 f"1. [bold cyan]Branch Status:[/bold cyan] {self.branch_status or 'Ready...'}\n"
