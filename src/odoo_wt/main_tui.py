@@ -6,7 +6,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll, Center
 from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable, Static, Checkbox
 from textual import on, work
-from textual.events import Paste, Key
+from textual.events import Paste, Key, DescendantFocus
 from textual.binding import Binding
 from spellchecker import SpellChecker
 
@@ -16,6 +16,23 @@ spell.word_frequency.load_words(['odoo', 'saas', 'erp', 'mrp', 'pos', 'crm', 'wt
 from .app_config import config_mgr
 from .system_discovery import discover_system_data, get_remote, run_git
 from .custom_screens import DeleteConfirmScreen, DeployScreen, LogDetailScreen
+
+SETTINGS_HELP = {
+    "set-wt": "The base directory where all your WorkTrees will be created.",
+    "set-env": "Where the centralized UV virtual environments will be stored.",
+    "set-suffix": "Your default developer quadrigram (e.g., 'pian') used as a branch suffix.",
+    "set-remote": "The name of the git remote pointing to your personal Odoo fork.",
+    "set-py-v": "The default Python version used when creating new UV environments.",
+    "set-comm": "The name of the community folder inside a worktree (default: 'odoo').",
+    "set-ent": "The name of the enterprise folder inside a worktree (default: 'enterprise').",
+    "set-default-tab": "Which tab to open by default when the app starts.",
+    "set-ig-v": "Comma-separated list of versions to hide from the creation dropdowns.",
+    "set-ig-s": "Comma-separated list of suffixes to hide from the creation dropdowns.",
+    "set-show-prefix": "Toggle visibility of the version dropdown in the Creation tab.",
+    "set-show-suffix": "Toggle visibility of the suffix dropdown in the Creation tab.",
+    "set-config-path": "Moving this will migrate your config file to a new location.",
+    "set-log-path": "Moving this will migrate your log file to a new location.",
+}
 
 class OdooWtApp(App):
     ENABLE_COMMAND_PALETTE = False
@@ -52,23 +69,28 @@ class OdooWtApp(App):
         self.branch_status = ""
         self.save_timer = None
 
-    from textual.events import DescendantFocus
-
     @on(DescendantFocus)
     def on_descendant_focus(self, event: DescendantFocus) -> None:
         try:
+            help_bar = self.query_one("#global-help-bar", Static)
+            
             if self.query_one("#tabs").active != "tab-settings":
+                help_bar.update("[bold]Shortcuts:[/bold] Ctrl+S (Create) | Ctrl+D (Delete) | Ctrl+R (Refresh) | Ctrl+T (Next Tab) | Ctrl+Q (Quit)")
                 return
             
-            # Check the actual top-level focused widget, not the internal descendant
-            focused = self.focused
-            help_bar = self.query_one("#settings-help-bar", Static)
+            # Find help text in our global dictionary based on widget ID
+            curr = event.widget
+            help_text = None
+            while curr and curr != self:
+                if curr.id and curr.id in SETTINGS_HELP:
+                    help_text = SETTINGS_HELP[curr.id]
+                    break
+                curr = curr.parent
             
-            if focused and hasattr(focused, "tooltip") and focused.tooltip:
-                # In Textual, tooltip might be a Renderable, cast to string for the Static widget
-                help_bar.update(f"[bold cyan]Info:[/bold cyan] {focused.tooltip}")
+            if help_text:
+                help_bar.update(f"[bold cyan]Info:[/bold cyan] {help_text}")
             else:
-                help_bar.update("Navigate inputs to see descriptions.")
+                help_bar.update("[bold cyan]Info:[/bold cyan] Navigate inputs to see descriptions.")
         except Exception: pass
 
     @on(Key)
@@ -157,67 +179,65 @@ class OdooWtApp(App):
                         yield Button("Refresh", id="refresh-btn")
                         yield Button("Delete Selected", variant="error", id="delete-btn")
                 with TabPane("Settings", id="tab-settings"):
-                    with Vertical(classes="settings-outer"):
-                        with VerticalScroll(classes="settings-container"):
-                            with Horizontal(classes="setting-item"):
-                                yield Label("Worktree Root:", classes="setting-label")
-                                yield Input(value=self.config.get("wt_root", ""), id="set-wt", classes="setting-input")
-                            with Horizontal(classes="setting-item"):
-                                yield Label("UV Envs Path:", classes="setting-label")
-                                yield Input(value=self.config.get("env_root", ""), id="set-env", classes="setting-input")
-                            with Horizontal(classes="setting-item"):
-                                yield Label("Default Suffix:", classes="setting-label")
-                                yield Input(value=self.config.get("suffix", ""), id="set-suffix", classes="setting-input")
-                            with Horizontal(classes="setting-item"):
-                                yield Label("Dev Remote (Fork):", classes="setting-label")
-                                yield Input(value=self.config.get("remote_name", "odoo-dev"), id="set-remote", classes="setting-input")
-                            with Horizontal(classes="setting-item"):
-                                yield Label("Python Version:", classes="setting-label")
-                                yield Input(value=self.config.get("python_version", "3.12"), id="set-py-v", classes="setting-input")
-                            with Horizontal(classes="setting-item"):
-                                yield Label("Community Dir:", classes="setting-label")
-                                yield Input(value=self.config.get("community_dir", "odoo"), id="set-comm", classes="setting-input")
-                            with Horizontal(classes="setting-item"):
-                                yield Label("Enterprise Dir:", classes="setting-label")
-                                yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input")
-                            with Horizontal(classes="setting-item"):
-                                yield Label("Default Tab:", classes="setting-label")
-                                yield Select(
-                                    [("Creation", "tab-create"), ("Existing", "tab-manage")],
-                                    value=self.config.get("default_tab", "tab-create"),
-                                    id="set-default-tab",
-                                    classes="setting-input",
-                                    tooltip="Which tab to open by default when the app starts."
-                                )
-                            with Horizontal(classes="setting-item"):
-                                yield Label("Removed Versions:", classes="setting-label")
-                                yield Input(value=",".join(self.config.get("ignored_versions", [])), id="set-ig-v", classes="setting-input", tooltip="Comma-separated lists of auto-discovered versions to hide from the creation dropdowns.")
-                            with Horizontal(classes="setting-item"):
-                                yield Label("Removed Suffixes:", classes="setting-label")
-                                yield Input(value=",".join(self.config.get("ignored_suffixes", [])), id="set-ig-s", classes="setting-input", tooltip="Comma-separated lists of auto-discovered suffixes to hide from the creation dropdowns.")
-                            with Horizontal(classes="setting-item"):
-                                yield Label("Show Prefix (Version):", classes="setting-label")
-                                yield Checkbox(value=self.config.get("show_prefix", True), id="set-show-prefix", classes="setting-input", tooltip="Toggle visibility of the version dropdown in the Creation tab.")
-                            with Horizontal(classes="setting-item"):
-                                yield Label("Show Suffix:", classes="setting-label")
-                                yield Checkbox(value=self.config.get("show_suffix", True), id="set-show-suffix", classes="setting-input", tooltip="Toggle visibility of the suffix dropdown in the Creation tab.")
-                            with Horizontal(classes="setting-item full-width"):
-                                yield Label("Config Path:", classes="setting-label")
-                                yield Input(value=self.config.get("config_path", ""), id="set-config-path", classes="setting-input", tooltip="Changing this will automatically move your existing config to the new location.")
-                            with Horizontal(classes="setting-item full-width"):
-                                yield Label("Log Path:", classes="setting-label")
-                                yield Input(value=self.config.get("log_path", ""), id="set-log-path", classes="setting-input", tooltip="Changing this will automatically move your existing logs to the new location.")
-                            
-                            yield Static(f"[bold]Config File:[/bold] {config_mgr.config_file}\n", classes="tab-description")
+                    with VerticalScroll(classes="settings-container"):
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Worktree Root:", classes="setting-label")
+                            yield Input(value=self.config.get("wt_root", ""), id="set-wt", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("UV Envs Path:", classes="setting-label")
+                            yield Input(value=self.config.get("env_root", ""), id="set-env", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Default Suffix:", classes="setting-label")
+                            yield Input(value=self.config.get("suffix", ""), id="set-suffix", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Dev Remote (Fork):", classes="setting-label")
+                            yield Input(value=self.config.get("remote_name", "odoo-dev"), id="set-remote", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Python Version:", classes="setting-label")
+                            yield Input(value=self.config.get("python_version", "3.12"), id="set-py-v", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Community Dir:", classes="setting-label")
+                            yield Input(value=self.config.get("community_dir", "odoo"), id="set-comm", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Enterprise Dir:", classes="setting-label")
+                            yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Default Tab:", classes="setting-label")
+                            yield Select(
+                                [("Creation", "tab-create"), ("Existing", "tab-manage")],
+                                value=self.config.get("default_tab", "tab-create"),
+                                id="set-default-tab",
+                                classes="setting-input"
+                            )
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Removed Versions:", classes="setting-label")
+                            yield Input(value=",".join(self.config.get("ignored_versions", [])), id="set-ig-v", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Removed Suffixes:", classes="setting-label")
+                            yield Input(value=",".join(self.config.get("ignored_suffixes", [])), id="set-ig-s", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Show Prefix (Version):", classes="setting-label")
+                            yield Checkbox(value=self.config.get("show_prefix", True), id="set-show-prefix", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Show Suffix:", classes="setting-label")
+                            yield Checkbox(value=self.config.get("show_suffix", True), id="set-show-suffix", classes="setting-input")
+                        with Horizontal(classes="setting-item full-width"):
+                            yield Label("Config Path:", classes="setting-label")
+                            yield Input(value=self.config.get("config_path", ""), id="set-config-path", classes="setting-input")
+                        with Horizontal(classes="setting-item full-width"):
+                            yield Label("Log Path:", classes="setting-label")
+                            yield Input(value=self.config.get("log_path", ""), id="set-log-path", classes="setting-input")
                         
-                        yield Static("Navigate inputs to see descriptions.", id="settings-help-bar", classes="help-bar")
+                        yield Static(f"[bold]Config File:[/bold] {config_mgr.config_file}\n", classes="tab-description")
                 with TabPane("Logs", id="tab-logs"):
                     yield Label("System Logs (Newest first)", classes="tab-description")
                     yield DataTable(id="logs-table", cursor_type="row")
                     with Horizontal(classes="btn-row"):
                         yield Button("Refresh", id="refresh-logs-btn")
                         yield Button("Clear Logs", variant="error", id="clear-logs-btn")
-        yield Footer()
+        
+        # Replace Footer with our custom global help bar
+        yield Static("[bold]Shortcuts:[/bold] Ctrl+S (Create) | Ctrl+D (Delete) | Ctrl+R (Refresh) | Ctrl+T (Next Tab) | Ctrl+Q (Quit)", id="global-help-bar", classes="help-bar")
 
     def on_mount(self) -> None:
         config_mgr.append_log("App Started")
