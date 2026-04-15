@@ -211,7 +211,7 @@ class OdooWtApp(App):
                             yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input")
                         with Horizontal(classes="setting-item"):
                             yield Label("Start in Manage Tab:", classes="setting-label")
-                            yield Checkbox(value=(self.config.get("default_tab", "tab-create") == "tab-manage"), id="set-default-tab", classes="setting-input")
+                            yield Switch(value=(self.config.get("default_tab", "tab-create") == "tab-manage"), id="set-default-tab", classes="setting-input")
                         with Horizontal(classes="setting-item"):
                             yield Label("Removed Versions:", classes="setting-label")
                             yield Input(value=",".join(self.config.get("ignored_versions", [])), id="set-ig-v", classes="setting-input")
@@ -220,17 +220,17 @@ class OdooWtApp(App):
                             yield Input(value=",".join(self.config.get("ignored_suffixes", [])), id="set-ig-s", classes="setting-input")
                         with Horizontal(classes="setting-item"):
                             yield Label("Show Prefix (Version):", classes="setting-label")
-                            yield Checkbox(value=self.config.get("show_prefix", True), id="set-show-prefix", classes="setting-input")
+                            yield Switch(value=self.config.get("show_prefix", True), id="set-show-prefix", classes="setting-input")
                         with Horizontal(classes="setting-item"):
                             yield Label("Show Suffix:", classes="setting-label")
-                            yield Checkbox(value=self.config.get("show_suffix", True), id="set-show-suffix", classes="setting-input")
+                            yield Switch(value=self.config.get("show_suffix", True), id="set-show-suffix", classes="setting-input")
                         with Horizontal(classes="setting-item"):
                             yield Label("Show Description:", classes="setting-label")
-                            yield Checkbox(value=self.config.get("show_desc", True), id="set-show-desc", classes="setting-input")
-                        with Horizontal(classes="setting-item full-width"):
+                            yield Switch(value=self.config.get("show_desc", True), id="set-show-desc", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
                             yield Label("Config Path:", classes="setting-label")
                             yield Input(value=self.config.get("config_path", ""), id="set-config-path", classes="setting-input")
-                        with Horizontal(classes="setting-item full-width"):
+                        with Horizontal(classes="setting-item"):
                             yield Label("Log Path:", classes="setting-label")
                             yield Input(value=self.config.get("log_path", ""), id="set-log-path", classes="setting-input")
                 with TabPane("Logs", id="tab-logs"):
@@ -578,14 +578,14 @@ class OdooWtApp(App):
         self.query_one("#set-py-v", Input).value = self.config.get("python_version", "3.12")
         self.query_one("#set-comm", Input).value = self.config.get("community_dir", "odoo")
         self.query_one("#set-ent", Input).value = self.config.get("enterprise_dir", "enterprise")
-        self.query_one("#set-default-tab", Checkbox).value = (self.config.get("default_tab", "tab-create") == "tab-manage")
+        self.query_one("#set-default-tab", Switch).value = (self.config.get("default_tab", "tab-create") == "tab-manage")
         self.query_one("#set-ig-v", Input).value = ",".join(self.config.get("ignored_versions", []))
         self.query_one("#set-ig-s", Input).value = ",".join(self.config.get("ignored_suffixes", []))
         self.query_one("#set-config-path", Input).value = self.config.get("config_path", "")
         self.query_one("#set-log-path", Input).value = self.config.get("log_path", "")
-        self.query_one("#set-show-prefix", Checkbox).value = self.config.get("show_prefix", True)
-        self.query_one("#set-show-suffix", Checkbox).value = self.config.get("show_suffix", True)
-        self.query_one("#set-show-desc", Checkbox).value = self.config.get("show_desc", True)
+        self.query_one("#set-show-prefix", Switch).value = self.config.get("show_prefix", True)
+        self.query_one("#set-show-suffix", Switch).value = self.config.get("show_suffix", True)
+        self.query_one("#set-show-desc", Switch).value = self.config.get("show_desc", True)
         self.apply_visibility_settings()
         self.notify("Settings reset to last saved state.")
 
@@ -697,10 +697,10 @@ class OdooWtApp(App):
     @on(Input.Changed, "#set-ig-s")
     @on(Input.Changed, "#set-config-path")
     @on(Input.Changed, "#set-log-path")
-    @on(Checkbox.Changed, "#set-default-tab")
-    @on(Checkbox.Changed, "#set-show-prefix")
-    @on(Checkbox.Changed, "#set-show-suffix")
-    @on(Checkbox.Changed, "#set-show-desc")
+    @on(Switch.Changed, "#set-default-tab")
+    @on(Switch.Changed, "#set-show-prefix")
+    @on(Switch.Changed, "#set-show-suffix")
+    @on(Switch.Changed, "#set-show-desc")
     def on_setting_changed(self, event) -> None:
         if self.is_mounted:
             if self.save_timer:
@@ -716,14 +716,14 @@ class OdooWtApp(App):
         self.config["community_dir"] = self.query_one("#set-comm", Input).value
         self.config["enterprise_dir"] = self.query_one("#set-ent", Input).value
         
-        is_manage_tab = self.query_one("#set-default-tab", Checkbox).value
+        is_manage_tab = self.query_one("#set-default-tab", Switch).value
         self.config["default_tab"] = "tab-manage" if is_manage_tab else "tab-create"
         
         self.config["config_path"] = self.query_one("#set-config-path", Input).value
         self.config["log_path"] = self.query_one("#set-log-path", Input).value
-        self.config["show_prefix"] = self.query_one("#set-show-prefix", Checkbox).value
-        self.config["show_suffix"] = self.query_one("#set-show-suffix", Checkbox).value
-        self.config["show_desc"] = self.query_one("#set-show-desc", Checkbox).value
+        self.config["show_prefix"] = self.query_one("#set-show-prefix", Switch).value
+        self.config["show_suffix"] = self.query_one("#set-show-suffix", Switch).value
+        self.config["show_desc"] = self.query_one("#set-show-desc", Switch).value
 
         ig_v = [v.strip() for v in self.query_one("#set-ig-v", Input).value.split(",") if v.strip()]
         ig_s = [s.strip() for s in self.query_one("#set-ig-s", Input).value.split(",") if s.strip()]
