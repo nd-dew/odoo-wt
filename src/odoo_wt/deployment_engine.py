@@ -37,11 +37,11 @@ class DeployEngine:
     def __init__(self, config: dict, data: dict):
         self.config = config
         self.data = data
-        self.wt_root = Path(config["wt_root"])
+        self.wt_root = Path(config["wt_root"]).expanduser().absolute()
         self.dev_remote = config.get("remote_name", "odoo-dev")
         self.comm_dir = config.get("community_dir", "odoo")
         self.ent_dir = config.get("enterprise_dir", "enterprise")
-        self.env_root = Path(config["env_root"])
+        self.env_root = Path(config["env_root"]).expanduser().absolute()
         
         clean_desc = data["desc"].strip().replace(" ", "_")
         parts = [p for p in [data["version"], clean_desc, data["suffix"]] if p]
