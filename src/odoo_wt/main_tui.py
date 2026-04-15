@@ -93,6 +93,7 @@ class OdooWtApp(App):
                         yield Button("Create ⏎", variant="success", id="submit-btn")
                 with TabPane("Existing / Removal", id="tab-manage"):
                     yield Label("Discovery: Scans 'Worktree Root Path' (in Settings)\nfor 'odoo/.git' folders. [bold cyan]Hint: Double-click or press Enter on a row to open in terminal.[/bold cyan]", classes="tab-description")
+                    yield Input(placeholder="Fuzzy search worktrees...", id="wt-search", classes="search-input")
                     yield DataTable(id="wt-table", cursor_type="row")
                     with Horizontal(classes="btn-row"):
                         yield Button("Refresh", id="refresh-btn")
@@ -431,16 +432,49 @@ class OdooWtApp(App):
         self.populate_logs_table()
         self.notify("Logs cleared!")
 
+    def _version_sort_key(self, wt_dict):
+        v = wt_dict["version"]
+        if v == "master": return (999, 999)
+        # Parse version strings like "17.0", "saas-17.1"
+        try:
+            num_part = v.replace("saas-", "")
+            parts = num_part.split(".")
+            major = int(parts[0]) if parts else 0
+            minor = int(parts[1]) if len(parts) > 1 else 0
+            # Put saas branches slightly ahead of their base version
+            is_saas = 1 if "saas-" in v else 0
+            return (major, minor, is_saas)
+        except Exception:
+            return (0, 0, 0)
+
     def populate_table(self):
         table = self.query_one("#wt-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("Branch Name", "Version", "Suffix")
-        for wt in self.worktrees:
+        table.add_columns("Branch Name", "Version")
+        
+        try:
+            search_term = self.query_one("#wt-search", Input).value.lower()
+        except Exception:
+            search_term = ""
+
+        # Sort by parsed version (descending), then by name
+        sorted_wts = sorted(self.worktrees, key=lambda x: (self._version_sort_key(x), x["name"]), reverse=True)
+
+        for wt in sorted_wts:
             name = wt["name"]
             path = wt["path"]
+            
+            # Fuzzy match
+            if search_term and search_term not in name.lower():
+                continue
+
             if path in self.deleting_paths:
                 name = f"[strike]{name}[/strike] [bold red](Deleting...)[/bold red]"
-            table.add_row(name, wt["version"], wt["suffix"], key=path)
+            table.add_row(name, wt["version"], key=path)
+
+    @on(Input.Changed, "#wt-search")
+    def on_wt_search_changed(self, event: Input.Changed) -> None:
+        self.populate_table()
 
     @on(DataTable.RowSelected, "#wt-table")
     def on_wt_row_selected(self, event: DataTable.RowSelected) -> None:
