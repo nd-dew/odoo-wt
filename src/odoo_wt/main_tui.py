@@ -487,48 +487,70 @@ class OdooWtApp(App):
             is_local = False
             is_remote = False
             found_remote_name = ""
-            
-            for i, check in enumerate(checks):
+
+            # 1. Local Checks (Sequential & Fast)
+            for i in range(2):
+                check = checks[i]
                 if not check["path"].exists():
                     results[check["name"]] = "skip"
                     continue
                 
-                # Update status with animation and checklist
-                self.check_results_str = ""
-                for name, res in results.items():
-                    if res == "ok": self.check_results_str += f" [green]✓[/green] {name}"
-                    elif res == "fail": self.check_results_str += f" [red]✗[/red] {name}"
-                
-                dots = "." * ((i % 4) + 1)
-                self.branch_status = f"Checking{dots}"
-                self.check_results_str += f" [yellow]→[/yellow] {check['name']}"
+                self.branch_status = "Checking local..."
+                self.check_results_str = self._build_checklist(checks, results) + f" [yellow]→[/yellow] {check['name']}"
                 self.update_summary()
                 
-                if check["type"] == "local":
-                    found = await asyncio.to_thread(check_local, check["path"], branch_name)
-                    if found:
-                        is_local = True
-                        results[check["name"]] = "ok"
-                        break
-                    results[check["name"]] = "fail"
-                else:
-                    remote_to_check = check.get("remote", dev_remote)
-                    found = await asyncio.to_thread(check_remote, check["path"], branch_name, remote_to_check)
-                    if found:
-                        is_remote = True
-                        found_remote_name = remote_to_check
-                        results[check["name"]] = "ok"
-                        break
-                    results[check["name"]] = "fail"
-                
-                await asyncio.sleep(0.2) # Small delay for visual effect
+                found = await asyncio.to_thread(check_local, check["path"], branch_name)
+                if found:
+                    is_local = True
+                    results[check["name"]] = "ok"
+                    break
+                results[check["name"]] = "fail"
+            
+            # 2. Remote Checks (Parallel & Networked)
+            if not is_local:
+                remote_checks = []
+                for i in range(2, 6):
+                    check = checks[i]
+                    if check["path"].exists():
+                        remote_checks.append(check)
+                    else:
+                        results[check["name"]] = "skip"
+
+                if remote_checks:
+                    async def run_one_remote(c):
+                        r = c.get("remote", dev_remote)
+                        found = await asyncio.to_thread(check_remote, c["path"], branch_name, r)
+                        return c["name"], "ok" if found else "fail", r
+
+                    pending_tasks = [asyncio.create_task(run_one_remote(c)) for c in remote_checks]
+                    
+                    dot_count = 0
+                    while pending_tasks:
+                        # Wait for any task to finish with a timeout to keep the "dots" moving
+                        done, pending = await asyncio.wait(pending_tasks, timeout=0.1, return_when=asyncio.FIRST_COMPLETED)
+                        pending_tasks = list(pending)
+                        
+                        for task in done:
+                            name, res, r_name = task.result()
+                            results[name] = res
+                        
+                        # Update UI animation
+                        dot_count = (dot_count + 1) % 4
+                        self.branch_status = f"Checking remotes{'.' * (dot_count + 1)}"
+                        active_check = next((c["name"] for c in remote_checks if c["name"] not in results), "Finishing...")
+                        self.check_results_str = self._build_checklist(checks, results) + (f" [yellow]→[/yellow] {active_check}" if pending_tasks else "")
+                        self.update_summary()
+
+                    # Pick the highest priority remote result
+                    for i in range(2, 6):
+                        c_name = checks[i]["name"]
+                        if results.get(c_name) == "ok":
+                            is_remote = True
+                            found_remote_name = checks[i].get("remote", dev_remote)
+                            break
 
             # Final results string for the outcome block
-            self.check_results_str = ""
-            for name, res in results.items():
-                if res == "ok": self.check_results_str += f" [green]✓[/green] {name}"
-                elif res == "fail": self.check_results_str += f" [red]✗[/red] {name}"
-                elif res == "skip": pass 
+            self.check_results_str = self._build_checklist(checks, results)
 
             # Spell Check & Validation
             words = branch_name.replace("-", "_").split("_")
@@ -574,6 +596,14 @@ class OdooWtApp(App):
         except Exception as e:
             import traceback
             config_mgr.append_log("Non-crashing UI error", {"error": str(e), "trace": traceback.format_exc()})
+
+    def _build_checklist(self, checks, results) -> str:
+        parts = []
+        for c in checks:
+            res = results.get(c["name"])
+            if res == "ok": parts.append(f"[green]✓[/green] {c['name']}")
+            elif res == "fail": parts.append(f"[red]✗[/red] {c['name']}")
+        return " ".join(parts)
 
     @on(Input.Submitted, "#desc")
     @on(Input.Submitted, "#custom_version")
