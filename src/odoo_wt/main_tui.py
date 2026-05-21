@@ -464,19 +464,23 @@ class OdooWtApp(App):
             base_ent = wt_root / "master" / "enterprise"
             dev_remote = self.config.get("remote_name", "odoo-dev")
 
+            from .system_discovery import check_local, check_remote, get_remote
+            main_remote = await asyncio.to_thread(get_remote, base_odoo)
+
             # Animation & Checklist Logic
             checks = [
                 {"name": "Local Community", "path": base_odoo, "type": "local"},
                 {"name": "Local Enterprise", "path": base_ent, "type": "local"},
-                {"name": "Remote Community", "path": base_odoo, "type": "remote"},
-                {"name": "Remote Enterprise", "path": base_ent, "type": "remote"},
+                {"name": f"Dev ({dev_remote}) Community", "path": base_odoo, "type": "remote", "remote": dev_remote},
+                {"name": f"Dev ({dev_remote}) Enterprise", "path": base_ent, "type": "remote", "remote": dev_remote},
+                {"name": f"Main ({main_remote}) Community", "path": base_odoo, "type": "remote", "remote": main_remote},
+                {"name": f"Main ({main_remote}) Enterprise", "path": base_ent, "type": "remote", "remote": main_remote},
             ]
             
             results = {}
             is_local = False
             is_remote = False
-            
-            from .system_discovery import check_local, check_remote
+            found_remote_name = ""
             
             for i, check in enumerate(checks):
                 if not check["path"].exists():
@@ -501,9 +505,11 @@ class OdooWtApp(App):
                         break
                     results[check["name"]] = "fail"
                 else:
-                    found = await asyncio.to_thread(check_remote, check["path"], branch_name, dev_remote)
+                    remote_to_check = check.get("remote", dev_remote)
+                    found = await asyncio.to_thread(check_remote, check["path"], branch_name, remote_to_check)
                     if found:
                         is_remote = True
+                        found_remote_name = remote_to_check
                         results[check["name"]] = "ok"
                         break
                     results[check["name"]] = "fail"
@@ -527,7 +533,7 @@ class OdooWtApp(App):
             if is_local:
                 self.branch_status = f"[bold yellow]Found branch '{branch_name}' locally.[/bold yellow]{spell_warning}"
             elif is_remote:
-                self.branch_status = f"[bold green]Found branch on '{dev_remote}'.[/bold green]{spell_warning}"
+                self.branch_status = f"[bold green]Found branch on '{found_remote_name}'.[/bold green]{spell_warning}"
             else:
                 self.branch_status = f"[bold white]New branch will be created.[/bold white]{spell_warning}"
             
