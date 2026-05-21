@@ -530,9 +530,9 @@ class OdooWtApp(App):
                 elif res == "fail": self.check_results_str += f" [red]✗[/red] {name}"
                 elif res == "skip": pass 
 
-            # Spell Check
-            words = clean_desc.replace("-", "_").split("_")
-            unknown = spell.unknown(words)
+            # Spell Check & Validation
+            words = branch_name.replace("-", "_").split("_")
+            unknown = spell.unknown([w for w in words if w not in (version, suffix)])
             unknown = {w for w in unknown if not w.isnumeric() and len(w) > 2}
             
             # Ignore configured and active suffixes
@@ -542,7 +542,26 @@ class OdooWtApp(App):
             if suffix and suffix != "none":
                 unknown.discard(suffix)
                 
-            spell_warning = f" [bold red](Typo? {', '.join(unknown)})[/bold red]" if unknown else ""
+            warnings = []
+            if unknown:
+                warnings.append(f"Typo? {', '.join(unknown)}")
+            
+            # Repeated words check
+            seen_words = set()
+            repeated = []
+            for w in words:
+                if not w or len(w) < 3: continue
+                if w in seen_words:
+                    repeated.append(w)
+                seen_words.add(w)
+            if repeated:
+                warnings.append(f"Repeated: {', '.join(repeated)}")
+            
+            # Invalid characters check
+            if ":" in branch_name:
+                warnings.append("Found ':' (Github paste?)")
+            
+            spell_warning = f" [bold red]({'; '.join(warnings)})[/bold red]" if warnings else ""
 
             if is_local:
                 self.branch_status = f"[bold yellow]Found branch '{branch_name}' locally.[/bold yellow]{spell_warning}"
