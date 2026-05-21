@@ -429,7 +429,9 @@ class OdooWtApp(App):
     @on(Input.Changed, "#desc")
     @on(Input.Changed, "#custom_version")
     @on(Input.Changed, "#custom_suffix")
-    def on_text_changed(self, event) -> None: 
+    @on(Select.Changed, "#version")
+    @on(Select.Changed, "#suffix")
+    def on_selection_changed(self, event) -> None: 
         self.check_results_str = ""
         self.update_summary()
         self.check_branch_existence_task()
