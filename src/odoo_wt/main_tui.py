@@ -28,6 +28,7 @@ SETTINGS_HELP = {
     "set-default-tab": "Which tab to open by default when the app starts.",
     "set-ig-v": "Comma-separated list of versions to hide from the creation dropdowns.",
     "set-ig-s": "Comma-separated list of suffixes to hide from the creation dropdowns.",
+    "set-whitelist": "Comma-separated list of unrecognized words to ignore permanently.",
     "set-show-prefix": "Toggle visibility of the version dropdown in the Creation tab.",
     "set-show-suffix": "Toggle visibility of the suffix dropdown in the Creation tab.",
     "set-show-desc": "Toggle visibility of the app description text at the top.",
@@ -242,6 +243,9 @@ class OdooWtApp(App):
                         with Horizontal(classes="setting-item"):
                             yield Label("Removed Suffixes:", classes="setting-label")
                             yield Input(value=",".join(self.config.get("ignored_suffixes", [])), id="set-ig-s", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Typos Whitelist:", classes="setting-label")
+                            yield Input(value=",".join(self.config.get("ignored_typos", [])), id="set-whitelist", classes="setting-input")
                         with Horizontal(classes="setting-item"):
                             yield Label("Show Prefix (Version):", classes="setting-label")
                             yield Switch(value=self.config.get("show_prefix", True), id="set-show-prefix", classes="setting-input")
@@ -568,8 +572,8 @@ class OdooWtApp(App):
             
             warnings = []
             if unknown:
-                # Format unknown words as clickable links for the TUI
-                typo_links = [f"[@click=ignore_typo('{w}')]{w}[/]" for w in sorted(list(unknown))]
+                # Format unknown words as clickable blue underlined links with a tooltip
+                typo_links = [f"[underline blue][@click=app.ignore_typo('{w}') tooltip='Whitelist?']{w}[/][/]" for w in sorted(list(unknown))]
                 warnings.append(f"Typo? {', '.join(typo_links)}")
             
             # Repeated words check
@@ -754,6 +758,7 @@ class OdooWtApp(App):
         self.query_one("#set-default-tab", Switch).value = (self.config.get("default_tab", "tab-create") == "tab-manage")
         self.query_one("#set-ig-v", Input).value = ",".join(self.config.get("ignored_versions", []))
         self.query_one("#set-ig-s", Input).value = ",".join(self.config.get("ignored_suffixes", []))
+        self.query_one("#set-whitelist", Input).value = ",".join(self.config.get("ignored_typos", []))
         self.query_one("#set-config-path", Input).value = self.config.get("config_path", "")
         self.query_one("#set-log-path", Input).value = self.config.get("log_path", "")
         self.query_one("#set-show-prefix", Switch).value = self.config.get("show_prefix", True)
@@ -885,6 +890,7 @@ class OdooWtApp(App):
     @on(Input.Changed, "#set-ent")
     @on(Input.Changed, "#set-ig-v")
     @on(Input.Changed, "#set-ig-s")
+    @on(Input.Changed, "#set-whitelist")
     @on(Input.Changed, "#set-config-path")
     @on(Input.Changed, "#set-log-path")
     @on(Switch.Changed, "#set-default-tab")
@@ -923,8 +929,10 @@ class OdooWtApp(App):
 
         ig_v = [v.strip() for v in self.query_one("#set-ig-v", Input).value.split(",") if v.strip()]
         ig_s = [s.strip() for s in self.query_one("#set-ig-s", Input).value.split(",") if s.strip()]
+        ig_t = [t.strip() for t in self.query_one("#set-whitelist", Input).value.split(",") if t.strip()]
         self.config["ignored_versions"] = ig_v
         self.config["ignored_suffixes"] = ig_s
+        self.config["ignored_typos"] = ig_t
 
         config_mgr.save(self.config)
         config_mgr.append_log("Settings Auto-Saved", self.config)
