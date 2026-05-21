@@ -69,7 +69,7 @@ def discover_system_data(wt_root, default_suffix):
                 if entry.is_dir() and not entry.name.startswith("."):
                     v, s = parse_branch_name(entry.name)
                     is_wt = (entry / "odoo" / ".git").exists()
-                    if is_wt and entry.name != "master":
+                    if is_wt:
                         worktrees.append({"name": entry.name, "path": str(entry), "version": v, "suffix": s})
                     if v == "master" or v.startswith("saas-") or (v and v[0].isdigit()):
                         versions.add(v)
