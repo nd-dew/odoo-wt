@@ -560,7 +560,8 @@ class OdooWtApp(App):
             # Words to definitely ignore
             tech_terms = set(self.config.get("technical_terms", []))
             user_ignored = set(self.config.get("ignored_typos", []))
-            system_ignore = {version, suffix, cfg_suffix, "none", "master"}
+            cfg_suffix = self.config.get("suffix", "")
+            system_ignore = {version, suffix, cfg_suffix, "none", "master", ""}
             
             unknown = spell.unknown([w for w in words if w not in system_ignore and w not in tech_terms and w not in user_ignored])
             unknown = {w for w in unknown if not w.isnumeric() and len(w) > 2}
