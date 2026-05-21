@@ -26,6 +26,8 @@ class ConfigManager:
             "default_tab": "tab-create",
             "ignored_versions": [],
             "ignored_suffixes": [],
+            "ignored_typos": [],
+            "technical_terms": ["url", "api", "id", "odoo", "crm", "pos", "ui", "ux", "db", "ip"],
             "config_path": str(DEFAULT_CONFIG_FILE),
             "log_path": str(DEFAULT_LOG_FILE),
             "show_prefix": True,
