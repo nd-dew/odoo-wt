@@ -52,6 +52,10 @@ class DeployEngine:
     async def deploy_repo(self, repo_path: Path, dest_label: str, category: str) -> AsyncGenerator[DeployUpdate, None]:
         yield DeployUpdate(category=category, total=3)
         
+        if not repo_path.exists():
+            yield DeployUpdate(category=category, log_line=f"[bold red]Error: Base repository not found at {repo_path}[/bold red]", advance=3)
+            return
+
         remote = await asyncio.to_thread(get_remote, repo_path)
         yield DeployUpdate(category=category, log_line=f"Detected base remote: {remote}", advance=1)
 
