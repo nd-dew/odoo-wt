@@ -76,6 +76,7 @@ class OdooWtApp(App):
         self.fetched_versions = set()
         self.deleting_paths = set()
         self.branch_status = ""
+        self.check_results_str = ""
         self.save_timer = None
 
         # Modern Textual Theme API
@@ -411,8 +412,9 @@ class OdooWtApp(App):
                     "3. Fresh Start: If neither exist, creates a new branch from the official base version."
                 )
 
+            res_block = f"\n[bright_black]{self.check_results_str}[/bright_black]\n" if self.check_results_str else ""
             summary = (
-                f"[bold]Outcome:[/bold]\n"
+                f"[bold]Outcome:[/bold]{res_block}"
                 f"1. [bold cyan]Branch Status:[/bold cyan] {self.branch_status or 'Ready...'}\n"
                 f"2. I will create a new directory at [bold green]{wt_root}/{branch_name}[/bold green]:\n"
                 f"   ├── {comm_dir}/       [bright_black](Community worktree)[/bright_black]\n"
@@ -428,6 +430,7 @@ class OdooWtApp(App):
     @on(Input.Changed, "#custom_version")
     @on(Input.Changed, "#custom_suffix")
     def on_text_changed(self, event) -> None: 
+        self.check_results_str = ""
         self.update_summary()
         self.check_branch_existence_task()
 
@@ -442,6 +445,7 @@ class OdooWtApp(App):
             
             if not desc:
                 self.branch_status = ""
+                self.check_results_str = ""
                 self.update_summary()
                 return
 
@@ -451,10 +455,12 @@ class OdooWtApp(App):
             
             if any(w['name'] == branch_name for w in self.worktrees):
                 self.branch_status = "[bold red]A WORKTREE WITH THIS NAME ALREADY EXISTS![/bold red]"
+                self.check_results_str = ""
                 self.update_summary()
                 return
             
             self.branch_status = "Checking..."
+            self.check_results_str = ""
             self.update_summary()
             
             await asyncio.sleep(0.5) # Debounce
@@ -488,13 +494,14 @@ class OdooWtApp(App):
                     continue
                 
                 # Update status with animation and checklist
-                checklist_str = ""
+                self.check_results_str = ""
                 for name, res in results.items():
-                    if res == "ok": checklist_str += f" [green]✓[/green] {name}"
-                    elif res == "fail": checklist_str += f" [red]✗[/red] {name}"
+                    if res == "ok": self.check_results_str += f" [green]✓[/green] {name}"
+                    elif res == "fail": self.check_results_str += f" [red]✗[/red] {name}"
                 
                 dots = "." * ((i % 4) + 1)
-                self.branch_status = f"Checking{dots}\n{checklist_str} [yellow]→[/yellow] {check['name']}"
+                self.branch_status = f"Checking{dots}"
+                self.check_results_str += f" [yellow]→[/yellow] {check['name']}"
                 self.update_summary()
                 
                 if check["type"] == "local":
@@ -515,6 +522,13 @@ class OdooWtApp(App):
                     results[check["name"]] = "fail"
                 
                 await asyncio.sleep(0.2) # Small delay for visual effect
+
+            # Final results string for the outcome block
+            self.check_results_str = ""
+            for name, res in results.items():
+                if res == "ok": self.check_results_str += f" [green]✓[/green] {name}"
+                elif res == "fail": self.check_results_str += f" [red]✗[/red] {name}"
+                elif res == "skip": pass 
 
             # Spell Check
             words = clean_desc.replace("-", "_").split("_")
