@@ -458,15 +458,58 @@ class OdooWtApp(App):
             self.update_summary()
             
             await asyncio.sleep(0.5) # Debounce
-            
+
             wt_root = Path(self.config["wt_root"]).expanduser().absolute()
             base_odoo = wt_root / "master" / "odoo"
+            base_ent = wt_root / "master" / "enterprise"
             dev_remote = self.config.get("remote_name", "odoo-dev")
+
+            # Animation & Checklist Logic
+            checks = [
+                {"name": "Local Community", "path": base_odoo, "type": "local"},
+                {"name": "Local Enterprise", "path": base_ent, "type": "local"},
+                {"name": "Remote Community", "path": base_odoo, "type": "remote"},
+                {"name": "Remote Enterprise", "path": base_ent, "type": "remote"},
+            ]
             
-            # Check local git
+            results = {}
+            is_local = False
+            is_remote = False
+            
             from .system_discovery import check_local, check_remote
-            is_local = await asyncio.to_thread(check_local, base_odoo, branch_name)
             
+            for i, check in enumerate(checks):
+                if not check["path"].exists():
+                    results[check["name"]] = "skip"
+                    continue
+                
+                # Update status with animation and checklist
+                checklist_str = ""
+                for name, res in results.items():
+                    if res == "ok": checklist_str += f" [green]✓[/green] {name}"
+                    elif res == "fail": checklist_str += f" [red]✗[/red] {name}"
+                
+                dots = "." * ((i % 4) + 1)
+                self.branch_status = f"Checking{dots}\n{checklist_str} [yellow]→[/yellow] {check['name']}"
+                self.update_summary()
+                
+                if check["type"] == "local":
+                    found = await asyncio.to_thread(check_local, check["path"], branch_name)
+                    if found:
+                        is_local = True
+                        results[check["name"]] = "ok"
+                        break
+                    results[check["name"]] = "fail"
+                else:
+                    found = await asyncio.to_thread(check_remote, check["path"], branch_name, dev_remote)
+                    if found:
+                        is_remote = True
+                        results[check["name"]] = "ok"
+                        break
+                    results[check["name"]] = "fail"
+                
+                await asyncio.sleep(0.2) # Small delay for visual effect
+
             # Spell Check
             words = clean_desc.replace("-", "_").split("_")
             unknown = spell.unknown(words)
@@ -483,12 +526,10 @@ class OdooWtApp(App):
 
             if is_local:
                 self.branch_status = f"[bold yellow]Found branch '{branch_name}' locally.[/bold yellow]{spell_warning}"
+            elif is_remote:
+                self.branch_status = f"[bold green]Found branch on '{dev_remote}'.[/bold green]{spell_warning}"
             else:
-                is_remote = await asyncio.to_thread(check_remote, base_odoo, branch_name, dev_remote)
-                if is_remote:
-                    self.branch_status = f"[bold green]Found branch on '{dev_remote}'.[/bold green]{spell_warning}"
-                else:
-                    self.branch_status = f"[bold white]New branch will be created.[/bold white]{spell_warning}"
+                self.branch_status = f"[bold white]New branch will be created.[/bold white]{spell_warning}"
             
             self.update_summary()
         except Exception as e:
@@ -845,6 +886,9 @@ class OdooWtApp(App):
         try:
             row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value
             wt_name = Path(row_key).name
+            if wt_name == "master":
+                self.notify("The 'master' worktree is protected and cannot be deleted.", severity="error")
+                return
             def check_delete(confirm: bool):
                 if confirm: self.execute_deletion(row_key, wt_name)
             self.app.push_screen(DeleteConfirmScreen(wt_name), check_delete)
