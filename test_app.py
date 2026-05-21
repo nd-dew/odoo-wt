@@ -36,6 +36,31 @@ def test_path_utilities():
     assert shorten_path(home + "/repos") == "~/repos"
     assert expand_path("~/repos") == home + "/repos"
 
+def test_worktree_discovery(tmp_path):
+    from odoo_wt.system_discovery import discover_system_data
+    
+    # Create mock worktree structure
+    wt_root = tmp_path / "wt"
+    wt_root.mkdir()
+    
+    # master worktree
+    master_wt = wt_root / "master"
+    master_wt.mkdir()
+    (master_wt / "odoo" / ".git").mkdir(parents=True)
+    
+    # normal worktree
+    feature_wt = wt_root / "17.0-fix-pian"
+    feature_wt.mkdir()
+    (feature_wt / "odoo" / ".git").mkdir(parents=True)
+    
+    v_list, s_list, worktrees = discover_system_data(str(wt_root), "pian")
+    
+    # Verify master is included in worktrees
+    wt_names = [w["name"] for w in worktrees]
+    assert "master" in wt_names
+    assert "17.0-fix-pian" in wt_names
+    assert "master" in v_list
+
 def test_config_management(mock_config_path):
     # Ensure we start clean
     if mock_config_path.exists(): mock_config_path.unlink()
@@ -85,10 +110,39 @@ async def test_app_mount_with_worktrees():
         assert table.row_count == 1
 
 @pytest.mark.asyncio
+async def test_protected_master_deletion():
+    mock_worktrees = [
+        {"name": "master", "path": "/tmp/wt/master", "version": "master", "suffix": ""}
+    ]
+    app = OdooWtApp({"wt_root": "/tmp", "python_version": "3.12"}, ["master"], ["pian"], mock_worktrees)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        pilot.app.query_one("#tabs").active = "tab-manage"
+        await pilot.pause()
+        
+        # Select the master row (first row)
+        table = pilot.app.query_one("#wt-table")
+        table.cursor_coordinate = (0, 0)
+        
+        # Trigger delete action
+        await pilot.press("ctrl+d")
+        await pilot.pause()
+        
+        # Ensure no DeleteConfirmScreen was pushed (meaning it was blocked)
+        # Note: In Textual tests, we can check the screen stack
+        assert not any(isinstance(s, DeleteConfirmScreen) for s in pilot.app.screen_stack)
+        
+        # Optionally check the notification text if possible, but screen stack check is robust
+        # Check for error notification
+        # This part is a bit tricky to assert directly in textual, but the logic is verified.
+
+@pytest.mark.asyncio
 async def test_spell_check():
     from odoo_wt.main_tui import spell
     assert "odoo" in spell
     assert "pos" in spell
+
+from odoo_wt.custom_screens import DeleteConfirmScreen
 
 @pytest.mark.asyncio
 async def test_deployment_engine_base_branch(monkeypatch):
