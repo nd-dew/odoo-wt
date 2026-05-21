@@ -556,19 +556,20 @@ class OdooWtApp(App):
 
             # Spell Check & Validation
             words = branch_name.replace("-", "_").split("_")
-            unknown = spell.unknown([w for w in words if w not in (version, suffix)])
+            
+            # Words to definitely ignore
+            tech_terms = set(self.config.get("technical_terms", []))
+            user_ignored = set(self.config.get("ignored_typos", []))
+            system_ignore = {version, suffix, cfg_suffix, "none", "master"}
+            
+            unknown = spell.unknown([w for w in words if w not in system_ignore and w not in tech_terms and w not in user_ignored])
             unknown = {w for w in unknown if not w.isnumeric() and len(w) > 2}
             
-            # Ignore configured and active suffixes
-            cfg_suffix = self.config.get("suffix", "")
-            if cfg_suffix:
-                unknown.discard(cfg_suffix)
-            if suffix and suffix != "none":
-                unknown.discard(suffix)
-                
             warnings = []
             if unknown:
-                warnings.append(f"Typo? {', '.join(unknown)}")
+                # Format unknown words as clickable links for the TUI
+                typo_links = [f"[@click=ignore_typo('{w}')]{w}[/]" for w in sorted(list(unknown))]
+                warnings.append(f"Typo? {', '.join(typo_links)}")
             
             # Repeated words check
             seen_words = set()
@@ -783,6 +784,18 @@ class OdooWtApp(App):
     def action_quit(self) -> None:
         config_mgr.append_log("App Quit")
         self.exit()
+
+    def action_ignore_typo(self, word: str) -> None:
+        """Adds a word to the ignored_typos list in config."""
+        ignored = self.config.get("ignored_typos", [])
+        if word not in ignored:
+            ignored.append(word)
+            self.config["ignored_typos"] = ignored
+            config_mgr.save(self.config)
+            config_mgr.append_log("Typo Ignored", {"word": word})
+            self.update_summary()
+            self.check_branch_existence_task()
+            self.notify(f"Added '{word}' to ignored list.")
 
     def action_next_tab(self) -> None:
         config_mgr.append_log("Next Tab Shortcut Used")
