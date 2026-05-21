@@ -9,6 +9,8 @@ from textual import on, work
 from textual.events import Paste, Key, DescendantFocus
 from textual.binding import Binding
 from spellchecker import SpellChecker
+from rich.text import Text
+from rich.style import Style
 
 spell = SpellChecker()
 spell.word_frequency.load_words(['odoo', 'saas', 'erp', 'mrp', 'pos', 'crm', 'wt', 'api', 'ui', 'ux', 'db', 'sql', 'backend', 'frontend', 'js', 'py', 'xml', 'owl', 'mac', 'linux', 'windows', 'repo'])
@@ -416,15 +418,41 @@ class OdooWtApp(App):
                     "3. Fresh Start: If neither exist, creates a new branch from the official base version."
                 )
 
-            res_block = f"\n[bright_black]{self.check_results_str}[/bright_black]\n" if self.check_results_str else ""
-            summary = (
-                f"[bold]Outcome:[/bold]{res_block}"
-                f"1. [bold cyan]Branch Status:[/bold cyan] {self.branch_status or 'Ready...'}\n"
-                f"2. I will create a new directory at [bold green]{wt_root}/{branch_name}[/bold green]:\n"
-                f"   ├── {comm_dir}/       [bright_black](Community worktree)[/bright_black]\n"
-                f"   └── {ent_dir}/ [bright_black](Enterprise worktree)[/bright_black]\n"
-                f"3. I will use or create the [bold magenta]{base_v}[/bold magenta] UV environment and link it as '.venv'."
-            )
+            # Build Summary using Rich Text for complex interactivity
+            summary = Text()
+            summary.append("Outcome:", style="bold")
+            
+            if self.check_results_str:
+                summary.append("\n")
+                summary.append_text(Text.from_markup(f"[bright_black]{self.check_results_str}[/bright_black]"))
+                summary.append("\n")
+            else:
+                summary.append("\n")
+
+            # 1. Branch Status Line
+            summary.append("1. ", style="")
+            summary.append("Branch Status: ", style="bold cyan")
+            
+            # Use self.branch_status which can be markup (like Checking...)
+            if isinstance(self.branch_status, str):
+                summary.append_text(Text.from_markup(self.branch_status or "Ready..."))
+            else:
+                summary.append_text(self.branch_status)
+
+            # 2. Directory Line
+            summary.append(f"\n2. I will create a new directory at ")
+            summary.append(f"{wt_root}/{branch_name}", style="bold green")
+            summary.append(":\n")
+            summary.append(f"   ├── {comm_dir}/       ", style="")
+            summary.append("(Community worktree)", style="bright_black")
+            summary.append(f"\n   └── {ent_dir}/ ", style="")
+            summary.append("(Enterprise worktree)", style="bright_black")
+            
+            # 3. UV Line
+            summary.append(f"\n3. I will use or create the ")
+            summary.append(f"{base_v}", style="bold magenta")
+            summary.append(" UV environment and link it as '.venv'.")
+
             self.query_one("#dynamic-summary", Label).update(summary)
         except Exception as e:
             import traceback
@@ -437,6 +465,7 @@ class OdooWtApp(App):
     @on(Select.Changed, "#suffix")
     def on_selection_changed(self, event) -> None: 
         self.check_results_str = ""
+        self.branch_status = ""
         self.update_summary()
         self.check_branch_existence_task()
 
@@ -524,21 +553,32 @@ class OdooWtApp(App):
 
                 if remote_checks:
                     async def run_one_remote(c):
-                        r = c.get("remote", dev_remote)
-                        found = await asyncio.to_thread(check_remote, c["path"], branch_name, r)
-                        return c["name"], "ok" if found else "fail", r
+                        try:
+                            r = c.get("remote", dev_remote)
+                            # Add a 10s timeout to git ls-remote to prevent hanging
+                            found = await asyncio.wait_for(asyncio.to_thread(check_remote, c["path"], branch_name, r), timeout=10.0)
+                            return c["name"], "ok" if found else "fail", r
+                        except asyncio.TimeoutError:
+                            return c["name"], "fail", c.get("remote", dev_remote)
+                        except Exception as e:
+                            config_mgr.append_log("Remote Check Error", {"name": c["name"], "error": str(e)})
+                            return c["name"], "fail", c.get("remote", dev_remote)
 
                     pending_tasks = [asyncio.create_task(run_one_remote(c)) for c in remote_checks]
                     
                     dot_count = 0
+                    start_time = asyncio.get_event_loop().time()
                     while pending_tasks:
-                        # Wait for any task to finish with a timeout to keep the "dots" moving
-                        done, pending = await asyncio.wait(pending_tasks, timeout=0.1, return_when=asyncio.FIRST_COMPLETED)
+                        # Wait for any task to finish
+                        done, pending = await asyncio.wait(pending_tasks, timeout=0.2, return_when=asyncio.FIRST_COMPLETED)
                         pending_tasks = list(pending)
                         
                         for task in done:
-                            name, res, r_name = task.result()
-                            results[name] = res
+                            try:
+                                name, res, r_name = task.result()
+                                results[name] = res
+                            except Exception as e:
+                                config_mgr.append_log("Task Result Error", {"error": str(e)})
                         
                         # Update UI animation
                         dot_count = (dot_count + 1) % 4
@@ -546,6 +586,12 @@ class OdooWtApp(App):
                         active_check = next((c["name"] for c in remote_checks if c["name"] not in results), "Finishing...")
                         self.check_results_str = self._build_checklist(checks, results) + (f" [yellow]→[/yellow] {active_check}" if pending_tasks else "")
                         self.update_summary()
+
+                        # Absolute safety break (30s)
+                        if asyncio.get_event_loop().time() - start_time > 30:
+                            config_mgr.append_log("Discovery Timeout", {"msg": "Forced break after 30s"})
+                            for t in pending_tasks: t.cancel()
+                            break
 
                     # Pick the highest priority remote result
                     for i in range(2, 6):
@@ -559,7 +605,7 @@ class OdooWtApp(App):
             self.check_results_str = self._build_checklist(checks, results)
 
             # Spell Check & Validation
-            words = branch_name.replace("-", "_").split("_")
+            words = [w for w in branch_name.replace("-", "_").split("_") if w]
             
             # Words to definitely ignore
             tech_terms = set(self.config.get("technical_terms", []))
@@ -570,13 +616,31 @@ class OdooWtApp(App):
             unknown = spell.unknown([w for w in words if w not in system_ignore and w not in tech_terms and w not in user_ignored])
             unknown = {w for w in unknown if not w.isnumeric() and len(w) > 2}
             
-            warnings = []
-            if unknown:
-                # Format unknown words as clickable blue underlined links with a tooltip
-                typo_links = [f"[underline blue][@click=app.ignore_typo('{w}') tooltip='Whitelist?']{w}[/][/]" for w in sorted(list(unknown))]
-                warnings.append(f"Typo? {', '.join(typo_links)}")
+            # Build final status using Rich Text
+            status_text = Text()
+            if is_local:
+                status_text.append(f"Found branch '{branch_name}' locally.", style="bold yellow")
+            elif is_remote:
+                status_text.append(f"Found branch on '{found_remote_name}'.", style="bold green")
+            else:
+                status_text.append("New branch will be created.", style="bold white")
             
-            # Repeated words check
+            warnings_text = Text()
+            warn_list = []
+            
+            # 1. Typos with hover tooltips (using Textual's way of handling tooltips if possible, or just text)
+            if unknown:
+                typo_part = Text("Typo? ", style="bold red")
+                for i, w in enumerate(sorted(list(unknown))):
+                    if i > 0: typo_part.append(", ", style="bold red")
+                    # We'll use a simpler markup for now to avoid crashes, 
+                    # and rely on the fact that these are clickable blue links.
+                    # To show tooltips in Textual for specific regions, we'd need a more complex setup,
+                    # so for now we just make them look like buttons.
+                    typo_part.append(w, style=Style(underline=True, color="blue", meta={"@click": f"app.ignore_typo('{w}')"}))
+                warn_list.append(typo_part)
+            
+            # 2. Repeated words check
             seen_words = set()
             repeated = []
             for w in words:
@@ -585,21 +649,20 @@ class OdooWtApp(App):
                     repeated.append(w)
                 seen_words.add(w)
             if repeated:
-                warnings.append(f"Repeated: {', '.join(repeated)}")
+                warn_list.append(Text(f"Repeated: {', '.join(repeated)}", style="bold red"))
             
-            # Invalid characters check
+            # 3. Invalid characters check
             if ":" in branch_name:
-                warnings.append("Found ':' (Github paste?)")
+                warn_list.append(Text("Found ':' (Github paste?)", style="bold red"))
             
-            spell_warning = f" [bold red]({'; '.join(warnings)})[/bold red]" if warnings else ""
+            if warn_list:
+                status_text.append(" (", style="bold red")
+                for i, w_text in enumerate(warn_list):
+                    if i > 0: status_text.append("; ", style="bold red")
+                    status_text.append_text(w_text)
+                status_text.append(")", style="bold red")
 
-            if is_local:
-                self.branch_status = f"[bold yellow]Found branch '{branch_name}' locally.[/bold yellow]{spell_warning}"
-            elif is_remote:
-                self.branch_status = f"[bold green]Found branch on '{found_remote_name}'.[/bold green]{spell_warning}"
-            else:
-                self.branch_status = f"[bold white]New branch will be created.[/bold white]{spell_warning}"
-            
+            self.branch_status = status_text
             self.update_summary()
         except Exception as e:
             import traceback
