@@ -1,12 +1,17 @@
 import sys
 import os
 import shutil
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    VERSION = version("odoo-wt")
+except PackageNotFoundError:
+    VERSION = "dev"
+
 from .app_config import config_mgr
 from .system_discovery import discover_system_data, decompose_branch
 from .setup_wizard import WizardApp
 from .main_tui import OdooWtApp
-
-VERSION = "1.2.0"
 
 def show_help():
     print(f"Odoo Worktree Assistant (odoo-wt) v{VERSION}")
@@ -99,7 +104,7 @@ def main():
         data = app.run()
     else:
         v_list, s_list, worktrees = discover_system_data(config["wt_root"], config["suffix"])
-        app = OdooWtApp(config, v_list, s_list, worktrees)
+        app = OdooWtApp(config, v_list, s_list, worktrees, VERSION)
         data = app.run()
 
     # Handle deployment completion actions
