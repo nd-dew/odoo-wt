@@ -70,20 +70,16 @@ def main():
     # CLI direct creation mode
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
         branch_name = sys.argv[1]
-        from .system_discovery import parse_branch_name
-        v, s = parse_branch_name(branch_name)
-
-        # Remove the prefix/suffix to get just the description part
-        desc = branch_name
-        if v and desc.startswith(f"{v}-"):
-            desc = desc[len(v)+1:]
-        if s and desc.endswith(f"-{s}"):
-            desc = desc[:-len(s)-1]
+        
+        from .system_discovery import discover_system_data, decompose_branch
+        v_list, s_list, _ = discover_system_data(config["wt_root"], config["suffix"])
+        
+        remote, v, d, s = decompose_branch(branch_name, v_list, s_list)
 
         data = {
             "action": "create",
             "version": v,
-            "desc": desc,
+            "desc": d,
             "suffix": s
         }
 
