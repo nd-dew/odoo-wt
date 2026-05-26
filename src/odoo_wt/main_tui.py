@@ -193,6 +193,9 @@ class OdooWtApp(App):
                             yield Select(((s, s) for s in self.s_list), value=self.s_list[0] if self.s_list else None, id="suffix", allow_blank=False)
                             yield Input(id="custom_suffix", classes="custom-field")
 
+                    with Center():
+                        yield Button("✨ Magic Fix", id="magic-btn", classes="mini-btn hidden")
+
                     yield Label(
                         "Deployment Strategy (Surgical Safety):\n"
                         "1. Remote Check: Tries to pull the exact branch from your remote (e.g., odoo-dev).\n"
@@ -256,6 +259,9 @@ class OdooWtApp(App):
                         with Horizontal(classes="setting-item"):
                             yield Label("Show Description:", classes="setting-label")
                             yield Switch(value=self.config.get("show_desc", True), id="set-show-desc", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Auto Magic Fix:", classes="setting-label")
+                            yield Switch(value=self.config.get("auto_magic_fix", True), id="set-auto-magic", classes="setting-input")
                         with Horizontal(classes="setting-item"):
                             yield Label("Dark Mode:", classes="setting-label")
                             yield Switch(value=self.config.get("dark_mode", True), id="set-dark-mode", classes="setting-input")
@@ -654,6 +660,24 @@ class OdooWtApp(App):
             if ":" in branch_name:
                 warn_list.append(Text("Found ':' (Github paste?)", style="bold red"))
             
+            # 4. Smart Paste & Magic Fix
+            needs_magic = ":" in branch_name or repeated
+            magic_btn = self.query_one("#magic-btn")
+            
+            if needs_magic:
+                if self.config.get("auto_magic_fix", True):
+                    # Only auto-fix once to prevent loops
+                    if not getattr(self, "_magic_fixing", False):
+                        self._magic_fixing = True
+                        self.action_magic_fix()
+                        self._magic_fixing = False
+                        return
+                
+                magic_btn.remove_class("hidden")
+                warn_list.append(Text("Magic Fix?", style=Style(underline=True, color="blue", meta={"@click": "app.magic_fix"})))
+            else:
+                magic_btn.add_class("hidden")
+
             if warn_list:
                 status_text.append(" (", style="bold red")
                 for i, w_text in enumerate(warn_list):
@@ -826,6 +850,7 @@ class OdooWtApp(App):
         self.query_one("#set-show-prefix", Switch).value = self.config.get("show_prefix", True)
         self.query_one("#set-show-suffix", Switch).value = self.config.get("show_suffix", True)
         self.query_one("#set-show-desc", Switch).value = self.config.get("show_desc", True)
+        self.query_one("#set-auto-magic", Switch).value = self.config.get("auto_magic_fix", True)
         
         is_dark = self.config.get("dark_mode", True)
         self.query_one("#set-dark-mode", Switch).value = is_dark
@@ -852,6 +877,63 @@ class OdooWtApp(App):
     def action_quit(self) -> None:
         config_mgr.append_log("App Quit")
         self.exit()
+
+    @on(Button.Pressed, "#magic-btn")
+    def on_magic_btn_pressed(self) -> None:
+        self.action_magic_fix()
+
+    def action_magic_fix(self) -> None:
+        """Cleans up pasted branch names (e.g., 'remote:v-desc-s') and updates UI."""
+        try:
+            desc_input = self.query_one("#desc", Input)
+            raw_desc = desc_input.value
+            
+            from .system_discovery import decompose_branch
+            remote, v, d, s = decompose_branch(raw_desc, self.v_list, self.s_list)
+            
+            flashed = False
+            # If decompose found a version or suffix, update the selectors
+            if v:
+                v_sel = self.query_one("#version", Select)
+                if v in self.v_list:
+                    v_sel.value = v
+                else:
+                    v_sel.value = "custom..."
+                    self.query_one("#custom_version", Input).value = v
+                v_sel.add_class("magic-flash")
+                self.set_timer(0.5, lambda: v_sel.remove_class("magic-flash"))
+                flashed = True
+                 
+            if s:
+                s_sel = self.query_one("#suffix", Select)
+                if s in self.s_list:
+                    s_sel.value = s
+                else:
+                    s_sel.value = "custom..."
+                    self.query_one("#custom_suffix", Input).value = s
+                s_sel.add_class("magic-flash")
+                self.set_timer(0.5, lambda: s_sel.remove_class("magic-flash"))
+                flashed = True
+            
+            if d != raw_desc:
+                desc_input.value = d
+                desc_input.add_class("magic-flash")
+                self.set_timer(0.5, lambda: desc_input.remove_class("magic-flash"))
+                flashed = True
+            
+            if flashed:
+                if remote:
+                    self.notify(f"✨ Magic Fix: Stripped remote '{remote}' and cleaned parts.", timeout=3)
+                else:
+                    self.notify("✨ Magic Fix: Cleaned redundant parts.", timeout=3)
+                
+            self.query_one("#magic-btn").add_class("hidden")
+            self.update_summary()
+            self.check_branch_existence_task()
+            config_mgr.append_log("Magic Fix Applied", {"original": raw_desc, "new_desc": d, "version": v, "suffix": s})
+        except Exception as e:
+            self.notify(f"Magic Fix Error: {str(e)}", severity="error")
+            config_mgr.append_log("Magic Fix Error", {"error": str(e)})
 
     def action_ignore_typo(self, word: str) -> None:
         """Adds a word to the ignored_typos list in config."""
@@ -959,6 +1041,7 @@ class OdooWtApp(App):
     @on(Switch.Changed, "#set-show-prefix")
     @on(Switch.Changed, "#set-show-suffix")
     @on(Switch.Changed, "#set-show-desc")
+    @on(Switch.Changed, "#set-auto-magic")
     @on(Switch.Changed, "#set-dark-mode")
     def on_setting_changed(self, event) -> None:
         if self.is_mounted:
@@ -987,6 +1070,7 @@ class OdooWtApp(App):
         self.config["show_prefix"] = self.query_one("#set-show-prefix", Switch).value
         self.config["show_suffix"] = self.query_one("#set-show-suffix", Switch).value
         self.config["show_desc"] = self.query_one("#set-show-desc", Switch).value
+        self.config["auto_magic_fix"] = self.query_one("#set-auto-magic", Switch).value
         self.config["dark_mode"] = self.query_one("#set-dark-mode", Switch).value
 
         ig_v = [v.strip() for v in self.query_one("#set-ig-v", Input).value.split(",") if v.strip()]
