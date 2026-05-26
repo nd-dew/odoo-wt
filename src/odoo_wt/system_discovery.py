@@ -58,6 +58,54 @@ def parse_branch_name(name):
             s = s_candidate
     return v, s
 
+def decompose_branch(full_name, known_versions=None, known_suffixes=None):
+    """
+    Advanced parser for Odoo branch names.
+    Handles 'remote:version-desc-suffix', 'version-desc-suffix', etc.
+    Returns (remote, version, desc, suffix)
+    """
+    remote = ""
+    # 1. Extract remote if present (e.g., "odoo-dev:...")
+    if ":" in full_name:
+        remote, full_name = full_name.split(":", 1)
+    
+    # 2. Extract version (e.g., "master", "17.0", "saas-17.1")
+    version = ""
+    v_candidates = []
+    if full_name.startswith("saas-"):
+        parts = full_name.split("-")
+        if len(parts) >= 2:
+            v_candidates.append(f"{parts[0]}-{parts[1]}")
+    else:
+        v_candidates.append(full_name.split("-")[0])
+    
+    for v in v_candidates:
+        # Prioritize matching against known versions if provided
+        if known_versions and v in known_versions:
+            version = v
+            full_name = full_name[len(v):].lstrip("-")
+            break
+        # Fallback for standard patterns
+        if v == "master" or (v and v[0].isdigit() and "." in v):
+            version = v
+            full_name = full_name[len(v):].lstrip("-")
+            break
+
+    # 3. Extract suffix (e.g., "-pian", "-mate")
+    suffix = ""
+    if "-" in full_name:
+        s_candidate = full_name.rsplit("-", 1)[-1]
+        
+        # Suffixes are usually short quadrigrams or known words
+        is_known = known_suffixes and s_candidate in known_suffixes
+        is_pattern = 3 <= len(s_candidate) <= 8 and s_candidate.isalnum()
+        
+        if is_known or is_pattern:
+            suffix = s_candidate
+            full_name = full_name[:-len(suffix)].rstrip("-")
+            
+    return remote, version, full_name, suffix
+
 def discover_system_data(wt_root, default_suffix):
     versions = set()
     suffixes = set([default_suffix, "test", "none"])
