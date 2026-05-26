@@ -13,6 +13,7 @@ class ConfigManager:
         self.config_file = DEFAULT_CONFIG_FILE
         self.log_file = DEFAULT_LOG_FILE
         self.config = self._get_defaults()
+        self.is_test_mode = False
 
     def _get_defaults(self):
         return {
@@ -38,6 +39,7 @@ class ConfigManager:
         }
 
     def append_log(self, action: str, details: dict = None):
+        if self.is_test_mode: return
         if details is None: details = {}
         entry = {"timestamp": datetime.datetime.now().isoformat(), "action": action, "details": details}
         try:
@@ -81,6 +83,11 @@ class ConfigManager:
         return self.config
 
     def save(self, new_config):
+        if self.is_test_mode:
+            # When in test mode, we update the internal state but NEVER write to disk
+            self.config.update(new_config)
+            return
+
         raw_config_path = str(new_config.get("config_path", "")).strip() or str(DEFAULT_CONFIG_FILE)
         raw_log_path = str(new_config.get("log_path", "")).strip() or str(DEFAULT_LOG_FILE)
         
