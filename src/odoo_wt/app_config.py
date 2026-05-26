@@ -35,6 +35,7 @@ class ConfigManager:
             "show_suffix": True,
             "show_desc": True,
             "dark_mode": True,
+            "auto_magic_fix": True,
             "use_count": 0
         }
 
