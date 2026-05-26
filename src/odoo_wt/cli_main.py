@@ -2,7 +2,7 @@ import sys
 import os
 import shutil
 from .app_config import config_mgr
-from .system_discovery import discover_system_data
+from .system_discovery import discover_system_data, decompose_branch
 from .setup_wizard import WizardApp
 from .main_tui import OdooWtApp
 
@@ -71,7 +71,6 @@ def main():
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
         branch_name = sys.argv[1]
         
-        from .system_discovery import discover_system_data, decompose_branch
         v_list, s_list, _ = discover_system_data(config["wt_root"], config["suffix"])
         
         remote, v, d, s = decompose_branch(branch_name, v_list, s_list)
