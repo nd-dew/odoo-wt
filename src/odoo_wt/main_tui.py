@@ -16,7 +16,7 @@ spell = SpellChecker()
 spell.word_frequency.load_words(['odoo', 'saas', 'erp', 'mrp', 'pos', 'crm', 'wt', 'api', 'ui', 'ux', 'db', 'sql', 'backend', 'frontend', 'js', 'py', 'xml', 'owl', 'mac', 'linux', 'windows', 'repo'])
 
 from .app_config import config_mgr
-from .system_discovery import discover_system_data, get_remote, run_git
+from .system_discovery import discover_system_data, get_remote, run_git, decompose_branch
 from .custom_screens import DeleteConfirmScreen, DeployScreen, LogDetailScreen
 
 SETTINGS_HELP = {
@@ -888,7 +888,6 @@ class OdooWtApp(App):
             desc_input = self.query_one("#desc", Input)
             raw_desc = desc_input.value
             
-            from .system_discovery import decompose_branch
             remote, v, d, s = decompose_branch(raw_desc, self.v_list, self.s_list)
             
             flashed = False
