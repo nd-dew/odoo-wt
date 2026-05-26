@@ -92,7 +92,7 @@ class OdooWtApp(App):
         except Exception:
             active_tab = "tab-create"
             
-        parts = ["^S Create", "^D Delete", "^R Refresh", "^T Tab", "^Q Quit"]
+        parts = ["^S Create", "^X Delete", "^R Refresh", "^T Tab", "^Q Quit"]
         if active_tab == "tab-manage":
             parts.append("Enter Open")
         return "  ".join(parts)
@@ -211,11 +211,11 @@ class OdooWtApp(App):
                 with TabPane("Manage", id="tab-manage"):
                     yield Label("Discovery: Scans 'Worktree Root Path' (in Settings)\nfor 'odoo/.git' folders. [bold cyan]Hint: Double-click or press Enter on a row to open in terminal.[/bold cyan]", classes="tab-description")
                     yield Input(placeholder="Fuzzy search worktrees...", id="wt-search", classes="search-input")
-                    yield DataTable(id="wt-table", cursor_type="row")
                     with Horizontal(classes="btn-row"):
                         yield Button("Open Selected ⏎", variant="success", id="open-btn")
                         yield Button("Refresh", id="refresh-btn")
                         yield Button("Delete Selected ^X", variant="error", id="delete-btn")
+                    yield DataTable(id="wt-table", cursor_type="row")
                 with TabPane("Settings", id="tab-settings"):
                     yield Input(placeholder="Fuzzy search settings... (e.g. 'log', 'dark', 'path')", id="settings-search", classes="search-input")
                     with VerticalScroll(classes="settings-container"):
