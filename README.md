@@ -117,6 +117,22 @@ uv tool install . --force
     - To copy text manually: Hold the Shift key while clicking and dragging over the text to bypass the app and use your terminal's native selection, then use Ctrl+Shift+C.
     - To paste text: Sometimes native terminal paste (Ctrl+Shift+V or middle-click) events are intercepted unreliably by the underlying framework. If pasting into an input field fails, you may need to type the branch name manually.
 
+## Current Issues (Help Wanted!)
+
+- **Config Reset Bug:** The `wt_root` sometimes resets itself to `/tmp`. We need to investigate why this field is being overwritten in the configuration.
+- **Log Clipping:** Long log entries in the "Logs" tab are currently clipped with `...` instead of being wrapped. They should wrap for better readability.
+
+## Future Roadmap
+
+### 1. Smart Paste & Magic Fix
+- **Paste Detection:** Intelligently detect when a full branch name is pasted into the description. 
+- **Auto-Unset:** When a paste is detected, automatically set "Version" and "Suffix" dropdowns to "none" to avoid redundancy.
+- **Magic Fix Button:** A one-click (or shortcut-triggered) button to clean up pasted strings (e.g., stripping `odoo-dev:`, removing redundant `master-` prefixes).
+- **Settings Integration:** Ability to trigger a "Magic Fix" cleanup directly from the settings menu.
+
+### 2. Enhanced CLI Mode
+- **Smart Parsing:** Improve the CLI to accept complex, pasted branch names and automatically apply the "Magic Fix" logic to determine the correct remote, version, and description.
+
 ## Development
 
 To apply changes made to the source:

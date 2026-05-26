@@ -64,7 +64,6 @@ class OdooWtApp(App):
         self.config["use_count"] = use_count
         if use_count == 18:
             self.config["show_desc"] = False
-        config_mgr.save(self.config)
         
         ig_v = set(config.get("ignored_versions", []))
         ig_s = set(config.get("ignored_suffixes", []))
