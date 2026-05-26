@@ -131,6 +131,13 @@ class OdooWtApp(App):
             active_tab = self.query_one("#tabs").active
             focused = self.focused
             
+            # Priority Shortcut: Always delete on Manage tab with Ctrl+X, even if search is focused
+            if active_tab == "tab-manage" and event.key == "ctrl+x":
+                self.action_delete_wt()
+                event.stop()
+                event.prevent_default()
+                return
+
             # 1. Search Navigation Proxy (Existing Tab)
             if focused and focused.id == "wt-search" and event.key in ("down", "up", "enter"):
                 table = self.query_one("#wt-table", DataTable)
