@@ -45,7 +45,7 @@ class OdooWtApp(App):
 
     BINDINGS = [
         Binding("ctrl+s", "submit", "Create", key_display="^S"),
-        Binding("ctrl+d", "delete_wt", "Delete", key_display="^D"),
+        Binding("ctrl+x", "delete_wt", "Delete", key_display="^X"),
         Binding("ctrl+r", "refresh", "Refresh/Reset", key_display="^R"),
         Binding("ctrl+t", "next_tab", "Tab", key_display="^T"),
         Binding("ctrl+tab", "next_tab", "", show=False),
@@ -212,8 +212,9 @@ class OdooWtApp(App):
                     yield Input(placeholder="Fuzzy search worktrees...", id="wt-search", classes="search-input")
                     yield DataTable(id="wt-table", cursor_type="row")
                     with Horizontal(classes="btn-row"):
+                        yield Button("Open Selected ⏎", variant="success", id="open-btn")
                         yield Button("Refresh", id="refresh-btn")
-                        yield Button("Delete Selected", variant="error", id="delete-btn")
+                        yield Button("Delete Selected ^X", variant="error", id="delete-btn")
                 with TabPane("Settings", id="tab-settings"):
                     yield Input(placeholder="Fuzzy search settings... (e.g. 'log', 'dark', 'path')", id="settings-search", classes="search-input")
                     with VerticalScroll(classes="settings-container"):
@@ -279,7 +280,7 @@ class OdooWtApp(App):
                         yield Button("Clear Logs", variant="error", id="clear-logs-btn")
         
         # Replace Footer with our custom global help bar
-        yield Static("^S Create  ^D Delete  ^R Refresh  ^T Tab  ^Q Quit", id="global-help-bar", classes="help-bar")
+        yield Static("^S Create  ^X Delete  ^R Refresh  ^T Tab  ^Q Quit", id="global-help-bar", classes="help-bar")
 
     def on_mount(self) -> None:
         config_mgr.append_log("App Started")
@@ -735,8 +736,6 @@ class OdooWtApp(App):
                     ts = data.get("timestamp", "")
                     rt = relative_time(ts)
                     details_str = json.dumps(data.get("details", {}))
-                    if len(details_str) > 60:
-                        details_str = details_str[:57] + "..."
                     table.add_row(rt, data.get("action", ""), details_str)
             except (OSError, IOError, json.JSONDecodeError) as e:
                 config_mgr.append_log("Log table parsing error", {"error": str(e)})
@@ -1081,6 +1080,7 @@ class OdooWtApp(App):
 
         config_mgr.save(self.config)
         config_mgr.append_log("Settings Auto-Saved", self.config)
+        self.notify("Settings saved automatically", timeout=2)
         
         self.apply_visibility_settings()
         self.update_summary()
@@ -1103,6 +1103,15 @@ class OdooWtApp(App):
 
     @on(Button.Pressed, "#submit-btn")
     def on_submit_btn(self) -> None: self.action_submit()
+
+    @on(Button.Pressed, "#open-btn")
+    def on_open_btn(self) -> None:
+        table = self.query_one("#wt-table", DataTable)
+        try:
+            row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+            self.on_wt_selected(DataTable.RowSelected(table, row_key))
+        except Exception:
+            self.notify("Select a worktree first!", severity="error")
     
     @on(Button.Pressed, "#refresh-btn")
     def on_refresh_btn(self) -> None:
