@@ -32,14 +32,18 @@ The tool creates and manages a standardized folder structure that looks like thi
 
 ### Key Features
 
-- Modern TUI: A sleek, reactive All-in-One form built with Textual.
-- Smart Branching: Follows the Odoo standard: [VERSION]-[description]-[SUFFIX].
-- Dual Repo Support: Simultaneously creates worktrees for both odoo (Community) and enterprise.
-- Automated UV Environments:
-    - Centralizes environments in ~/.envs/[VERSION].
-    - Automatically runs uv venv and uv pip install if the environment is missing.
-    - Instantly symlinks .venv into your new worktree folder for automatic VS Code detection.
-- Proactive Status Checks: Checks odoo-dev and local remotes to detect if branches already exist before creation.
+- **Modern TUI:** A sleek, reactive All-in-One form built with Textual.
+- **Smart Branching:** Follows the Odoo standard: `[VERSION]-[description]-[SUFFIX]`.
+- **Magic Fix ✨:** Intelligently parses pasted branch names (e.g., `odoo-dev:master-fix-bug-pian`) and automatically cleans up dropdowns and inputs.
+- **Dual Repo Support:** Simultaneously creates worktrees for both `odoo` (Community) and `enterprise`.
+- **Automated UV Environments:**
+    - Centralizes environments in `~/.envs/[VERSION]`.
+    - Automatically runs `uv venv` and `uv pip install` if the environment is missing.
+    - Instantly symlinks `.venv` into your new worktree folder for automatic VS Code detection.
+- **Advanced Management:** 
+    - Search, Open, and Delete worktrees directly from the TUI.
+    - Protected `master` worktrees and triple-confirmation "nuke" safety for deletions.
+- **Proactive Status Checks:** Parallelized checks across local and remote repositories to detect existing branches before creation.
 
 ## Installation
 
@@ -120,18 +124,12 @@ uv tool install . --force
 ## Current Issues (Help Wanted!)
 
 - **Config Reset Bug:** The `wt_root` sometimes resets itself to `/tmp`. We need to investigate why this field is being overwritten in the configuration.
-- **Log Clipping:** Long log entries in the "Logs" tab are currently clipped with `...` instead of being wrapped. They should wrap for better readability.
 
 ## Future Roadmap
 
-### 1. Smart Paste & Magic Fix
-- **Paste Detection:** Intelligently detect when a full branch name is pasted into the description. 
-- **Auto-Unset:** When a paste is detected, automatically set "Version" and "Suffix" dropdowns to "none" to avoid redundancy.
-- **Magic Fix Button:** A one-click (or shortcut-triggered) button to clean up pasted strings (e.g., stripping `odoo-dev:`, removing redundant `master-` prefixes).
-- **Settings Integration:** Ability to trigger a "Magic Fix" cleanup directly from the settings menu.
-
-### 2. Enhanced CLI Mode
-- **Smart Parsing:** Improve the CLI to accept complex, pasted branch names and automatically apply the "Magic Fix" logic to determine the correct remote, version, and description.
+### 1. Enhanced CLI Mode
+- **Action Selection:** Add flags to directly trigger 'terminal' or 'vscode' actions from the command line after deployment.
+- **Improved Logging:** Add more granular log levels for troubleshooting.
 
 ## Development
 
