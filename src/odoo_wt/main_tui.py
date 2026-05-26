@@ -293,6 +293,10 @@ class OdooWtApp(App):
     def on_mount(self) -> None:
         config_mgr.append_log("App Started")
         
+        # Initialize Manage Table Columns
+        table = self.query_one("#wt-table", DataTable)
+        table.add_columns("Branch Name", "Version")
+
         default_tab = self.config.get("default_tab", "tab-create")
         try:
             self.query_one("#tabs", TabbedContent).active = default_tab
@@ -782,8 +786,7 @@ class OdooWtApp(App):
 
     def populate_table(self):
         table = self.query_one("#wt-table", DataTable)
-        table.clear(columns=True)
-        table.add_columns("Branch Name", "Version")
+        table.clear()
         
         try:
             search_term = self.query_one("#wt-search", Input).value.lower()
