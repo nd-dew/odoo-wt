@@ -55,9 +55,10 @@ class OdooWtApp(App):
         Binding("ctrl+c", "quit", "Quit", show=False),
     ]
 
-    def __init__(self, config, v_list, s_list, worktrees):
+    def __init__(self, config, v_list, s_list, worktrees, version_str="dev"):
         super().__init__()
         self.config = config
+        self.app_version = version_str
         
         # Track usage and auto-hide description at 18th launch
         use_count = self.config.get("use_count", 0) + 1
@@ -169,7 +170,7 @@ class OdooWtApp(App):
         with Vertical(id="dialog"):
             with Horizontal(id="top-bar"):
                 with Vertical(id="title-container"):
-                    yield Label("Odoo WorkTree Tool", classes="title")
+                    yield Label(f"Odoo WorkTree Tool v{self.app_version}", classes="title")
                     yield Label("Opinionated tool for Odoo development. Creates/removes WorkTrees\nreusing UV environments per Odoo version.", id="app-desc", classes="description")
                 yield Button("X", id="btn-close-app", classes="close-btn")
             yield Label("")
