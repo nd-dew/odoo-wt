@@ -71,24 +71,32 @@ def decompose_branch(full_name, known_versions=None, known_suffixes=None):
     
     # 2. Extract version (e.g., "master", "17.0", "saas-17.1")
     version = ""
-    v_candidates = []
-    if full_name.startswith("saas-"):
-        parts = full_name.split("-")
-        if len(parts) >= 2:
-            v_candidates.append(f"{parts[0]}-{parts[1]}")
-    else:
-        v_candidates.append(full_name.split("-")[0])
-    
-    for v in v_candidates:
-        # Prioritize matching against known versions if provided
-        if known_versions and v in known_versions:
-            version = v
-            full_name = full_name[len(v):].lstrip("-")
-            break
-        # Fallback for standard patterns
-        if v == "master" or (v and v[0].isdigit() and "." in v):
-            version = v
-            full_name = full_name[len(v):].lstrip("-")
+    # We loop to catch multiple prefixes (e.g. 17.0-17.0-desc)
+    while True:
+        found_any = False
+        v_candidates = []
+        if full_name.startswith("saas-"):
+            parts = full_name.split("-")
+            if len(parts) >= 2:
+                v_candidates.append(f"{parts[0]}-{parts[1]}")
+        else:
+            v_candidates.append(full_name.split("-")[0])
+        
+        for v in v_candidates:
+            is_match = False
+            if known_versions and v in known_versions:
+                is_match = True
+            elif v == "master" or (v and v[0].isdigit() and "." in v):
+                is_match = True
+            
+            if is_match:
+                # Keep the first version found as the "canonical" one
+                if not version: version = v
+                full_name = full_name[len(v):].lstrip("-")
+                found_any = True
+                break
+        
+        if not found_any:
             break
 
     # 3. Extract suffix (e.g., "-pian", "-mate")
