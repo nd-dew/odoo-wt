@@ -339,6 +339,21 @@ LogDetailScreen {
     height: 3;
 }
 
+.manage-top-row {
+    height: 3;
+    margin-bottom: 1;
+}
+
+.manage-top-row .search-input {
+    width: 1fr;
+    margin-right: 1;
+}
+
+.manage-top-row .mini-btn {
+    min-width: 10;
+    margin-left: 1;
+}
+
 .mini-btn {
     height: 3;
     min-width: 15;
