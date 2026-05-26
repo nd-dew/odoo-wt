@@ -7,7 +7,7 @@ from textual.widgets import TabbedContent, Select
 from pathlib import Path
 import json
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_config_path(tmp_path, monkeypatch):
     config_dir = tmp_path / ".config"
     config_dir.mkdir()
@@ -20,6 +20,14 @@ def mock_config_path(tmp_path, monkeypatch):
     monkeypatch.setattr(config_mgr, "config_file", config_file)
     monkeypatch.setattr(config_mgr, "log_file", log_file)
     
+    # SAFETY SHIELD: Disable all disk writes during tests
+    monkeypatch.setattr(config_mgr, "is_test_mode", True)
+    
+    # Pre-populate with valid defaults to avoid validation errors
+    config_mgr.config = config_mgr._get_defaults()
+    config_mgr.config["config_path"] = str(config_file)
+    config_mgr.config["log_path"] = str(log_file)
+
     return config_file
 
 def test_pure_logic_parsing():
@@ -62,6 +70,9 @@ def test_worktree_discovery(tmp_path):
     assert "master" in v_list
 
 def test_config_management(mock_config_path):
+    # This test specifically tests writing, so we temporarily allow it
+    config_mgr.is_test_mode = False
+    
     # Ensure we start clean
     if mock_config_path.exists(): mock_config_path.unlink()
     
@@ -75,6 +86,9 @@ def test_config_management(mock_config_path):
     assert mock_config_path.exists()
 
 def test_logging_system(mock_config_path):
+    # This test specifically tests writing, so we temporarily allow it
+    config_mgr.is_test_mode = False
+    
     config_mgr.append_log("Test Action", {"key": "value"})
     assert config_mgr.log_file.exists()
     with open(config_mgr.log_file, "r") as f:
