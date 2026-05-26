@@ -210,11 +210,11 @@ class OdooWtApp(App):
                         yield Button("Create ⏎", variant="success", id="submit-btn")
                 with TabPane("Manage", id="tab-manage"):
                     yield Label("Discovery: Scans 'Worktree Root Path' (in Settings)\nfor 'odoo/.git' folders. [bold cyan]Hint: Double-click or press Enter on a row to open in terminal.[/bold cyan]", classes="tab-description")
-                    yield Input(placeholder="Fuzzy search worktrees...", id="wt-search", classes="search-input")
-                    with Horizontal(classes="btn-row"):
-                        yield Button("Open Selected ⏎", variant="success", id="open-btn")
-                        yield Button("Refresh", id="refresh-btn")
-                        yield Button("Delete Selected ^X", variant="error", id="delete-btn")
+                    with Horizontal(classes="manage-top-row"):
+                        yield Input(placeholder="Fuzzy search...", id="wt-search", classes="search-input")
+                        yield Button("Open", variant="success", id="open-btn", classes="mini-btn")
+                        yield Button("Refresh", id="refresh-btn", classes="mini-btn")
+                        yield Button("Delete ^X", variant="error", id="delete-btn", classes="mini-btn")
                     yield DataTable(id="wt-table", cursor_type="row")
                 with TabPane("Settings", id="tab-settings"):
                     yield Input(placeholder="Fuzzy search settings... (e.g. 'log', 'dark', 'path')", id="settings-search", classes="search-input")
