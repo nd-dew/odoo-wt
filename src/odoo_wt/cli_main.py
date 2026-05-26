@@ -16,6 +16,7 @@ def show_help():
     print("  odoo-wt <branch-name>    Open TUI with a specific branch name pre-filled")
     print("  odoo-wt --create         Force start in the 'Creation' tab")
     print("  odoo-wt --manage         Force start in the 'Existing / Removal' tab")
+    print("  odoo-wt --no-magic       Disable automatic 'Magic Fix' for this session")
     print("  odoo-wt --help, -h       Show this help message")
     print("  odoo-wt --version        Show the current version")
     print("\nEnvironment Variables:")
@@ -66,6 +67,10 @@ def main():
 
     if forced_tab:
         config["default_tab"] = forced_tab
+
+    if "--no-magic" in sys.argv:
+        config["auto_magic_fix"] = False
+        sys.argv.remove("--no-magic")
 
     # CLI direct creation mode
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
