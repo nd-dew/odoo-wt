@@ -414,7 +414,13 @@ class OdooWtApp(App):
             wt_root_raw = self.config.get("wt_root", "")
             wt_root = str(Path(wt_root_raw).expanduser().absolute())
             remote = self.config.get("remote_name", "odoo-dev")
-            base_v = version if version else "master"
+            
+            # Resolve base version from branch name if not explicitly set
+            base_v = version if version else ""
+            if not base_v or base_v == "none":
+                _, parsed_v, _, _ = decompose_branch(branch_name)
+                base_v = parsed_v or "master"
+                
             comm_dir = self.config.get("community_dir", "odoo")
             ent_dir = self.config.get("enterprise_dir", "enterprise")
             
@@ -705,12 +711,26 @@ class OdooWtApp(App):
             config_mgr.append_log("Non-crashing UI error", {"error": str(e), "trace": traceback.format_exc()})
 
     def _build_checklist(self, checks, results) -> str:
-        parts = []
-        for c in checks:
-            res = results.get(c["name"])
-            if res == "ok": parts.append(f"[green]✓[/green] {c['name']}")
-            elif res == "fail": parts.append(f"[red]✗[/red] {c['name']}")
-        return " ".join(parts)
+        def get_status_tag(res):
+            if res == "ok": return "[green]✓[/green]"
+            if res == "fail": return "[red]✗[/red]"
+            return "[bright_black]~[/bright_black]"  # skipped / pending
+            
+        lc = get_status_tag(results.get(checks[0]["name"]))
+        le = get_status_tag(results.get(checks[1]["name"]))
+        dc = get_status_tag(results.get(checks[2]["name"]))
+        de = get_status_tag(results.get(checks[3]["name"]))
+        mc = get_status_tag(results.get(checks[4]["name"]))
+        me = get_status_tag(results.get(checks[5]["name"]))
+        
+        dev_label = checks[2].get("remote", "odoo-dev")
+        
+        return (
+            f"Availability:   Local: {lc} Comm / {le} Ent   |   "
+            f"Fork ({dev_label}): {dc} Comm / {de} Ent   |   "
+            f"Odoo: {mc} Comm / {me} Ent"
+        )
+
 
     @on(Input.Submitted, "#desc")
     @on(Input.Submitted, "#custom_version")
