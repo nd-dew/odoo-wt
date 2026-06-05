@@ -202,6 +202,18 @@ async def test_deployment_engine_base_branch(monkeypatch):
     # Instead, it should immediately fetch the base version from the official remote
     assert ["git", "fetch", "odoo", "19.0"] in commands_run
 
+    # Test 3: Dynamic Fallback base version extraction
+    # If version dropdown is "none" or empty, but description is "saas-19.3"
+    engine_fallback = DeployEngine(config, {"version": "", "desc": "saas-19.3", "suffix": ""})
+    assert engine_fallback.base_v == "saas-19.3"
+    assert engine_fallback.branch_name == "saas-19.3"
+    commands_run.clear()
+    async for _ in engine_fallback.deploy_repo(Path("/tmp"), "odoo", "odoo"):
+        pass
+    # It should dynamically fetch saas-19.3
+    assert ["git", "fetch", "odoo", "saas-19.3"] in commands_run
+
+
 @pytest.mark.asyncio
 async def test_wizard_mount():
     app = WizardApp()

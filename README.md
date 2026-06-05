@@ -121,15 +121,14 @@ uv tool install . --force
     - To copy text manually: Hold the Shift key while clicking and dragging over the text to bypass the app and use your terminal's native selection, then use Ctrl+Shift+C.
     - To paste text: Sometimes native terminal paste (Ctrl+Shift+V or middle-click) events are intercepted unreliably by the underlying framework. If pasting into an input field fails, you may need to type the branch name manually.
 
-## Current Issues (Help Wanted!)
+## TODO
 
-- **Config Reset Bug:** The `wt_root` sometimes resets itself to `/tmp`. We need to investigate why this field is being overwritten in the configuration.
-
-## Future Roadmap
-
-### 1. Enhanced CLI Mode
+- **Config Reset Bug:** The `wt_root` sometimes resets itself to `/tmp`. We need to investigate why this field is being overwritten in the configuration. solved no? it was tests?
 - **Action Selection:** Add flags to directly trigger 'terminal' or 'vscode' actions from the command line after deployment.
 - **Improved Logging:** Add more granular log levels for troubleshooting.
+- add cli option to --list existing wt
+- opening the directory in terminal is very slow (like 10s)
+
 
 ## Development
 
