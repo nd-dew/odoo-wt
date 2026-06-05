@@ -47,7 +47,15 @@ class DeployEngine:
         parts = [p for p in [data["version"], clean_desc, data["suffix"]] if p]
         self.branch_name = "-".join(parts)
         self.target_dir = self.wt_root / self.branch_name
-        self.base_v = data["version"] or "master"
+        
+        # Resolve base version from branch name if not explicitly provided
+        base_v = data.get("version")
+        if not base_v or base_v == "none":
+            from .system_discovery import decompose_branch
+            _, parsed_v, _, _ = decompose_branch(self.branch_name)
+            base_v = parsed_v or "master"
+        self.base_v = base_v
+
 
     async def deploy_repo(self, repo_path: Path, dest_label: str, category: str) -> AsyncGenerator[DeployUpdate, None]:
         yield DeployUpdate(category=category, total=3)
