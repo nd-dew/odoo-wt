@@ -86,7 +86,7 @@ def decompose_branch(full_name, known_versions=None, known_suffixes=None):
             is_match = False
             if known_versions and v in known_versions:
                 is_match = True
-            elif v == "master" or (v and v[0].isdigit() and "." in v):
+            elif v == "master" or (v and v[0].isdigit() and "." in v) or (v and v.startswith("saas-") and "-" in v and v.split("-")[1] and v.split("-")[1][0].isdigit()):
                 is_match = True
             
             if is_match:
