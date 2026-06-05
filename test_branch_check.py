@@ -84,4 +84,4 @@ async def test_branch_check_ui_transitions(tmp_path, monkeypatch):
         await pilot.pause(0.8)
         text = summary.render().plain
         assert "Found branch on 'odoo-dev'" in text
-        assert "✓ Dev (odoo-dev) Community" in text
+        assert "Fork (odoo-dev): ✓ Comm" in text
