@@ -962,13 +962,16 @@ class OdooWtApp(App):
                 self.set_timer(0.5, lambda: v_sel.remove_class("magic-flash"))
                 flashed = True
                  
-            if s:
-                s_sel = self.query_one("#suffix", Select)
-                if s in self.s_list:
-                    s_sel.value = s
+            s_sel = self.query_one("#suffix", Select)
+            custom_s_input = self.query_one("#custom_suffix", Input)
+            target_s = s if s else "none"
+            
+            if s_sel.value != target_s or (target_s == "custom..." and custom_s_input.value != s):
+                if target_s in self.s_list:
+                    s_sel.value = target_s
                 else:
                     s_sel.value = "custom..."
-                    self.query_one("#custom_suffix", Input).value = s
+                    custom_s_input.value = s
                 s_sel.add_class("magic-flash")
                 self.set_timer(0.5, lambda: s_sel.remove_class("magic-flash"))
                 flashed = True
