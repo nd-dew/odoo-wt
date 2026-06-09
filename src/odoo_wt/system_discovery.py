@@ -161,5 +161,15 @@ def check_local(repo, branch):
     return run_git(["rev-parse", "--verify", branch], cwd=repo)
 
 def get_remote(repo):
+    if not repo or not Path(repo).exists():
+        return "origin"
     success, out = run_git(["remote"], cwd=repo, capture=True)
     return "odoo" if (success and "odoo\n" in out) else "origin"
+
+def get_remote_url(repo, remote_name):
+    if not repo or not Path(repo).exists():
+        return "unknown"
+    success, out = run_git(["remote", "get-url", remote_name], cwd=repo, capture=True)
+    return out.strip() if success else "unknown"
+
+
