@@ -27,6 +27,8 @@ class ConfigManager:
             "enterprise_remote": "",
             "python_version": "3.12",
             "default_tab": "tab-create",
+            "create_vscode_launch": True,
+            "next_debug_port": 8069,
             "ignored_versions": [],
             "ignored_suffixes": [],
             "ignored_typos": [],
