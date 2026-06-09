@@ -35,6 +35,14 @@ def test_decompose_no_remote():
     assert d == "cool-feature"
     assert s == "pian"
 
+def test_decompose_ignored_suffix_fw():
+    # Forward port branches ending with -fw should not have 'fw' extracted as developer suffix
+    r, v, d, s = decompose_branch("odoo-dev:saas-19.1-19.0-16565-529424-fw", known_versions=["saas-19.1"])
+    assert r == "odoo-dev"
+    assert v == "saas-19.1"
+    assert d == "19.0-16565-529424-fw"
+    assert s == ""
+
 # --- INTEGRATION TESTS (The UI) ---
 
 @pytest.fixture(autouse=True)
@@ -66,13 +74,12 @@ async def test_magic_fix_ui_auto(tmp_path, monkeypatch):
     config["wt_root"] = str(wt_root)
     
     monkeypatch.setattr("odoo_wt.main_tui.get_remote", lambda _: "odoo")
-    monkeypatch.setattr("odoo_wt.main_tui.discover_system_data", lambda _, __: (["master", "17.0"], ["pian", "mate"], []))
+    monkeypatch.setattr("odoo_wt.main_tui.discover_system_data", lambda _, __: (["master", "17.0", "saas-19.1"], ["pian", "mate", "none", "custom..."], []))
 
-    app = OdooWtApp(config, ["master", "17.0"], ["pian", "mate"], [])
+    app = OdooWtApp(config, ["master", "17.0", "saas-19.1"], ["pian", "mate", "none", "custom..."], [])
     async with app.run_test() as pilot:
-        # 1. Type a messy branch
-        await pilot.click("#desc")
-        await pilot.press(*"odoo-dev:17.0-fix-bug-mate")
+        # 1. Paste a messy branch
+        pilot.app.query_one("#desc").value = "odoo-dev:17.0-fix-bug-mate"
         
         # Debounce + Magic Fix execution
         await pilot.pause(0.8)
@@ -81,6 +88,14 @@ async def test_magic_fix_ui_auto(tmp_path, monkeypatch):
         assert pilot.app.query_one("#version").value == "17.0"
         assert pilot.app.query_one("#suffix").value == "mate"
         assert pilot.app.query_one("#desc").value == "fix-bug"
+
+        # 3. Now paste a suffixless forward port branch to verify that the suffix is reset to "none"
+        pilot.app.query_one("#desc").value = "odoo-dev:saas-19.1-19.0-16565-529424-fw"
+        await pilot.pause(0.8)
+
+        assert pilot.app.query_one("#version").value == "saas-19.1"
+        assert pilot.app.query_one("#suffix").value == "none"
+        assert pilot.app.query_one("#desc").value == "19.0-16565-529424-fw"
 
 @pytest.mark.asyncio
 async def test_magic_fix_ui_manual(tmp_path, monkeypatch):
