@@ -33,6 +33,11 @@ SETTINGS_HELP = {
     "set-ig-v": "Comma-separated list of versions to hide from the creation dropdowns.",
     "set-ig-s": "Comma-separated list of suffixes to hide from the creation dropdowns.",
     "set-whitelist": "Comma-separated list of unrecognized words to ignore permanently.",
+    "set-known-versions": "The default known/pinned versions displayed in the Creation dropdown.",
+    "set-known-suffixes": "The default known/pinned developer suffixes displayed in the Creation dropdown.",
+    "set-tech-terms": "Technical words or jargon to completely bypass during spell checking.",
+    "set-next-port": "The starting port number for Odoo's debugging sessions (incremented on each run).",
+    "set-spell-check": "Toggle spellchecking on branch names to highlight potential typos.",
     "set-show-prefix": "Toggle visibility of the version dropdown in the Creation tab.",
     "set-show-suffix": "Toggle visibility of the suffix dropdown in the Creation tab.",
     "set-show-desc": "Toggle visibility of the app description text at the top.",
@@ -272,6 +277,21 @@ class OdooWtApp(App):
                         with Horizontal(classes="setting-item"):
                             yield Label("Typos Whitelist:", classes="setting-label")
                             yield Input(value=",".join(self.config.get("ignored_typos", [])), id="set-whitelist", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Pinned Versions:", classes="setting-label")
+                            yield Input(value=",".join(self.config.get("known_versions", [])), id="set-known-versions", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Pinned Suffixes:", classes="setting-label")
+                            yield Input(value=",".join(self.config.get("known_suffixes", [])), id="set-known-suffixes", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Technical Jargon:", classes="setting-label")
+                            yield Input(value=",".join(self.config.get("technical_terms", [])), id="set-tech-terms", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Next Debug Port:", classes="setting-label")
+                            yield Input(value=str(self.config.get("next_debug_port", 8069)), id="set-next-port", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Enable Spell Check:", classes="setting-label")
+                            yield Switch(value=self.config.get("enable_spell_check", True), id="set-spell-check", classes="setting-input")
                         with Horizontal(classes="setting-item"):
                             yield Label("Show Prefix (Version):", classes="setting-label")
                             yield Switch(value=self.config.get("show_prefix", True), id="set-show-prefix", classes="setting-input")
@@ -666,8 +686,11 @@ class OdooWtApp(App):
             cfg_suffix = self.config.get("suffix", "")
             system_ignore = {version, suffix, cfg_suffix, "none", "master", ""}
             
-            unknown = spell.unknown([w for w in words if w not in system_ignore and w not in tech_terms and w not in user_ignored])
-            unknown = {w for w in unknown if not w.isnumeric() and len(w) > 2}
+            if self.config.get("enable_spell_check", True):
+                unknown = spell.unknown([w for w in words if w not in system_ignore and w not in tech_terms and w not in user_ignored])
+                unknown = {w for w in unknown if not w.isnumeric() and len(w) > 2}
+            else:
+                unknown = set()
             
             # Build final status using Rich Text
             status_text = Text()
@@ -904,6 +927,11 @@ class OdooWtApp(App):
         self.query_one("#set-ig-v", Input).value = ",".join(self.config.get("ignored_versions", []))
         self.query_one("#set-ig-s", Input).value = ",".join(self.config.get("ignored_suffixes", []))
         self.query_one("#set-whitelist", Input).value = ",".join(self.config.get("ignored_typos", []))
+        self.query_one("#set-known-versions", Input).value = ",".join(self.config.get("known_versions", []))
+        self.query_one("#set-known-suffixes", Input).value = ",".join(self.config.get("known_suffixes", []))
+        self.query_one("#set-tech-terms", Input).value = ",".join(self.config.get("technical_terms", []))
+        self.query_one("#set-next-port", Input).value = str(self.config.get("next_debug_port", 8069))
+        self.query_one("#set-spell-check", Switch).value = self.config.get("enable_spell_check", True)
         self.query_one("#set-config-path", Input).value = self.config.get("config_path", "")
         self.query_one("#set-log-path", Input).value = self.config.get("log_path", "")
         self.query_one("#set-show-prefix", Switch).value = self.config.get("show_prefix", True)
@@ -1098,6 +1126,11 @@ class OdooWtApp(App):
     @on(Input.Changed, "#set-ig-v")
     @on(Input.Changed, "#set-ig-s")
     @on(Input.Changed, "#set-whitelist")
+    @on(Input.Changed, "#set-known-versions")
+    @on(Input.Changed, "#set-known-suffixes")
+    @on(Input.Changed, "#set-tech-terms")
+    @on(Input.Changed, "#set-next-port")
+    @on(Switch.Changed, "#set-spell-check")
     @on(Input.Changed, "#set-config-path")
     @on(Input.Changed, "#set-log-path")
     @on(Switch.Changed, "#set-default-tab")
@@ -1143,6 +1176,18 @@ class OdooWtApp(App):
         self.config["ignored_suffixes"] = ig_s
         self.config["ignored_typos"] = ig_t
 
+        # New fields saving
+        self.config["known_versions"] = [v.strip() for v in self.query_one("#set-known-versions", Input).value.split(",") if v.strip()]
+        self.config["known_suffixes"] = [s.strip() for s in self.query_one("#set-known-suffixes", Input).value.split(",") if s.strip()]
+        self.config["technical_terms"] = [t.strip() for t in self.query_one("#set-tech-terms", Input).value.split(",") if t.strip()]
+        
+        try:
+            self.config["next_debug_port"] = int(self.query_one("#set-next-port", Input).value.strip())
+        except ValueError:
+            pass
+            
+        self.config["enable_spell_check"] = self.query_one("#set-spell-check", Switch).value
+
         config_mgr.save(self.config)
         config_mgr.append_log("Settings Auto-Saved", self.config)
         self.notify("Settings saved automatically", timeout=2)
@@ -1150,7 +1195,12 @@ class OdooWtApp(App):
         self.apply_visibility_settings()
         self.update_summary()
         
-        v_list, s_list, _ = discover_system_data(self.config["wt_root"], self.config["suffix"])
+        v_list, s_list, _ = discover_system_data(
+            self.config["wt_root"], 
+            self.config["suffix"],
+            known_versions=self.config.get("known_versions", []),
+            known_suffixes=self.config.get("known_suffixes", [])
+        )
         self.v_list = [v for v in v_list if v not in ig_v or v in ("none", "custom...")]
         if not self.v_list: self.v_list = ["custom..."]
         self.s_list = [s for s in s_list if s not in ig_s or s in ("none", "custom...")]
