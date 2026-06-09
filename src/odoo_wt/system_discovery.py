@@ -55,7 +55,8 @@ def parse_branch_name(name):
     if "-" in name:
         s_candidate = name.rsplit("-", 1)[-1]
         if s_candidate and len(s_candidate) <= 12 and " " not in s_candidate:
-            s = s_candidate
+            if s_candidate.lower() not in {"fw", "pr", "tmp", "temp", "none"}:
+                s = s_candidate
     return v, s
 
 def decompose_branch(full_name, known_versions=None, known_suffixes=None):
@@ -90,6 +91,8 @@ def decompose_branch(full_name, known_versions=None, known_suffixes=None):
                 is_match = True
             
             if is_match:
+                if version and v != version:
+                    break
                 # Keep the first version found as the "canonical" one
                 if not version: version = v
                 full_name = full_name[len(v):].lstrip("-")
@@ -105,10 +108,11 @@ def decompose_branch(full_name, known_versions=None, known_suffixes=None):
         s_candidate = full_name.rsplit("-", 1)[-1]
         
         # Suffixes are usually short quadrigrams or known words
+        is_ignored = s_candidate.lower() in {"fw", "pr", "tmp", "temp", "none"}
         is_known = known_suffixes and s_candidate in known_suffixes
         is_pattern = 3 <= len(s_candidate) <= 8 and s_candidate.isalnum()
         
-        if is_known or is_pattern:
+        if not is_ignored and (is_known or is_pattern):
             suffix = s_candidate
             full_name = full_name[:-len(suffix)].rstrip("-")
             
