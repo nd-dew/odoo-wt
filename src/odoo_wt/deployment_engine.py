@@ -64,8 +64,19 @@ class DeployEngine:
             yield DeployUpdate(category=category, log_line=f"[bold red]Error: Base repository not found at {repo_path}[/bold red]", advance=3)
             return
 
-        remote = await asyncio.to_thread(get_remote, repo_path)
-        yield DeployUpdate(category=category, log_line=f"Detected base remote: {remote}", advance=1)
+        # Resolve main remote (use setting if specified, otherwise auto-detect)
+        if dest_label == self.comm_dir:
+            remote = self.config.get("community_remote", "").strip()
+        elif dest_label == self.ent_dir:
+            remote = self.config.get("enterprise_remote", "").strip()
+        else:
+            remote = ""
+            
+        if not remote:
+            remote = await asyncio.to_thread(get_remote, repo_path)
+            yield DeployUpdate(category=category, log_line=f"Detected base remote: {remote}", advance=1)
+        else:
+            yield DeployUpdate(category=category, log_line=f"Using configured remote: {remote}", advance=1)
 
         is_base_branch = (self.branch_name == self.base_v)
         fetch_success = False

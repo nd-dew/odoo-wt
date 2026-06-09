@@ -16,7 +16,7 @@ spell = SpellChecker()
 spell.word_frequency.load_words(['odoo', 'saas', 'erp', 'mrp', 'pos', 'crm', 'wt', 'api', 'ui', 'ux', 'db', 'sql', 'backend', 'frontend', 'js', 'py', 'xml', 'owl', 'mac', 'linux', 'windows', 'repo'])
 
 from .app_config import config_mgr
-from .system_discovery import discover_system_data, get_remote, run_git, decompose_branch
+from .system_discovery import discover_system_data, get_remote, run_git, decompose_branch, get_remote_url
 from .custom_screens import DeleteConfirmScreen, DeployScreen, LogDetailScreen
 
 SETTINGS_HELP = {
@@ -27,6 +27,8 @@ SETTINGS_HELP = {
     "set-py-v": "The default Python version used when creating new UV environments.",
     "set-comm": "The name of the community folder inside a worktree (default: 'odoo').",
     "set-ent": "The name of the enterprise folder inside a worktree (default: 'enterprise').",
+    "set-comm-remote": "The main official remote for Community (leave blank to auto-detect).",
+    "set-ent-remote": "The main official remote for Enterprise (leave blank to auto-detect).",
     "set-default-tab": "Which tab to open by default when the app starts.",
     "set-ig-v": "Comma-separated list of versions to hide from the creation dropdowns.",
     "set-ig-s": "Comma-separated list of suffixes to hide from the creation dropdowns.",
@@ -81,6 +83,11 @@ class OdooWtApp(App):
         self.branch_status = ""
         self.check_results_str = ""
         self.save_timer = None
+        self.resolved_comm_remote = ""
+        self.resolved_comm_url = ""
+        self.resolved_ent_remote = ""
+        self.resolved_ent_url = ""
+
 
         # Modern Textual Theme API
         is_dark = self.config.get("dark_mode", True)
@@ -247,6 +254,12 @@ class OdooWtApp(App):
                         with Horizontal(classes="setting-item"):
                             yield Label("Enterprise Dir:", classes="setting-label")
                             yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Comm Main Remote:", classes="setting-label")
+                            yield Input(value=self.config.get("community_remote", ""), placeholder="Blank = auto-detect", id="set-comm-remote", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("Ent Main Remote:", classes="setting-label")
+                            yield Input(value=self.config.get("enterprise_remote", ""), placeholder="Blank = auto-detect", id="set-ent-remote", classes="setting-input")
                         with Horizontal(classes="setting-item"):
                             yield Label("Start in Manage Tab:", classes="setting-label")
                             yield Switch(value=(self.config.get("default_tab", "tab-create") == "tab-manage"), id="set-default-tab", classes="setting-input")
@@ -477,6 +490,13 @@ class OdooWtApp(App):
             summary.append(f"{base_v}", style="bold magenta")
             summary.append(" UV environment and link it as '.venv'.")
 
+            if getattr(self, "resolved_comm_remote", ""):
+                summary.append("\n\nUsing Remotes (Configuration & Auto-detect):")
+                summary.append(f"\n  • Community: '{self.resolved_comm_remote}' -> ", style="bright_black")
+                summary.append(f"{self.resolved_comm_url}", style="cyan")
+                summary.append(f"\n  • Enterprise: '{self.resolved_ent_remote}' -> ", style="bright_black")
+                summary.append(f"{self.resolved_ent_url}", style="cyan")
+
             self.query_one("#dynamic-summary", Label).update(summary)
         except Exception as e:
             import traceback
@@ -530,7 +550,16 @@ class OdooWtApp(App):
             dev_remote = self.config.get("remote_name", "odoo-dev")
 
             from .system_discovery import check_local, check_remote, get_remote
-            main_remote = await asyncio.to_thread(get_remote, base_odoo)
+            comm_main_remote = self.config.get("community_remote", "").strip() or await asyncio.to_thread(get_remote, base_odoo)
+            ent_main_remote = self.config.get("enterprise_remote", "").strip() or await asyncio.to_thread(get_remote, base_ent)
+            
+            comm_url = await asyncio.to_thread(get_remote_url, base_odoo, comm_main_remote)
+            ent_url = await asyncio.to_thread(get_remote_url, base_ent, ent_main_remote)
+            
+            self.resolved_comm_remote = comm_main_remote
+            self.resolved_comm_url = comm_url
+            self.resolved_ent_remote = ent_main_remote
+            self.resolved_ent_url = ent_url
 
             # Animation & Checklist Logic
             checks = [
@@ -538,8 +567,8 @@ class OdooWtApp(App):
                 {"name": "Local Enterprise", "path": base_ent, "type": "local"},
                 {"name": f"Dev ({dev_remote}) Community", "path": base_odoo, "type": "remote", "remote": dev_remote},
                 {"name": f"Dev ({dev_remote}) Enterprise", "path": base_ent, "type": "remote", "remote": dev_remote},
-                {"name": f"Main ({main_remote}) Community", "path": base_odoo, "type": "remote", "remote": main_remote},
-                {"name": f"Main ({main_remote}) Enterprise", "path": base_ent, "type": "remote", "remote": main_remote},
+                {"name": f"Main ({comm_main_remote}) Community", "path": base_odoo, "type": "remote", "remote": comm_main_remote},
+                {"name": f"Main ({ent_main_remote}) Enterprise", "path": base_ent, "type": "remote", "remote": ent_main_remote},
             ]
             
             results = {}
@@ -1061,6 +1090,8 @@ class OdooWtApp(App):
     @on(Input.Changed, "#set-py-v")
     @on(Input.Changed, "#set-comm")
     @on(Input.Changed, "#set-ent")
+    @on(Input.Changed, "#set-comm-remote")
+    @on(Input.Changed, "#set-ent-remote")
     @on(Input.Changed, "#set-ig-v")
     @on(Input.Changed, "#set-ig-s")
     @on(Input.Changed, "#set-whitelist")
