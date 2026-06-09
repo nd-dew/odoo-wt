@@ -1,9 +1,12 @@
 import asyncio
 import os
+import json
+import subprocess
 from pathlib import Path
 from dataclasses import dataclass
 from typing import AsyncGenerator, List, Optional
 from .system_discovery import get_remote, check_local
+from .app_config import config_mgr
 
 @dataclass
 class DeployUpdate:
@@ -164,4 +167,118 @@ class DeployEngine:
             yield DeployUpdate(category=category, advance=1, log_line="✅ Done.")
         except RuntimeError:
             yield DeployUpdate(category=category, log_line=f"[bold red]CRITICAL FAILURE: UV setup aborted.[/bold red]")
+
+    async def setup_vscode(self) -> None:
+        if not self.config.get("create_vscode_launch", True):
+            return
+
+        from .system_discovery import decompose_branch
+        _, _, desc, _ = decompose_branch(self.branch_name)
+        if desc:
+            db_name = desc.replace("-", "_").strip("_")
+        else:
+            db_name = self.branch_name.replace("-", "_").strip("_")
+
+        # Determine if enterprise folder exists to build addons-path
+        has_ent = (self.target_dir / self.ent_dir).exists()
+        if has_ent:
+            addons_path = f"{self.comm_dir}/addons,enterprise"
+        else:
+            addons_path = f"{self.comm_dir}/addons"
+
+        # Detect modified modules via git diff against origin/{base_v}
+        def get_modified_modules(repo_path, base_v):
+            if not repo_path.exists():
+                return set()
+            cmds = [
+                ["git", "diff", "--name-only", f"origin/{base_v}..."],
+                ["git", "diff", "--name-only", f"origin/{base_v}...HEAD"],
+                ["git", "diff", "--name-only", "HEAD~1"]
+            ]
+            output = ""
+            for cmd in cmds:
+                try:
+                    res = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True, check=True)
+                    if res.stdout.strip():
+                        output = res.stdout
+                        break
+                except Exception:
+                    continue
+            
+            modules = set()
+            for line in output.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                parts = Path(line).parts
+                if "addons" in parts:
+                    idx = parts.index("addons")
+                    if idx + 1 < len(parts):
+                        modules.add(parts[idx + 1])
+                elif len(parts) > 0:
+                    modules.add(parts[0])
+            return modules
+
+        comm_repo = self.target_dir / self.comm_dir
+        ent_repo = self.target_dir / self.ent_dir
+        
+        modules = set()
+        if comm_repo.exists():
+            modules.update(get_modified_modules(comm_repo, self.base_v))
+        if ent_repo.exists():
+            modules.update(get_modified_modules(ent_repo, self.base_v))
+
+        # Filter to keep only actual, valid Odoo modules (must contain a __manifest__.py)
+        valid_modules = []
+        for m in sorted(modules):
+            comm_addon_path = comm_repo / "addons" / m
+            comm_base_addon_path = comm_repo / "odoo" / "addons" / m
+            ent_addon_path = ent_repo / m
+            
+            if (comm_addon_path / "__manifest__.py").exists() or \
+               (comm_base_addon_path / "__manifest__.py").exists() or \
+               (ent_addon_path / "__manifest__.py").exists():
+                valid_modules.append(m)
+
+        # Retrieve and increment global next_debug_port
+        port = self.config.get("next_debug_port", 8069)
+        self.config["next_debug_port"] = port + 1
+        config_mgr.save(self.config)
+
+        # Prepare and write the VS Code launch.json file
+        vscode_dir = self.target_dir / ".vscode"
+        vscode_dir.mkdir(parents=True, exist_ok=True)
+
+        args = [
+            "--addons-path", addons_path,
+            "-d", db_name
+        ]
+        if valid_modules:
+            args.extend(["-i", ",".join(valid_modules)])
+        
+        args.extend([
+            "--with-demo",
+            "--http-port", str(port),
+            "--dev=all"
+        ])
+
+        config_data = {
+            "version": "0.2.0",
+            "configurations": [
+                {
+                    "name": f"Odoo {self.base_v.capitalize()}: Run Server (Port {port})",
+                    "type": "debugpy",
+                    "request": "launch",
+                    "program": f"${{workspaceFolder}}/{self.comm_dir}/odoo-bin",
+                    "python": "${workspaceFolder}/.venv/bin/python",
+                    "args": args,
+                    "console": "integratedTerminal",
+                    "cwd": "${workspaceFolder}",
+                    "justMyCode": False
+                }
+            ]
+        }
+
+        with open(vscode_dir / "launch.json", "w") as f:
+            json.dump(config_data, f, indent=4)
 
