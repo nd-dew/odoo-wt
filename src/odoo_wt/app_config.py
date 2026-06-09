@@ -23,6 +23,8 @@ class ConfigManager:
             "remote_name": "odoo-dev",
             "community_dir": "odoo",
             "enterprise_dir": "enterprise",
+            "community_remote": "",
+            "enterprise_remote": "",
             "python_version": "3.12",
             "default_tab": "tab-create",
             "ignored_versions": [],
