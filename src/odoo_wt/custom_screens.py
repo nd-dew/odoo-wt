@@ -141,6 +141,13 @@ class DeployScreen(Screen):
             handle_updates(self.engine.setup_uv())
         )
 
+        try:
+            self.query_one("#log-uv", RichLog).write("Generating VS Code launch configuration...")
+            await self.engine.setup_vscode()
+            self.query_one("#log-uv", RichLog).write("✅ VS Code launch configuration created.")
+        except Exception as e:
+            self.query_one("#log-uv", RichLog).write(f"[bold red]Failed to create VS Code launch config: {e}[/bold red]")
+
         config_mgr.append_log("Deployment Success", {"branch": self.engine.branch_name, "path": str(self.engine.target_dir)})
         self.show_success_footer()
 
