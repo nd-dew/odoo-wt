@@ -118,9 +118,17 @@ def decompose_branch(full_name, known_versions=None, known_suffixes=None):
             
     return remote, version, full_name, suffix
 
-def discover_system_data(wt_root, default_suffix):
-    versions = set()
-    suffixes = set([default_suffix, "test", "none"])
+def discover_system_data(wt_root, default_suffix, known_versions=None, known_suffixes=None):
+    versions = set(known_versions) if known_versions else set()
+    suffixes = set(known_suffixes) if known_suffixes else set([default_suffix, "test", "none"])
+    
+    # Ensure standard fallback entries are always present
+    versions.add("master")
+    versions.add("none")
+    suffixes.add(default_suffix)
+    suffixes.add("test")
+    suffixes.add("none")
+
     worktrees = []
     wt_path = Path(wt_root).expanduser().absolute()
     if wt_path.exists():
