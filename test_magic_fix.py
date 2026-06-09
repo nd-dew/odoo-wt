@@ -74,7 +74,7 @@ async def test_magic_fix_ui_auto(tmp_path, monkeypatch):
     config["wt_root"] = str(wt_root)
     
     monkeypatch.setattr("odoo_wt.main_tui.get_remote", lambda _: "odoo")
-    monkeypatch.setattr("odoo_wt.main_tui.discover_system_data", lambda _, __: (["master", "17.0", "saas-19.1"], ["pian", "mate", "none", "custom..."], []))
+    monkeypatch.setattr("odoo_wt.main_tui.discover_system_data", lambda *args, **kwargs: (["master", "17.0", "saas-19.1"], ["pian", "mate", "none", "custom..."], []))
 
     app = OdooWtApp(config, ["master", "17.0", "saas-19.1"], ["pian", "mate", "none", "custom..."], [])
     async with app.run_test() as pilot:
@@ -109,7 +109,7 @@ async def test_magic_fix_ui_manual(tmp_path, monkeypatch):
     config["wt_root"] = str(wt_root)
     
     monkeypatch.setattr("odoo_wt.main_tui.get_remote", lambda _: "odoo")
-    monkeypatch.setattr("odoo_wt.main_tui.discover_system_data", lambda _, __: (["master", "17.0"], ["pian", "mate"], []))
+    monkeypatch.setattr("odoo_wt.main_tui.discover_system_data", lambda *args, **kwargs: (["master", "17.0"], ["pian", "mate"], []))
 
     app = OdooWtApp(config, ["master", "17.0"], ["pian", "mate"], [])
     async with app.run_test() as pilot:
