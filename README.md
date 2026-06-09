@@ -110,7 +110,7 @@ uv run pytest -v
 ```
 
 ### Applying Changes
-If you modify the source code, you can apply your changes to your local installation using:
+If you modify the source code, make sure to bump the version in `pyproject.toml` so that `uv` registers the newly compiled files. Then, apply your changes to your local installation using:
 ```bash
 uv tool install . --force
 ```

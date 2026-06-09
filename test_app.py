@@ -274,3 +274,78 @@ def test_git_branch_strategy_detection(tmp_path):
 
     # 4. Strategy detection should now properly identify it exists locally
     assert check_local(repo, "saas-17.1-fix-test-pian") is True
+
+@pytest.mark.asyncio
+async def test_vscode_launch_generation(tmp_path, monkeypatch):
+    from odoo_wt.deployment_engine import DeployEngine
+    
+    # 1. Setup mock directories
+    wt_root = tmp_path / "wt"
+    wt_root.mkdir()
+    
+    target_dir = wt_root / "master-owl3-migration-remove-usestate-elco"
+    target_dir.mkdir()
+    
+    comm_dir = target_dir / "odoo"
+    comm_dir.mkdir()
+    
+    # Create crm addon structure and manifest so it passes validation
+    crm_addon = comm_dir / "addons" / "crm"
+    crm_addon.mkdir(parents=True)
+    with open(crm_addon / "__manifest__.py", "w") as f:
+        f.write("{'name': 'CRM'}")
+        
+    config = {
+        "wt_root": str(wt_root),
+        "env_root": "/tmp/envs",
+        "remote_name": "odoo-dev",
+        "community_dir": "odoo",
+        "enterprise_dir": "enterprise",
+        "create_vscode_launch": True,
+        "next_debug_port": 8069
+    }
+    
+    engine = DeployEngine(config, {"version": "master", "desc": "owl3-migration-remove-usestate", "suffix": "elco"})
+    engine.target_dir = target_dir
+    
+    # Mock subprocess.run to simulate crm addon modification
+    import subprocess
+    class MockCompletedProcess:
+        def __init__(self, stdout):
+            self.stdout = stdout
+            self.returncode = 0
+            
+    def mock_run(cmd, *args, **kwargs):
+        # We simulate git diff returning crm addon view change
+        if "diff" in cmd:
+            return MockCompletedProcess("addons/crm/views/crm_lead_views.xml\n")
+        return MockCompletedProcess("")
+        
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    
+    # 2. Run setup_vscode
+    await engine.setup_vscode()
+    
+    # 3. Assert launch.json content
+    launch_json_path = target_dir / ".vscode" / "launch.json"
+    assert launch_json_path.exists()
+    
+    with open(launch_json_path, "r") as f:
+        data = json.load(f)
+        config_entry = data["configurations"][0]
+        assert config_entry["name"] == "Odoo Master: Run Server (Port 8069)"
+        assert "--addons-path" in config_entry["args"]
+        assert "odoo/addons" in config_entry["args"]
+        assert "-d" in config_entry["args"]
+        assert "owl3_migration_remove_usestate" in config_entry["args"]
+        assert "-i" in config_entry["args"]
+        assert "crm" in config_entry["args"]
+        assert "--http-port" in config_entry["args"]
+        assert "8069" in config_entry["args"]
+        assert "--with-demo" in config_entry["args"]
+        assert "--dev=all" in config_entry["args"]
+        assert config_entry["cwd"] == "${workspaceFolder}"
+        
+    # Assert global port was incremented
+    assert engine.config["next_debug_port"] == 8070
+
