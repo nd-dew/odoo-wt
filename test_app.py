@@ -69,6 +69,27 @@ def test_worktree_discovery(tmp_path):
     assert "17.0-fix-pian" in wt_names
     assert "master" in v_list
 
+def test_worktree_discovery_with_known_lists(tmp_path):
+    from odoo_wt.system_discovery import discover_system_data
+    
+    wt_root = tmp_path / "wt"
+    wt_root.mkdir()
+    
+    v_list, s_list, worktrees = discover_system_data(
+        str(wt_root), 
+        "pian", 
+        known_versions=["18.0", "saas-18.2"], 
+        known_suffixes=["mate", "elco"]
+    )
+    
+    assert "18.0" in v_list
+    assert "saas-18.2" in v_list
+    assert "master" in v_list
+    
+    assert "mate" in s_list
+    assert "elco" in s_list
+    assert "pian" in s_list
+
 def test_config_management(mock_config_path):
     # This test specifically tests writing, so we temporarily allow it
     config_mgr.is_test_mode = False

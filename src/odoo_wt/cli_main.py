@@ -81,7 +81,12 @@ def main():
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
         branch_name = sys.argv[1]
         
-        v_list, s_list, _ = discover_system_data(config["wt_root"], config["suffix"])
+        v_list, s_list, _ = discover_system_data(
+            config["wt_root"], 
+            config["suffix"], 
+            config.get("known_versions", []), 
+            config.get("known_suffixes", [])
+        )
         
         remote, v, d, s = decompose_branch(branch_name, v_list, s_list)
 
@@ -103,7 +108,12 @@ def main():
         app = FastModeApp()
         data = app.run()
     else:
-        v_list, s_list, worktrees = discover_system_data(config["wt_root"], config["suffix"])
+        v_list, s_list, worktrees = discover_system_data(
+            config["wt_root"], 
+            config["suffix"], 
+            config.get("known_versions", []), 
+            config.get("known_suffixes", [])
+        )
         app = OdooWtApp(config, v_list, s_list, worktrees, VERSION)
         data = app.run()
 
