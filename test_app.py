@@ -370,3 +370,153 @@ async def test_vscode_launch_generation(tmp_path, monkeypatch):
     # Assert global port was incremented
     assert engine.config["next_debug_port"] == 8070
 
+def test_runbot_client(monkeypatch):
+    from odoo_wt.runbot_client import find_runbot_batch_url, check_batch_details
+    
+    class MockResponse:
+        def __init__(self, data):
+            self.data = data
+        def read(self):
+            return self.data
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+            
+    def mock_urlopen_search(req, *args, **kwargs):
+        return MockResponse(b'<html><body><a href="/runbot/batch/2588843" title="2026-06-17 06:14:59">Batch</a></body></html>')
+        
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen_search)
+    res = find_runbot_batch_url("17.0-fix-pian")
+    assert res == ("https://runbot.odoo.com/runbot/batch/2588843", "2026-06-17 06:14:59")
+    
+    def mock_urlopen_batch(req, *args, **kwargs):
+        return MockResponse(
+            b'class="btn-success" btn-success btn-success '
+            b'class="btn-danger" '
+            b'class="fa-spinner" fa-spinner'
+        )
+        
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen_batch)
+    success, failed, warning, running = check_batch_details("https://runbot.odoo.com/runbot/batch/2588843")
+    assert success == 3
+    assert failed == 1
+    assert warning == 0
+    assert running == 2
+
+@pytest.mark.asyncio
+async def test_main_tui_runbot_column(tmp_path, monkeypatch):
+    from odoo_wt.main_tui import OdooWtApp
+    
+    wt_root = tmp_path / "wt"
+    wt_root.mkdir()
+    (wt_root / "master" / "odoo" / ".git").mkdir(parents=True)
+    
+    config = config_mgr.config
+    config["wt_root"] = str(wt_root)
+    
+    monkeypatch.setattr("odoo_wt.main_tui.get_remote", lambda _: "odoo")
+    monkeypatch.setattr("odoo_wt.main_tui.discover_system_data", lambda *_, **__: (["master"], ["none"], [{"name": "17.0-fix-pian", "path": str(wt_root / "17.0-fix-pian"), "version": "17.0", "suffix": "pian"}]))
+    monkeypatch.setattr("odoo_wt.main_tui.OdooWtApp.run_runbot_checker", lambda self: None)
+    
+    app = OdooWtApp(config, ["master"], ["none"], [{"name": "17.0-fix-pian", "path": str(wt_root / "17.0-fix-pian"), "version": "17.0", "suffix": "pian"}])
+    async with app.run_test() as pilot:
+        table = pilot.app.query_one("#wt-table")
+        
+        cols = [col.label.plain for col in table.columns.values()]
+        assert "Branch Name" in cols
+        assert "Runbot Status" in cols
+        assert "Link" in cols
+        
+        assert "col-branch" in table.columns
+        assert "col-runbot" in table.columns
+        assert "col-link" in table.columns
+
+def test_query_branch_status(monkeypatch):
+    from odoo_wt.runbot_client import query_branch_status
+    
+    class MockResponse:
+        def __init__(self, data):
+            self.data = data
+        def read(self):
+            return self.data
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+            
+    def mock_urlopen_search(req, *args, **kwargs):
+        return MockResponse(
+            b'<html><body><a href="/runbot/batch/2588843" title="2026-06-17 06:14:59">Batch</a>'
+            b'<div class="batch_slots">'
+            b'class="btn-success" '
+            b'class="btn-danger" '
+            b'class="fa-spinner"'
+            b'</div>'
+            b'<a class="dropdown-item" href="https://github.com/odoo-dev/odoo/pull/5161" title="View PR">'
+            b'<a class="fa-sign-in btn btn-info" href="https://github.com/odoo-dev/enterprise/pull/1356" title="View PR">'
+            b'</body></html>'
+        )
+        
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen_search)
+    res = query_branch_status("17.0-fix-pian")
+    assert res == (
+        "https://runbot.odoo.com/runbot/batch/2588843", 
+        "2026-06-17 06:14:59", 
+        1, 1, 0, 1,
+        "https://github.com/odoo-dev/odoo/pull/5161",
+        "https://github.com/odoo-dev/enterprise/pull/1356"
+    )
+
+def test_print_cli_status(monkeypatch, tmp_path):
+    from odoo_wt.cli_main import print_cli_status
+    
+    config = {
+        "wt_root": str(tmp_path),
+        "suffix": "pian"
+    }
+    
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: ([], [], [
+        {"name": "master", "path": "/path/master", "version": "master"},
+        {"name": "17.0-fix-pian", "path": "/path/17.0-fix-pian", "version": "17.0"}
+    ]))
+    
+    monkeypatch.setattr("odoo_wt.runbot_client.query_branch_status", lambda name: ("https://runbot.odoo.com/runbot/batch/1", "2026-06-17 12:00:00", 10, 0, 0, 0, "https://github.com/odoo/odoo/pull/1", "https://github.com/odoo/enterprise/pull/1"))
+    
+    # Invoke CLI status function to verify it runs error-free
+    print_cli_status(config)
+
+def test_cli_typo_correction(monkeypatch, tmp_path):
+    from odoo_wt import cli_main
+    
+    # Mock sys.argv
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "statu"])
+    # Mock TTY
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    
+    # Mock check_dependencies
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock config exists and load
+    config_path = tmp_path / "odoo-wt.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {})
+    
+    # Mock input to return yes
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+    
+    # Track if print_cli_status was called
+    called = False
+    def mock_print_cli_status(config):
+        nonlocal called
+        called = True
+        
+    monkeypatch.setattr("odoo_wt.cli_main.print_cli_status", mock_print_cli_status)
+    
+    # Intercept sys.exit(0)
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+    assert excinfo.value.code == 0
+    assert called == True
+
