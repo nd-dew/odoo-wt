@@ -123,15 +123,15 @@ uv tool install . --force
 
 ## TODO
 
-- **Config Reset Bug:** The `wt_root` sometimes resets itself to `/tmp`. We need to investigate why this field is being overwritten in the configuration. solved no? it was tests?
-- **Action Selection:** Add flags to directly trigger 'terminal' or 'vscode' actions from the command line after deployment.
-- **Improved Logging:** Add more granular log levels for troubleshooting.
-- add cli option to --list existing wt
-- opening the directory in terminal is very slow (like 10s)
-- check on the runbot's PRs (log their last comments and by who)
-- the runbot/PR checks should work in cli, what would be super cool
-- the top space on the app could be tighter, we dont need such big header
-- we could inform users that to select text they need to hold Shift
+- [x] **Config Reset Bug:** Resolved (caused by a hijacked local virtualenv paths during testing).
+- [ ] **Action Selection:** Add flags to directly trigger 'terminal' or 'vscode' actions from the command line after deployment.
+- [x] **Improved Logging:** Add more granular log levels for troubleshooting. (Completed: added comprehensive multi-stage diagnostic and event logging).
+- [x] add cli option to --list existing wt (Completed: integrated into 'odoo-wt status' command-line table).
+- [ ] opening the directory in terminal is very slow (like 10s)
+- [ ] check on the runbot's PRs (Resolved: fetched and displayed direct Com/Ent PR links on CLI/TUI; todo: log their last comments and by who).
+- [x] the runbot/PR checks should work in cli, what would be super cool (Completed: integrated parallel concurrent polling into 'odoo-wt status').
+- [ ] the top space on the app could be tighter, we dont need such big header
+- [ ] we could inform users that to select text they need to hold Shift
 
 
 ## Development
