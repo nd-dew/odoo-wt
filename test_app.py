@@ -520,3 +520,30 @@ def test_cli_typo_correction(monkeypatch, tmp_path):
     assert excinfo.value.code == 0
     assert called == True
 
+def test_worktree_recency_sorting(tmp_path):
+    from odoo_wt.main_tui import OdooWtApp
+    
+    config = {
+        "wt_root": str(tmp_path),
+        "suffix": "pian",
+        "worktree_recency": {
+            "/path/wt_old": "2026-06-17T12:00:00",
+            "/path/wt_new": "2026-06-17T15:00:00"
+        }
+    }
+    
+    app = OdooWtApp(config, ["master"], ["pian"], [
+        {"name": "wt_old", "path": "/path/wt_old", "version": "17.0"},
+        {"name": "wt_new", "path": "/path/wt_new", "version": "17.0"}
+    ])
+    
+    def recency_sort_key(wt_dict):
+        path_str = wt_dict["path"]
+        ts = app.config.get("worktree_recency", {}).get(path_str, "")
+        return (ts, app._version_sort_key(wt_dict), wt_dict["name"])
+        
+    sorted_wts = sorted(app.worktrees, key=recency_sort_key, reverse=True)
+    
+    assert sorted_wts[0]["name"] == "wt_new"
+    assert sorted_wts[1]["name"] == "wt_old"
+

@@ -889,8 +889,13 @@ class OdooWtApp(App):
         except Exception:
             search_term = ""
 
-        # Sort by parsed version (descending), then by name
-        sorted_wts = sorted(self.worktrees, key=lambda x: (self._version_sort_key(x), x["name"]), reverse=True)
+        # Sort by recency timestamp first (descending), falling back to version and name
+        def recency_sort_key(wt_dict):
+            path_str = wt_dict["path"]
+            ts = self.config.get("worktree_recency", {}).get(path_str, "")
+            return (ts, self._version_sort_key(wt_dict), wt_dict["name"])
+
+        sorted_wts = sorted(self.worktrees, key=recency_sort_key, reverse=True)
 
         for wt in sorted_wts:
             name = wt["name"]
@@ -955,6 +960,7 @@ class OdooWtApp(App):
     @on(DataTable.RowSelected, "#wt-table")
     def on_wt_row_selected(self, event: DataTable.RowSelected) -> None:
         path = str(event.row_key.value)
+        self.touch_worktree(path)
         config_mgr.append_log("Worktree Selected (Action)", {"path": path})
         self.exit({"action": "terminal", "path": path})
 
@@ -1022,6 +1028,14 @@ class OdooWtApp(App):
             config_mgr.append_log("UI Cell Updated", {"row": row_key, "col": column_key, "value": value})
         except Exception as e:
             config_mgr.append_log("UI Cell Update Error", {"error": str(e)})
+
+    def touch_worktree(self, path_str: str) -> None:
+        import datetime
+        if "worktree_recency" not in self.config:
+            self.config["worktree_recency"] = {}
+        self.config["worktree_recency"][path_str] = datetime.datetime.utcnow().isoformat()
+        config_mgr.save(self.config)
+        config_mgr.append_log("Worktree Touched", {"path": path_str, "timestamp": self.config["worktree_recency"][path_str]})
 
     @work(exclusive=True, thread=True)
     def run_runbot_checker(self) -> None:
@@ -1388,7 +1402,7 @@ class OdooWtApp(App):
         table = self.query_one("#wt-table", DataTable)
         try:
             row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
-            self.on_wt_selected(DataTable.RowSelected(table, row_key))
+            self.on_wt_row_selected(DataTable.RowSelected(table, row_key))
         except Exception:
             self.notify("Select a worktree first!", severity="error")
     
@@ -1493,6 +1507,16 @@ class OdooWtApp(App):
         if s_sel == "custom..." and suffix and suffix != "none":
             self.config["suffix"] = suffix
             config_mgr.save(self.config)
+            
+        # Predict target folder name to touch the path
+        parts = []
+        if version: parts.append(str(version))
+        if desc: parts.append(str(desc))
+        if suffix: parts.append(str(suffix))
+        folder_name = "-".join(parts)
+        target_path = str(Path(self.config["wt_root"]).expanduser().absolute() / folder_name)
+        self.touch_worktree(target_path)
+        
         self.app.push_screen(DeployScreen({"action": "create", "version": version, "desc": desc, "suffix": suffix}, self.config))
 
     def handle_table_click(self, event: Click) -> None:
@@ -1527,6 +1551,12 @@ class OdooWtApp(App):
 
     def trigger_runbot_for_wt(self, wt_name: str) -> None:
         import webbrowser
+        
+        # Touch the worktree matching wt_name to update its recency
+        for wt in self.worktrees:
+            if wt["name"] == wt_name:
+                self.touch_worktree(wt["path"])
+                break
         
         if wt_name == "master":
             webbrowser.open("https://runbot.odoo.com/runbot")
