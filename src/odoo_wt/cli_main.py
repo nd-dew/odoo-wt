@@ -1,6 +1,7 @@
 import sys
 import os
 import shutil
+from pathlib import Path
 from importlib.metadata import version, PackageNotFoundError
 
 try:
@@ -17,17 +18,25 @@ def show_help():
     print(f"Odoo Worktree Assistant (odoo-wt) v{VERSION}")
     print("\nA professional TUI-driven Git worktree manager for Odoo developers.")
     print("\nUsage:")
-    print("  odoo-wt                  Launch the interactive TUI (Recommended)")
-    print("  odoo-wt status           Print the worktree and Runbot status table directly")
-    print("  odoo-wt <branch-name>    Open TUI with a specific branch name pre-filled")
-    print("  odoo-wt --create         Force start in the 'Creation' tab")
-    print("  odoo-wt --manage         Force start in the 'Existing / Removal' tab")
-    print("  odoo-wt --no-magic       Disable automatic 'Magic Fix' for this session")
-    print("  odoo-wt --help, -h       Show this help message")
-    print("  odoo-wt --version        Show the current version")
+    print("  odoo-wt                      Launch the interactive TUI (Recommended)")
+    print("  odoo-wt status               Print the worktree and Runbot status table directly")
+    print("  odoo-wt //runbot             Fast, dash-free alias to print status table directly")
+    print("  odoo-wt <branch>             Smart Switcher/Creator: opens TUI if new, opens shell if existing")
+    print("  odoo-wt create <branch>      Explicitly open TUI pre-filled in 'Creation' tab")
+    print("\nOptions & Actions:")
+    print("  -o, --open <branch>          Directly open terminal shell in an existing worktree")
+    print("  -c, --code <branch>          Directly open VS Code in an existing worktree")
+    print("  -d, --delete <branch>        Directly delete an existing worktree with CLI prompt")
+    print("  --no-magic                   Disable automatic 'Magic Fix' branch decomposition")
+    print("  --config-path                Print the active odoo-wt.json configuration path")
+    print("  --log-path                   Print the active odoo-wt-logs.jsonl path")
+    print("  --create                     Force start TUI in the 'Creation' tab")
+    print("  --manage                     Force start TUI in the 'Existing / Removal' tab")
+    print("  -h, --help                   Show this help message")
+    print("  -v, --version                Show the current version")
     print("\nEnvironment Variables:")
     print("  SHELL                    Target shell when opening 'Terminal' from the app (default: /bin/bash)")
-    print("\nDocumentation: https://github.com/AndrzejPietrusiak/odoo-wt")
+    print("\nDocumentation: https://github.com/nd-dew/odoo-wt")
 
 def check_dependencies():
     missing = []
@@ -66,17 +75,22 @@ def main():
         print(f"odoo-wt v{VERSION}")
         sys.exit(0)
 
+    # Initialize configuration first (required for all CLI commands)
+    if not config_mgr.config_file.exists():
+        check_dependencies()
+        app = WizardApp()
+        config = app.run()
+        if not config:
+            sys.exit(1)
+    else:
+        config = config_mgr.load()
+
     # Command-line Status mode
     if "--status" in sys.argv or "status" in sys.argv:
         if "--status" in sys.argv: sys.argv.remove("--status")
         if "status" in sys.argv: sys.argv.remove("status")
         
         check_dependencies()
-        if not config_mgr.config_file.exists():
-            print("❌ Error: No configuration file found. Please run odoo-wt once to initialize settings.")
-            sys.exit(1)
-            
-        config = config_mgr.load()
         print_cli_status(config)
         sys.exit(0)
 
@@ -85,12 +99,6 @@ def main():
         arg = sys.argv[1]
         if arg != "status" and arg != "create" and get_edit_distance(arg, "status") <= 2:
             check_dependencies()
-            if not config_mgr.config_file.exists():
-                print(f"❌ Error: Unknown command '{arg}'. Please run odoo-wt once to initialize settings.")
-                sys.exit(1)
-                
-            config = config_mgr.load()
-            
             # If interactive TTY, offer prompt
             if sys.stdout.isatty():
                 try:
@@ -108,6 +116,89 @@ def main():
                 print(f"❌ Error: Unknown command '{arg}'. Did you mean 'status'?")
                 sys.exit(1)
 
+    # Utility metadata commands
+    if "--config-path" in sys.argv:
+        print(config_mgr.config_file.absolute())
+        sys.exit(0)
+        
+    if "--log-path" in sys.argv:
+        print(config_mgr.log_file.absolute())
+        sys.exit(0)
+
+    # Wizard command
+    if "wizard" in sys.argv:
+        check_dependencies()
+        app = WizardApp()
+        config = app.run()
+        sys.exit(0)
+
+    # Command-line Status mode (supporting status, --status, and //runbot)
+    if "--status" in sys.argv or "status" in sys.argv or "//runbot" in sys.argv:
+        if "--status" in sys.argv: sys.argv.remove("--status")
+        if "status" in sys.argv: sys.argv.remove("status")
+        if "//runbot" in sys.argv: sys.argv.remove("//runbot")
+        
+        check_dependencies()
+        print_cli_status(config)
+        sys.exit(0)
+
+    # Check for status command typos (like 'statu', 'stats', 'stat')
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
+        arg = sys.argv[1]
+        # Skip checking recognized subcommands
+        if arg not in ("status", "create", "wizard", "//runbot"):
+            if get_edit_distance(arg, "status") <= 2:
+                check_dependencies()
+                if sys.stdout.isatty():
+                    try:
+                        ans = input(f"❌ Unknown command '{arg}'. Did you mean 'status'? [y/N]: ").strip().lower()
+                        if ans in ("y", "yes"):
+                            print_cli_status(config)
+                            sys.exit(0)
+                        else:
+                            print("Aborted.")
+                            sys.exit(1)
+                    except (KeyboardInterrupt, EOFError):
+                        print("\nAborted.")
+                        sys.exit(1)
+                else:
+                    print(f"❌ Error: Unknown command '{arg}'. Did you mean 'status'?")
+                    sys.exit(1)
+
+    # Explicit direct action flags
+    # -o, --open <branch>
+    open_branch = None
+    if "--open" in sys.argv or "-o" in sys.argv:
+        idx = sys.argv.index("--open") if "--open" in sys.argv else sys.argv.index("-o")
+        if idx + 1 < len(sys.argv):
+            open_branch = sys.argv[idx + 1]
+            sys.argv.pop(idx + 1)
+        sys.argv.pop(idx)
+
+    # -c, --code <branch>
+    code_branch = None
+    if "--code" in sys.argv or "-c" in sys.argv:
+        idx = sys.argv.index("--code") if "--code" in sys.argv else sys.argv.index("-c")
+        if idx + 1 < len(sys.argv):
+            code_branch = sys.argv[idx + 1]
+            sys.argv.pop(idx + 1)
+        sys.argv.pop(idx)
+
+    # -d, --delete <branch>
+    delete_branch = None
+    if "--delete" in sys.argv or "-d" in sys.argv:
+        idx = sys.argv.index("--delete") if "--delete" in sys.argv else sys.argv.index("-d")
+        if idx + 1 < len(sys.argv):
+            delete_branch = sys.argv[idx + 1]
+            sys.argv.pop(idx + 1)
+        sys.argv.pop(idx)
+
+    # --no-magic flag
+    no_magic = False
+    if "--no-magic" in sys.argv:
+        no_magic = True
+        sys.argv.remove("--no-magic")
+
     # Simple flag parsing for tab selection
     forced_tab = None
     if "--create" in sys.argv:
@@ -118,63 +209,219 @@ def main():
         sys.argv.remove("--manage")
 
     check_dependencies()
-    
-    if not config_mgr.config_file.exists():
-        app = WizardApp()
-        config = app.run()
-        if not config:
-            return
-    else:
-        config = config_mgr.load()
 
-    if forced_tab:
-        config["default_tab"] = forced_tab
+    # Discover local worktrees to check for existing switcher/actions
+    v_list, s_list, worktrees = discover_system_data(
+        config["wt_root"], 
+        config["suffix"], 
+        config.get("known_versions", []), 
+        config.get("known_suffixes", [])
+    )
 
-    if "--no-magic" in sys.argv:
-        config["auto_magic_fix"] = False
-        sys.argv.remove("--no-magic")
+    # Handle direct commands (open, code, delete)
+    if open_branch:
+        match = next((w for w in worktrees if w["name"] == open_branch), None)
+        if match:
+            if "worktree_recency" not in config: config["worktree_recency"] = {}
+            import datetime
+            config["worktree_recency"][match["path"]] = datetime.datetime.utcnow().isoformat()
+            config_mgr.save(config)
+            
+            os.chdir(match["path"])
+            shell = os.environ.get("SHELL", "/bin/bash")
+            os.execv(shell, [shell])
+        else:
+            print(f"❌ Error: Worktree '{open_branch}' does not exist locally.")
+            sys.exit(1)
 
-    # CLI direct creation mode
-    if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
-        branch_name = sys.argv[1]
+    if code_branch:
+        match = next((w for w in worktrees if w["name"] == code_branch), None)
+        if match:
+            if "worktree_recency" not in config: config["worktree_recency"] = {}
+            import datetime
+            config["worktree_recency"][match["path"]] = datetime.datetime.utcnow().isoformat()
+            config_mgr.save(config)
+            
+            if shutil.which("code"):
+                os.system(f"code {match['path']}")
+                sys.exit(0)
+            else:
+                print("❌ VS Code ('code' command) not found in PATH.")
+                sys.exit(1)
+        else:
+            print(f"❌ Error: Worktree '{code_branch}' does not exist locally.")
+            sys.exit(1)
+
+    if delete_branch:
+        match = next((w for w in worktrees if w["name"] == delete_branch), None)
+        if match:
+            ans = "n"
+            if sys.stdout.isatty():
+                try:
+                    ans = input(f"⚠️ Are you sure you want to delete worktree '{delete_branch}'? [y/N]: ").strip().lower()
+                except (KeyboardInterrupt, EOFError):
+                    print("\nAborted.")
+                    sys.exit(1)
+            else:
+                ans = "y"
+                
+            if ans in ("y", "yes"):
+                print(f"🧹 Deleting worktree '{delete_branch}'...")
+                target_path = match["path"]
+                subprocess.run(["git", "worktree", "remove", "--force", "odoo"], cwd=target_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if (Path(target_path) / "enterprise").exists():
+                    subprocess.run(["git", "worktree", "remove", "--force", "enterprise"], cwd=target_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["git", "worktree", "prune"], cwd=config["wt_root"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                try:
+                    shutil.rmtree(target_path)
+                except Exception:
+                    pass
+                print("✨ Deleted successfully.")
+                sys.exit(0)
+            else:
+                print("Aborted.")
+                sys.exit(0)
+        else:
+            print(f"❌ Error: Worktree '{delete_branch}' does not exist locally.")
+            sys.exit(1)
+
+    # Handle explicit 'create <branch>' command or Smart Switcher/Creator odoo-wt <branch>
+    explicit_create = False
+    branch_arg = None
+
+    if len(sys.argv) > 1 and sys.argv[1] == "create":
+        explicit_create = True
+        if len(sys.argv) > 2:
+            branch_arg = sys.argv[2]
+            sys.argv.pop(2)
+        sys.argv.pop(1)
+    elif len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
+        branch_arg = sys.argv[1]
+        sys.argv.pop(1)
+
+    if branch_arg:
+        # Check if it already exists locally (Switcher Mode)
+        matched_wt = next((w for w in worktrees if w["name"] == branch_arg), None)
         
-        v_list, s_list, _ = discover_system_data(
-            config["wt_root"], 
-            config["suffix"], 
-            config.get("known_versions", []), 
-            config.get("known_suffixes", [])
-        )
-        
-        remote, v, d, s = decompose_branch(branch_name, v_list, s_list)
+        if matched_wt and not explicit_create:
+            from rich.console import Console
+            from .runbot_client import query_branch_status
+            
+            console = Console()
+            console.print(f"✨ Worktree for '[cyan]{branch_arg}[/cyan]' already exists locally!")
+            
+            with console.status("[cyan]Fetching live Runbot status..."):
+                res = query_branch_status(branch_arg)
+                
+            if res:
+                batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr = res
+                warn_str = f"[yellow]{warning}w[/yellow]" if warning > 0 else "0w"
+                fail_str = f"[red]{failed}f[/red]" if failed > 0 else "0f"
+                
+                # Fetch relative time function local reference
+                def relative_time(ts_str: str) -> str:
+                    if not ts_str: return ""
+                    try:
+                        dt = datetime.datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+                        now = datetime.datetime.utcnow()
+                        delta = now - dt
+                        total_seconds = int(delta.total_seconds())
+                        if total_seconds < 0: total_seconds = 0
+                        if total_seconds < 60: return "just now"
+                        elif total_seconds < 3600: return f"{total_seconds // 60}m ago"
+                        elif total_seconds < 86400: return f"{total_seconds // 3600}h ago"
+                        else: return f"{total_seconds // 86400}d ago"
+                    except Exception: return ""
+                
+                time_suffix = f" {relative_time(ts_str)}" if ts_str else ""
+                
+                if running > 0:
+                    status = f"⏳ Running {warn_str} {fail_str}{time_suffix}"
+                elif failed > 0:
+                    status = f"🔴 Failed {fail_str}{time_suffix}"
+                elif warning > 0:
+                    status = f"🟡 Warning {warn_str}{time_suffix}"
+                else:
+                    status = f"🟢 Passed{time_suffix}"
+                    
+                console.print(f"  [bold]Runbot Status:[/bold] {status}")
+                console.print(f"  [bold]Batch URL:[/bold]     {batch_url}")
+            else:
+                console.print("  [bold]Runbot Status:[/bold] ⚪ No batch")
 
-        data = {
-            "action": "create",
-            "version": v,
-            "desc": d,
-            "suffix": s
-        }
+            # Touch worktree recency
+            if "worktree_recency" not in config: config["worktree_recency"] = {}
+            import datetime
+            config["worktree_recency"][matched_wt["path"]] = datetime.datetime.utcnow().isoformat()
+            config_mgr.save(config)
+            
+            console.print(f"🚀 Dropping you into [cyan]{matched_wt['path']}[/cyan]...\n")
+            os.chdir(matched_wt["path"])
+            shell = os.environ.get("SHELL", "/bin/bash")
+            os.execv(shell, [shell])
 
-        from textual.app import App
-        from .custom_screens import DeployScreen
+        else:
+            # Creator Mode!
+            if not no_magic:
+                remote, v, d, s = decompose_branch(branch_arg, v_list, s_list)
+                
+                from rich.console import Console
+                console = Console()
+                console.print("🪄 [bold cyan]Magic Detection Active:[/bold cyan]")
+                console.print(f"  - Target Version: [cyan]{v or 'none'}[/cyan]")
+                console.print(f"  - Description:    [cyan]{d or 'none'}[/cyan]")
+                console.print(f"  - Suffix:         [cyan]{s or 'none'}[/cyan]\n")
+            else:
+                # No Magic: use raw string directly as description, version default, suffix default
+                if branch_arg[0].isdigit():
+                    parts = branch_arg.split("-")
+                    v = parts[0]
+                    d = "-".join(parts[1:])
+                else:
+                    v = "master"
+                    d = branch_arg
+                s = config["suffix"]
+                
+                from rich.console import Console
+                Console().print("⚠️ [bold yellow]Magic Detection Disabled. Using raw branch values.[/bold yellow]\n")
 
-        class FastModeApp(App):
-            CSS_PATH = "stylesheet.tcss"
-            def on_mount(self):
-                self.push_screen(DeployScreen(data, config))
+            data = {
+                "action": "create",
+                "version": v,
+                "desc": d,
+                "suffix": s
+            }
 
-        app = FastModeApp()
-        data = app.run()
+            from textual.app import App
+            from .custom_screens import DeployScreen
+
+            # Automatically trigger touch on create
+            parts = []
+            if v: parts.append(str(v))
+            if d: parts.append(str(d))
+            if s: parts.append(str(s))
+            folder_name = "-".join(parts)
+            target_path = str(Path(config["wt_root"]).expanduser().absolute() / folder_name)
+            
+            if "worktree_recency" not in config: config["worktree_recency"] = {}
+            import datetime
+            config["worktree_recency"][target_path] = datetime.datetime.utcnow().isoformat()
+            config_mgr.save(config)
+
+            # Deploy directly in TUI progress bar with 0 extra clicks!
+            class FastModeApp(App):
+                CSS_PATH = "stylesheet.tcss"
+                def on_mount(self):
+                    self.push_screen(DeployScreen(data, config))
+
+            app = FastModeApp()
+            data = app.run()
     else:
-        v_list, s_list, worktrees = discover_system_data(
-            config["wt_root"], 
-            config["suffix"], 
-            config.get("known_versions", []), 
-            config.get("known_suffixes", [])
-        )
+        # Standard TUI App mode
         app = OdooWtApp(config, v_list, s_list, worktrees, VERSION)
         data = app.run()
 
-    # Handle deployment completion actions
+    # Handle post-deployment completion actions (vscode, terminal)
     if data and isinstance(data, dict):
         action = data.get("action")
         if action == "terminal":
@@ -307,7 +554,13 @@ def print_cli_status(config):
         except Exception:
             return (0, 0, 0)
              
-    sorted_wts = sorted(worktrees, key=lambda x: (version_sort_key(x), x["name"]), reverse=True)
+    # Sort by recency timestamp first (descending), falling back to version and name
+    def recency_sort_key(wt_dict):
+        path_str = wt_dict["path"]
+        ts = config.get("worktree_recency", {}).get(path_str, "")
+        return (ts, version_sort_key(wt_dict), wt_dict["name"])
+             
+    sorted_wts = sorted(worktrees, key=recency_sort_key, reverse=True)
     
     for wt in sorted_wts:
         name = wt["name"]
