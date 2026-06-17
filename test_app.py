@@ -547,3 +547,86 @@ def test_worktree_recency_sorting(tmp_path):
     assert sorted_wts[0]["name"] == "wt_new"
     assert sorted_wts[1]["name"] == "wt_old"
 
+def test_cli_help_flag(monkeypatch, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "--help"])
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "Usage:" in captured.out
+    assert "Options & Actions:" in captured.out
+
+def test_cli_version_flag(monkeypatch, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "--version"])
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "odoo-wt v" in captured.out
+
+def test_cli_config_path_flag(monkeypatch, capsys, tmp_path):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "--config-path"])
+    
+    config_path = tmp_path / "odoo-wt.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {})
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert str(config_path.absolute()) in captured.out.strip()
+
+def test_cli_switcher_mode(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "17.0-fix-pian"])
+    
+    config_path = tmp_path / "odoo-wt.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock discover_system_data to return existing worktree
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], [{"name": "17.0-fix-pian", "path": "/path/root/17.0-fix-pian", "version": "17.0"}]
+    ))
+    
+    # Mock query_branch_status to return None or dummy
+    monkeypatch.setattr("odoo_wt.runbot_client.query_branch_status", lambda name: None)
+    
+    # Assert that os.chdir and os.execv are called with correct target path and shell
+    chdir_called = None
+    def mock_chdir(path):
+        nonlocal chdir_called
+        chdir_called = path
+    monkeypatch.setattr("os.chdir", mock_chdir)
+    
+    execv_called = None
+    def mock_execv(shell, args):
+        nonlocal execv_called
+        execv_called = (shell, args)
+        # Raise SystemExit to break out of main() cleanly
+        raise SystemExit(0)
+    monkeypatch.setattr("os.execv", mock_execv)
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    assert chdir_called == "/path/root/17.0-fix-pian"
+    assert execv_called is not None
+
