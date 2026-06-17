@@ -130,7 +130,7 @@ class DeployEngine:
 
     async def setup_uv(self) -> AsyncGenerator[DeployUpdate, None]:
         category = "uv"
-        yield DeployUpdate(category=category, total=4)
+        yield DeployUpdate(category=category, total=3)
         
         self.env_root.mkdir(parents=True, exist_ok=True)
         py_v = self.config.get("python_version", "3.12")
