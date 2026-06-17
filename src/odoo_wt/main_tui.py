@@ -6,7 +6,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll, Center
 from textual.widgets import Header, Footer, Select, Input, Label, Button, TabbedContent, TabPane, DataTable, Static, Checkbox, Switch
 from textual import on, work
-from textual.events import Paste, Key, DescendantFocus
+from textual.events import Paste, Key, DescendantFocus, Click
 from textual.binding import Binding
 from spellchecker import SpellChecker
 from rich.text import Text
@@ -16,7 +16,7 @@ spell = SpellChecker()
 spell.word_frequency.load_words(['odoo', 'saas', 'erp', 'mrp', 'pos', 'crm', 'wt', 'api', 'ui', 'ux', 'db', 'sql', 'backend', 'frontend', 'js', 'py', 'xml', 'owl', 'mac', 'linux', 'windows', 'repo'])
 
 from .app_config import config_mgr
-from .system_discovery import discover_system_data, get_remote, run_git, decompose_branch, get_remote_url
+from .system_discovery import discover_system_data, get_remote, run_git, decompose_branch, get_remote_url, is_base_branch
 from .custom_screens import DeleteConfirmScreen, DeployScreen, LogDetailScreen
 
 SETTINGS_HELP = {
@@ -46,6 +46,18 @@ SETTINGS_HELP = {
     "set-log-path": "Moving this will migrate your log file to a new location.",
 }
 
+class RunbotDataTable(DataTable):
+    def on_click(self, event: Click) -> None:
+        meta = event.style.meta
+        config_mgr.append_log("RunbotDataTable Clicked Natively", {
+            "meta": str(meta),
+            "screen_x": event.screen_x,
+            "screen_y": event.screen_y,
+            "style": str(event.style) if event.style else "no-style"
+        })
+        if hasattr(self.app, "handle_table_click"):
+            self.app.handle_table_click(event)
+
 class OdooWtApp(App):
     ENABLE_COMMAND_PALETTE = False
     CSS_PATH = "stylesheet.tcss"
@@ -57,6 +69,7 @@ class OdooWtApp(App):
         Binding("ctrl+t", "next_tab", "Tab", key_display="^T"),
         Binding("ctrl+tab", "next_tab", "", show=False),
         Binding("c", "copy_text", "Copy", key_display="C"),
+        Binding("ctrl+b", "open_runbot", "Runbot", key_display="^B"),
         Binding("escape", "quit", "", show=False),
         Binding("ctrl+q", "quit", "Quit", show=True, key_display="^Q"),
         Binding("ctrl+c", "quit", "Quit", show=False),
@@ -92,6 +105,10 @@ class OdooWtApp(App):
         self.resolved_comm_url = ""
         self.resolved_ent_remote = ""
         self.resolved_ent_url = ""
+        self.resolved_runbot_urls = {}
+        self.resolved_runbot_statuses = {}
+        self.resolved_odoo_pr_urls = {}
+        self.resolved_enterprise_pr_urls = {}
 
 
         # Modern Textual Theme API
@@ -106,6 +123,7 @@ class OdooWtApp(App):
             
         parts = ["^S Create", "^X Delete", "^R Refresh", "^T Tab", "^Q Quit"]
         if active_tab == "tab-manage":
+            parts.append("^B Runbot")
             parts.append("Enter Open")
         return "  ".join(parts)
 
@@ -234,7 +252,7 @@ class OdooWtApp(App):
                         yield Button("Open", variant="success", id="open-btn", classes="mini-btn")
                         yield Button("Refresh", id="refresh-btn", classes="mini-btn")
                         yield Button("Delete ^X", variant="error", id="delete-btn", classes="mini-btn")
-                    yield DataTable(id="wt-table", cursor_type="row")
+                    yield RunbotDataTable(id="wt-table", cursor_type="row")
                 with TabPane("Settings", id="tab-settings"):
                     yield Input(placeholder="Fuzzy search settings... (e.g. 'log', 'dark', 'path')", id="settings-search", classes="search-input")
                     with VerticalScroll(classes="settings-container"):
@@ -321,14 +339,16 @@ class OdooWtApp(App):
                         yield Button("Clear Logs", variant="error", id="clear-logs-btn")
         
         # Replace Footer with our custom global help bar
-        yield Static("^S Create  ^X Delete  ^R Refresh  ^T Tab  ^Q Quit", id="global-help-bar", classes="help-bar")
+        yield Static("^S Create  ^X Delete  ^R Refresh  ^B Runbot  ^T Tab  ^Q Quit", id="global-help-bar", classes="help-bar")
 
     def on_mount(self) -> None:
         config_mgr.append_log("App Started")
         
         # Initialize Manage Table Columns
         table = self.query_one("#wt-table", DataTable)
-        table.add_columns("Branch Name", "Version")
+        table.add_column("Branch Name", key="col-branch")
+        table.add_column("Runbot Status", key="col-runbot")
+        table.add_column("Link", key="col-link")
 
         default_tab = self.config.get("default_tab", "tab-create")
         try:
@@ -350,6 +370,9 @@ class OdooWtApp(App):
         v_sel = self.query_one("#version", Select).value
         if v_sel and str(v_sel) != "custom...":
             self.background_fetch(str(v_sel))
+
+    def on_ready(self) -> None:
+        self.run_runbot_checker()
 
     def apply_visibility_settings(self):
         prefix_col = self.query_one("#version-col")
@@ -408,6 +431,7 @@ class OdooWtApp(App):
             self.query_one("#desc").focus()
         elif active_pane == "tab-manage":
             self.query_one("#wt-search").focus()
+            self.run_runbot_checker()
         elif active_pane == "tab-settings":
             self.query_one("#settings-search").focus()
         elif active_pane == "tab-logs":
@@ -878,7 +902,27 @@ class OdooWtApp(App):
 
             if path in self.deleting_paths:
                 name = f"[strike]{name}[/strike] [bold red](Deleting...)[/bold red]"
-            table.add_row(name, wt["version"], key=path)
+                
+            # Read from local status and URL caches
+            status = self.resolved_runbot_statuses.get(name, "⏳ Checking Status...       ")
+            
+            if is_base_branch(name):
+                status = "⚪ Base Branch"
+                link = "[link=https://runbot.odoo.com/runbot]Board               [/link]"
+            elif name in self.resolved_runbot_urls:
+                batch_url = self.resolved_runbot_urls[name]
+                parts = [f"[link={batch_url}]CI[/link]"]
+                odoo_pr = self.resolved_odoo_pr_urls.get(name)
+                if odoo_pr:
+                    parts.append(f"[link={odoo_pr}]Com[/link]")
+                ent_pr = self.resolved_enterprise_pr_urls.get(name)
+                if ent_pr:
+                    parts.append(f"[link={ent_pr}]Ent[/link]")
+                link = "  ".join(parts)
+            else:
+                link = f"[link=https://runbot.odoo.com/runbot?search={name}]Search...          [/link]"
+                
+            table.add_row(name, status, link, key=path)
 
     @on(Input.Changed, "#wt-search")
     def on_wt_search_changed(self, event: Input.Changed) -> None:
@@ -957,9 +1001,129 @@ class OdooWtApp(App):
             self.action_reset_settings()
 
     def action_refresh_wts(self) -> None:
-        _, _, self.worktrees = discover_system_data(self.config["wt_root"], self.config["suffix"])
+        self.resolved_runbot_urls.clear()
+        self.resolved_runbot_statuses.clear()
+        self.resolved_odoo_pr_urls.clear()
+        self.resolved_enterprise_pr_urls.clear()
+        _, _, self.worktrees = discover_system_data(
+            self.config["wt_root"], 
+            self.config["suffix"],
+            known_versions=self.config.get("known_versions", []),
+            known_suffixes=self.config.get("known_suffixes", [])
+        )
         self.populate_table()
+        self.run_runbot_checker()
         self.notify("Worktrees refreshed!")
+
+    def update_table_cell(self, row_key: str, column_key: str, value: str) -> None:
+        try:
+            table = self.query_one("#wt-table", DataTable)
+            table.update_cell(row_key, column_key, value)
+            config_mgr.append_log("UI Cell Updated", {"row": row_key, "col": column_key, "value": value})
+        except Exception as e:
+            config_mgr.append_log("UI Cell Update Error", {"error": str(e)})
+
+    @work(exclusive=True, thread=True)
+    def run_runbot_checker(self) -> None:
+        from .runbot_client import query_branch_status
+        import traceback
+        import datetime
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        config_mgr.append_log("Runbot Concurrent Checker Started", {"worktrees_count": len(self.worktrees)})
+        
+        def relative_time(ts_str: str) -> str:
+            if not ts_str: return ""
+            try:
+                dt = datetime.datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+                now = datetime.datetime.utcnow()
+                delta = now - dt
+                total_seconds = int(delta.total_seconds())
+                if total_seconds < 0:
+                    total_seconds = 0
+                if total_seconds < 60:
+                    return "just now"
+                elif total_seconds < 3600:
+                    return f"{total_seconds // 60}m ago"
+                elif total_seconds < 86400:
+                    return f"{total_seconds // 3600}h ago"
+                else:
+                    return f"{total_seconds // 86400}d ago"
+            except Exception:
+                return ""
+        
+        wts = list(self.worktrees)
+        
+        # 1. Update all base branches immediately (doesn't need network CI polling)
+        for wt in wts:
+            if is_base_branch(wt["name"]):
+                self.call_from_thread(self.update_table_cell, wt["path"], "col-runbot", "⚪ Base Branch")
+                self.call_from_thread(self.update_table_cell, wt["path"], "col-link", "[link=https://runbot.odoo.com/runbot]Board               [/link]")
+                self.resolved_runbot_statuses[wt["name"]] = "⚪ Base Branch"
+
+        # Filter out base branches for concurrent web checks
+        to_check = [wt for wt in wts if not is_base_branch(wt["name"])]
+        if not to_check:
+            return
+
+        # 2. Check all other branches in parallel concurrently
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            future_to_wt = {
+                executor.submit(query_branch_status, wt["name"]): wt 
+                for wt in to_check
+            }
+            
+            for future in as_completed(future_to_wt):
+                wt = future_to_wt[future]
+                path = wt["path"]
+                branch_name = wt["name"]
+                
+                status = "⚪ No batch"
+                link = f"[link=https://runbot.odoo.com/runbot?search={branch_name}]Search...          [/link]"
+                
+                try:
+                    res = future.result()
+                    if res:
+                        batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr = res
+                        self.resolved_runbot_urls[branch_name] = batch_url
+                        
+                        if odoo_pr:
+                            self.resolved_odoo_pr_urls[branch_name] = odoo_pr
+                        if enterprise_pr:
+                            self.resolved_enterprise_pr_urls[branch_name] = enterprise_pr
+                        
+                        parts = [f"[link={batch_url}]CI[/link]"]
+                        if odoo_pr:
+                            parts.append(f"[link={odoo_pr}]Com[/link]")
+                        if enterprise_pr:
+                            parts.append(f"[link={enterprise_pr}]Ent[/link]")
+                        link = "  ".join(parts)
+                        
+                        time_suffix = f" {relative_time(ts_str)}" if ts_str else ""
+                        warn_str = f" [yellow]{warning}w[/yellow]" if warning > 0 else " 0w"
+                        fail_str = f" [red]{failed}f[/red]" if failed > 0 else " 0f"
+                        
+                        if running > 0:
+                            status = f"⏳ Running{warn_str}{fail_str}{time_suffix}"
+                        elif failed > 0:
+                            status = f"🔴 Failed{fail_str}{time_suffix}"
+                        elif warning > 0:
+                            status = f"🟡 Warning{warn_str}{time_suffix}"
+                        else:
+                            status = f"🟢 Passed{time_suffix}"
+                    else:
+                        status = "⚪ No batch"
+                        link = f"[link=https://runbot.odoo.com/runbot?search={branch_name}]Search...          [/link]"
+                    
+                    self.resolved_runbot_statuses[branch_name] = status
+                except Exception as e:
+                    config_mgr.append_log("Runbot Concurrent Checker Error", {"branch": branch_name, "error": str(e), "traceback": traceback.format_exc()})
+                    status = "⚠️ Error"
+                    link = f"[link=https://runbot.odoo.com/runbot?search={branch_name}]Search...          [/link]"
+                    self.resolved_runbot_statuses[branch_name] = status
+                    
+                self.call_from_thread(self.update_table_cell, path, "col-runbot", status)
+                self.call_from_thread(self.update_table_cell, path, "col-link", link)
 
     def action_quit(self) -> None:
         config_mgr.append_log("App Quit")
@@ -1330,3 +1494,52 @@ class OdooWtApp(App):
             self.config["suffix"] = suffix
             config_mgr.save(self.config)
         self.app.push_screen(DeployScreen({"action": "create", "version": version, "desc": desc, "suffix": suffix}, self.config))
+
+    def handle_table_click(self, event: Click) -> None:
+        table = self.query_one("#wt-table", DataTable)
+        meta = event.style.meta
+        config_mgr.append_log("App received table click", {"meta": str(meta)})
+        
+        if "row" in meta and "column" in meta:
+            try:
+                col_index = meta["column"]
+                row_index = meta["row"]
+                col_key = list(table.columns.keys())[col_index].value
+                
+                if col_key == "col-link":
+                    from textual.coordinate import Coordinate
+                    coord = Coordinate(row_index, col_index)
+                    row_key = table.coordinate_to_cell_key(coord).row_key.value
+                    wt_name = Path(row_key).name
+                    config_mgr.append_log("Runbot Cell Mouse-Clicked", {"branch": wt_name})
+                    self.trigger_runbot_for_wt(wt_name)
+            except Exception as e:
+                config_mgr.append_log("DataTable Click Handler Error", {"error": str(e)})
+
+    def action_open_runbot(self) -> None:
+        table = self.query_one("#wt-table", DataTable)
+        try:
+            row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value
+            wt_name = Path(row_key).name
+            self.trigger_runbot_for_wt(wt_name)
+        except Exception:
+            self.notify("Select a worktree first!", severity="error")
+
+    def trigger_runbot_for_wt(self, wt_name: str) -> None:
+        import webbrowser
+        
+        if wt_name == "master":
+            webbrowser.open("https://runbot.odoo.com/runbot")
+            self.notify("Opened Runbot dashboard in browser.")
+            return
+
+        if wt_name in self.resolved_runbot_urls:
+            target_url = self.resolved_runbot_urls[wt_name]
+            webbrowser.open(target_url)
+            self.notify(f"Opened Runbot page for '{wt_name}'!")
+            return
+
+        # Fallback to search query
+        search_url = f"https://runbot.odoo.com/runbot?search={wt_name}"
+        webbrowser.open(search_url)
+        self.notify(f"Opening Runbot search for '{wt_name}'...")
