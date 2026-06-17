@@ -128,6 +128,10 @@ uv tool install . --force
 - **Improved Logging:** Add more granular log levels for troubleshooting.
 - add cli option to --list existing wt
 - opening the directory in terminal is very slow (like 10s)
+- check on the runbot's PRs (log their last comments and by who)
+- the runbot/PR checks should work in cli, what would be super cool
+- the top space on the app could be tighter, we dont need such big header
+- we could inform users that to select text they need to hold Shift
 
 
 ## Development
