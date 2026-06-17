@@ -186,17 +186,112 @@ class LogDetailScreen(ModalScreen[None]):
 
     def compose(self):
         with Vertical(id="log-detail-dialog"):
-            yield Label(f"[{self.ts}] {self.action}", classes="log-detail-title")
+            yield Label(f"[{self.ts}] {self.action}", classes="log-detail-title", markup=False)
             try:
                 parsed = json.loads(self.details)
                 pretty_details = json.dumps(parsed, indent=4)
             except json.JSONDecodeError:
                 pretty_details = str(self.details)
             with VerticalScroll():
-                yield Label(pretty_details, classes="log-detail-text")
+                yield Label(pretty_details, classes="log-detail-text", markup=False)
             with Horizontal(classes="log-detail-btn-row"):
                 yield Button("Close", variant="primary", id="btn-close-log")
 
     @on(Button.Pressed, "#btn-close-log")
     def on_close(self):
         self.dismiss()
+
+class RunbotMonitorScreen(ModalScreen[None]):
+    def __init__(self, wt_name: str):
+        super().__init__()
+        self.wt_name = wt_name
+        self.is_monitoring = True
+        self.batch_url = None
+
+    def compose(self):
+        with Vertical(id="runbot-dialog"):
+            yield Label("Runbot Monitor 🤖", classes="title")
+            yield Label(f"Branch: [bold cyan]{self.wt_name}[/bold cyan]")
+            yield Label(f"Resolving latest batch on Runbot...", id="runbot-status")
+            yield Label("", id="runbot-url")
+            yield Label("", id="runbot-timer")
+            with Horizontal(classes="runbot-row"):
+                yield Button("Close", variant="primary", id="btn-close-runbot")
+
+    @on(Button.Pressed, "#btn-close-runbot")
+    def on_close(self):
+        self.is_monitoring = False
+        self.dismiss()
+
+    def on_mount(self) -> None:
+        self.resolve_and_monitor()
+
+    @work(exclusive=True, thread=True)
+    def resolve_and_monitor(self) -> None:
+        import re
+        import urllib.request
+        import time
+
+        # 1. Resolve batch URL
+        search_url = f"https://runbot.odoo.com/runbot?search={self.wt_name}"
+        self.call_from_thread(self.query_one("#runbot-status", Label).update, f"Querying Runbot search for '{self.wt_name}'...")
+        
+        batch_url = None
+        req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
+        try:
+            with urllib.request.urlopen(req) as response:
+                html = response.read().decode('utf-8')
+            match = re.search(r'href="/runbot/batch/(\d+)"', html)
+            if match:
+                batch_id = match.group(1)
+                batch_url = f"https://runbot.odoo.com/runbot/batch/{batch_id}"
+        except Exception as e:
+            self.call_from_thread(self.query_one("#runbot-status", Label).update, f"[bold red]Search failed: {e}[/bold red]")
+            return
+
+        if not batch_url:
+            self.call_from_thread(self.query_one("#runbot-status", Label).update, "[bold red]No active/recent batch found for this branch on Runbot.[/bold red]")
+            return
+
+        self.batch_url = batch_url
+        self.call_from_thread(self.query_one("#runbot-url", Label).update, f"[bold]Batch URL:[/bold] [underline]{batch_url}[/underline]")
+
+        # 2. Polling loop
+        while self.is_monitoring:
+            self.call_from_thread(self.query_one("#runbot-status", Label).update, "⏳ Fetching batch build status...")
+            req_batch = urllib.request.Request(batch_url, headers={'User-Agent': 'Mozilla/5.0'})
+            try:
+                with urllib.request.urlopen(req_batch) as resp:
+                    batch_html = resp.read().decode('utf-8')
+                
+                spinners = batch_html.count("fa-spinner")
+                
+                if spinners > 0:
+                    self.call_from_thread(self.query_one("#runbot-status", Label).update, f"⏳ [bold yellow]Monitoring:[/bold yellow] {spinners} builds running.")
+                    # Countdown for 30s
+                    for i in range(30, 0, -1):
+                        if not self.is_monitoring:
+                            break
+                        self.call_from_thread(self.query_one("#runbot-timer", Label).update, f"Next check in {i}s...")
+                        time.sleep(1)
+                else:
+                    self.call_from_thread(self.query_one("#runbot-status", Label).update, "🎉 [bold green]COMPLETED![/bold green] All builds are finished!")
+                    self.call_from_thread(self.query_one("#runbot-timer", Label).update, "")
+                    
+                    # Play alarm sound
+                    ALARM_SOUND = "/usr/share/sounds/sound-icons/trumpet-12.wav"
+                    if os.path.exists(ALARM_SOUND):
+                        import subprocess
+                        for _ in range(5):
+                            subprocess.run(["aplay", ALARM_SOUND], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    else:
+                        import sys
+                        for _ in range(10):
+                            sys.stdout.write("\a")
+                            sys.stdout.flush()
+                            time.sleep(0.5)
+                            
+                    break
+            except Exception as e:
+                self.call_from_thread(self.query_one("#runbot-status", Label).update, f"⚠️ Error updating status: {e}. Retrying...")
+                time.sleep(10)
