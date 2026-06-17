@@ -184,4 +184,17 @@ def get_remote_url(repo, remote_name):
     success, out = run_git(["remote", "get-url", remote_name], cwd=repo, capture=True)
     return out.strip() if success else "unknown"
 
+def is_base_branch(name: str) -> bool:
+    import re
+    name = name.strip()
+    if name == "master":
+        return True
+    # Matches pure version numbers (e.g., "17.0", "18.0", "19.0")
+    if re.match(r'^\d+\.\d+$', name):
+        return True
+    # Matches official saas versions (e.g., "saas-18.2", "saas-19.3")
+    if re.match(r'^saas-\d+\.\d+$', name):
+        return True
+    return False
+
 
