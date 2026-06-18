@@ -501,10 +501,18 @@ def test_cli_typo_correction(monkeypatch, tmp_path):
     config_path = tmp_path / "odoo-wt.json"
     config_path.write_text("{}")
     monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
-    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {})
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
     
-    # Mock input to return yes
-    monkeypatch.setattr("builtins.input", lambda _: "y")
+    # Mock discover_system_data to avoid actual path errors
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], []
+    ))
+    
+    # Mock input to select the status option
+    monkeypatch.setattr("builtins.input", lambda _: "status")
     
     # Track if print_cli_status was called
     called = False
@@ -774,8 +782,8 @@ def test_cli_subcommand_typo_correction(monkeypatch, tmp_path, capsys):
         ]
     ))
     
-    # Mock input to return yes
-    monkeypatch.setattr("builtins.input", lambda _: "y")
+    # Mock input to return list
+    monkeypatch.setattr("builtins.input", lambda _: "list")
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
     
     with pytest.raises(SystemExit) as excinfo:
