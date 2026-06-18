@@ -24,7 +24,9 @@ def show_help():
     
     console.print("[bold yellow]Usage:[/bold yellow]")
     console.print("  [bold green]odoo-wt[/bold green]                       Launch the interactive TUI [dim](Recommended)[/dim]")
-    console.print("  [bold green]odoo-wt status[/bold green] [dim](or runbot)[/dim]    Print worktree and Runbot status table directly")
+    console.print("  [bold green]odoo-wt status[/bold green]                  Print highly compressed combined status table")
+    console.print("  [bold green]odoo-wt runbot[/bold green]                  Print detailed Runbot CI status table")
+    console.print("  [bold green]odoo-wt reviews[/bold green]                 Print detailed PR Reviews dashboard")
     console.print("  [bold green]odoo-wt list[/bold green]                  Simply list existing worktree names, one per line")
     console.print("  [bold green]odoo-wt <branch>[/bold green]              Smart Switcher/Creator: opens TUI if new, shell if existing")
     
