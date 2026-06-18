@@ -811,9 +811,17 @@ def print_cli_status(config, mode="combined"):
              
     sorted_wts = sorted(worktrees, key=recency_sort_key, reverse=True)
     
+    # Calculate target column widths dynamically based on config and terminal width
+    max_w = config.get("status_max_width", 150)
+    try:
+        terminal_width = console.width
+        tbl_width = min(max_w, terminal_width)
+    except Exception:
+        tbl_width = max_v = 120
+
     # 2. Render Table depending on chosen Mode!
     if mode == "runbot":
-        table = Table(title=f"Odoo Runbot Details (v{VERSION})", title_style="bold green", header_style="bold yellow", box=None)
+        table = Table(title=f"Odoo Runbot Details (v{VERSION})", title_style="bold green", header_style="bold yellow", box=None, width=tbl_width if tbl_width > 40 else None)
         table.add_column("Branch Name", style="cyan")
         table.add_column("Status")
         table.add_column("Success", style="green", justify="right")
@@ -864,7 +872,7 @@ def print_cli_status(config, mode="combined"):
             table.add_row(name, status_str, success_str, failed_str, warning_str, running_str, time_str, link_str)
             
     elif mode == "reviews":
-        table = Table(title=f"Odoo PR Reviews Dashboard (v{VERSION})", title_style="bold magenta", header_style="bold cyan", box=None)
+        table = Table(title=f"Odoo PR Reviews Dashboard (v{VERSION})", title_style="bold magenta", header_style="bold cyan", box=None, width=tbl_width if tbl_width > 40 else None)
         table.add_column("Branch Name", style="cyan")
         table.add_column("Community PR")
         table.add_column("Enterprise PR")
@@ -903,7 +911,7 @@ def print_cli_status(config, mode="combined"):
             table.add_row(name, odoo_pr_str, ent_pr_str, comment_str)
             
     else: # mode == "combined"
-        table = Table(title=f"Odoo Worktree Status (v{VERSION})", title_style="bold cyan", header_style="bold magenta", box=None)
+        table = Table(title=f"Odoo Worktree Status (v{VERSION})", title_style="bold cyan", header_style="bold magenta", box=None, width=tbl_width if tbl_width > 40 else None)
         table.add_column("Branch Name", style="cyan")
         table.add_column("Runbot")
         table.add_column("Links")
