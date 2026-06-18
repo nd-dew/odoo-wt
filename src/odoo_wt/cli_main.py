@@ -121,6 +121,8 @@ async def run_cli_deployment(config, data, verbose=False):
     return {"action": action, "path": str(engine.target_dir)}
 
 def main():
+    original_cwd = os.getcwd()
+    
     if "--help" in sys.argv or "-h" in sys.argv:
         show_help()
         sys.exit(0)
@@ -274,6 +276,7 @@ def main():
             config["worktree_recency"][match["path"]] = datetime.datetime.utcnow().isoformat()
             config_mgr.save(config)
             
+            os.environ["OLDPWD"] = original_cwd
             os.chdir(match["path"])
             shell = os.environ.get("SHELL", "/bin/bash")
             os.execv(shell, [shell])
@@ -554,6 +557,7 @@ def main():
             config_mgr.save(config)
             
             console.print(f"🚀 Changing directory to [cyan]{matched_wt['path']}[/cyan]...\n")
+            os.environ["OLDPWD"] = original_cwd
             os.chdir(matched_wt["path"])
             shell = os.environ.get("SHELL", "/bin/bash")
             os.execv(shell, [shell])
@@ -618,6 +622,7 @@ def main():
         action = data.get("action")
         if action == "terminal":
             target = data["path"]
+            os.environ["OLDPWD"] = original_cwd
             os.chdir(target)
             shell = os.environ.get("SHELL", "/bin/bash")
             os.execv(shell, [shell])
