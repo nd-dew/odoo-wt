@@ -100,7 +100,7 @@ class DeployEngine:
         try:
             if fetch_success:
                 yield DeployUpdate(category=category, log_line="Fetch successful. Creating worktree...")
-                async for update in run_cmd_stream_gen(["git", "worktree", "add", str(self.target_dir / dest_label), self.branch_name], repo_path, category):
+                async for update in run_cmd_stream_gen(["git", "worktree", "add", "--force", str(self.target_dir / dest_label), self.branch_name], repo_path, category):
                     yield update
             else:
                 if not is_base_branch:
@@ -114,12 +114,12 @@ class DeployEngine:
                 is_local = await asyncio.to_thread(check_local, repo_path, self.branch_name)
                 if is_local:
                     yield DeployUpdate(category=category, log_line="Branch exists locally. Creating worktree...")
-                    async for update in run_cmd_stream_gen(["git", "worktree", "add", str(self.target_dir / dest_label), self.branch_name], repo_path, category):
+                    async for update in run_cmd_stream_gen(["git", "worktree", "add", "--force", str(self.target_dir / dest_label), self.branch_name], repo_path, category):
                         yield update
                     # No error if checkout worked
                 else:
                     yield DeployUpdate(category=category, log_line=f"Creating new branch from {remote}/{self.base_v}...")
-                    async for update in run_cmd_stream_gen(["git", "worktree", "add", "-b", self.branch_name, str(self.target_dir / dest_label), f"{remote}/{self.base_v}"], repo_path, category):
+                    async for update in run_cmd_stream_gen(["git", "worktree", "add", "--force", "-b", self.branch_name, str(self.target_dir / dest_label), f"{remote}/{self.base_v}"], repo_path, category):
                         yield update
                     # Unset upstream tracking to keep the local feature branch pristine with no mismatched tracking
                     async for update in run_cmd_stream_gen(["git", "branch", "--unset-upstream", self.branch_name], repo_path, category):
