@@ -21,6 +21,7 @@ def show_help():
     print("  odoo-wt                      Launch the interactive TUI (Recommended)")
     print("  odoo-wt status               Print the worktree and Runbot status table directly")
     print("  odoo-wt //runbot             Fast, dash-free alias to print status table directly")
+    print("  odoo-wt list                 Simply list existing worktree names, one per line (no formatting)")
     print("  odoo-wt <branch>             Smart Switcher/Creator: opens TUI if new, opens shell if existing")
     print("  odoo-wt create <branch>      Explicitly open TUI pre-filled in 'Creation' tab")
     print("\nOptions & Actions:")
@@ -85,6 +86,38 @@ def main():
     else:
         config = config_mgr.load()
 
+    # Simple list command (one branch name per line, no formatting, no titles, sorted by recency)
+    if "list" in sys.argv:
+        check_dependencies()
+        _, _, worktrees = discover_system_data(
+            config["wt_root"], 
+            config["suffix"],
+            known_versions=config.get("known_versions", []),
+            known_suffixes=config.get("known_suffixes", [])
+        )
+        
+        def version_sort_key(wt):
+            v = wt["version"] or ""
+            try:
+                num_part = v.replace("saas-", "")
+                parts = num_part.split(".")
+                major = int(parts[0]) if parts else 0
+                minor = int(parts[1]) if len(parts) > 1 else 0
+                is_saas = 1 if "saas-" in v else 0
+                return (major, minor, is_saas)
+            except Exception:
+                return (0, 0, 0)
+                
+        def recency_sort_key(wt_dict):
+            path_str = wt_dict["path"]
+            ts = config.get("worktree_recency", {}).get(path_str, "")
+            return (ts, version_sort_key(wt_dict), wt_dict["name"])
+            
+        sorted_wts = sorted(worktrees, key=recency_sort_key, reverse=True)
+        for wt in sorted_wts:
+            print(wt["name"])
+        sys.exit(0)
+
     # Command-line Status mode
     if "--status" in sys.argv or "status" in sys.argv:
         if "--status" in sys.argv: sys.argv.remove("--status")
@@ -97,7 +130,7 @@ def main():
     # Check for status command typos (like 'statu', 'stats', 'stat')
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
         arg = sys.argv[1]
-        if arg != "status" and arg != "create" and get_edit_distance(arg, "status") <= 2:
+        if arg not in ("status", "create", "wizard", "//runbot", "list") and get_edit_distance(arg, "status") <= 2:
             check_dependencies()
             # If interactive TTY, offer prompt
             if sys.stdout.isatty():
