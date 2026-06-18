@@ -753,3 +753,35 @@ def test_cli_switcher_multiple_matches(monkeypatch, tmp_path, capsys):
     captured = capsys.readouterr()
     assert "Direct Matches" in captured.out
 
+def test_cli_subcommand_typo_correction(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "lis"])
+    
+    config_path = tmp_path / "odoo-wt.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock discover_system_data to return existing worktrees
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], [
+            {"name": "17.0-fix-pian", "path": "/path/root/17.0-fix-pian", "version": "17.0"}
+        ]
+    ))
+    
+    # Mock input to return yes
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "17.0-fix-pian" in captured.out
+
