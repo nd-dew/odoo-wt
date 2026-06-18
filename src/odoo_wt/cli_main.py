@@ -353,47 +353,125 @@ def main():
         sys.argv.pop(1)
 
     if branch_arg:
-        # Determine fuzzy matched worktrees (prioritize switcher over creator)
-        matched_wts = []
-        if not explicit_create:
-            query = branch_arg.strip().lower()
-            for wt in worktrees:
-                name = wt["name"].lower()
-                # 1. Direct substring match!
-                if query in name:
-                    matched_wts.append(wt)
-                    continue
-                # 2. Token-based Levenshtein match (distance <= 2) only if query length >= 5!
-                if len(query) >= 5:
-                    tokens = name.replace("-", " ").replace("_", " ").split()
-                    if any(get_edit_distance(query, tok) <= 2 for tok in tokens):
-                        matched_wts.append(wt)
-                    
-        # Let's handle the decision routing:
+        # Stateful multi-tiered progressive switcher loop
+        current_tier = 1  # 1: Substring, 2: Fuzzy/Multi-Term, 3: Typo (Levenshtein)
         matched_wt = None
-        if len(matched_wts) == 1:
-            matched_wt = matched_wts[0]
-        elif len(matched_wts) > 1:
-            from rich.console import Console
-            console = Console()
-            console.print(f"🔍 Multiple worktrees matched '[cyan]{branch_arg}[/cyan]':")
-            for idx, wt in enumerate(matched_wts, 1):
-                console.print(f"  [[green]{idx}[/green]] {wt['name']}")
-                
-            print()
+        
+        # Version sort key for fallback sorting
+        def local_version_sort_key(wt):
+            v = wt["version"] or ""
             try:
-                ans = input(f"Select a worktree to switch to [1-{len(matched_wts)}, or 'c' to create new]: ").strip().lower()
-                if ans.isdigit() and 1 <= int(ans) <= len(matched_wts):
-                    matched_wt = matched_wts[int(ans) - 1]
-                elif ans == 'c':
-                    # Explicitly trigger creator mode
-                    pass
-                else:
-                    print("Aborted.")
-                    sys.exit(0)
-            except (KeyboardInterrupt, EOFError):
-                print("\nAborted.")
-                sys.exit(1)
+                num_part = v.replace("saas-", "")
+                parts = num_part.split(".")
+                major = int(parts[0]) if parts else 0
+                minor = int(parts[1]) if len(parts) > 1 else 0
+                is_saas = 1 if "saas-" in v else 0
+                return (major, minor, is_saas)
+            except Exception:
+                return (0, 0, 0)
+                
+        while True:
+            matched_wts = []
+            if not explicit_create:
+                query = branch_arg.strip().lower()
+                
+                # --- TIER 1: Contiguous Substring Matches ---
+                if current_tier >= 1:
+                    for wt in worktrees:
+                        if query in wt["name"].lower():
+                            matched_wts.append(wt)
+                            
+                # --- TIER 2: Fuzzy Multi-Term Matches ---
+                if current_tier >= 2:
+                    terms = query.replace("-", " ").replace("_", " ").split()
+                    for wt in worktrees:
+                        if wt in matched_wts: continue
+                        if all(t in wt["name"].lower() for t in terms):
+                            matched_wts.append(wt)
+                            
+                # --- TIER 3: Typo Levenshtein Matches (Only if query length >= 5) ---
+                if current_tier >= 3 and len(query) >= 5:
+                    for wt in worktrees:
+                        if wt in matched_wts: continue
+                        tokens = wt["name"].lower().replace("-", " ").replace("_", " ").split()
+                        if any(get_edit_distance(query, tok) <= 2 for tok in tokens):
+                            matched_wts.append(wt)
+                            
+            # Sort matches consistently
+            def recency_sort_key(wt_dict):
+                path_str = wt_dict["path"]
+                ts = config.get("worktree_recency", {}).get(path_str, "")
+                return (ts, local_version_sort_key(wt_dict), wt_dict["name"])
+                
+            matched_wts = sorted(matched_wts, key=recency_sort_key, reverse=True)
+            
+            # Remove duplicate matches while preserving sorted order
+            seen = set()
+            unique_matches = []
+            for wt in matched_wts:
+                if wt["path"] not in seen:
+                    seen.add(wt["path"])
+                    unique_matches.append(wt)
+            matched_wts = unique_matches
+            
+            # If exactly 1 match on Tier 1 (on startup), switch directly!
+            if len(matched_wts) == 1 and current_tier == 1:
+                matched_wt = matched_wts[0]
+                break
+                
+            # If multiple matches or we've expanded tiers, prompt interactive selector
+            if len(matched_wts) > 0 or current_tier < 3:
+                from rich.console import Console
+                console = Console()
+                
+                tier_label = "Direct" if current_tier == 1 else ("Fuzzy" if current_tier == 2 else "Typo")
+                console.print(f"🔍 [bold cyan]{tier_label} Matches[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
+                for idx, wt in enumerate(matched_wts, 1):
+                    console.print(f"  [[green]{idx}[/green]] {wt['name']}")
+                    
+                print()
+                options = [f"1-{len(matched_wts)}"]
+                option_help = []
+                
+                if current_tier < 2:
+                    options.append("f")
+                    option_help.append("[f] Search more (fuzzy substring / words)")
+                if current_tier < 3:
+                    options.append("t")
+                    option_help.append("[t] Search more (typo / distance)")
+                    
+                options.append("c")
+                option_help.append("[c] Create brand new worktree")
+                
+                for opt in option_help:
+                    console.print(f"  {opt}")
+                    
+                print()
+                try:
+                    ans = input(f"Select an option [{', '.join(options)}]: ").strip().lower()
+                    if ans.isdigit() and 1 <= int(ans) <= len(matched_wts):
+                        matched_wt = matched_wts[int(ans) - 1]
+                        break
+                    elif ans == 'f' and current_tier < 2:
+                        current_tier = 2
+                        console.print("\n✨ Running [bold yellow]Fuzzy Substring Matcher[/bold yellow]...")
+                        continue
+                    elif ans == 't' and current_tier < 3:
+                        current_tier = 3
+                        console.print("\n✨ Running [bold yellow]Levenshtein Typo Matcher[/bold yellow]...")
+                        continue
+                    elif ans == 'c':
+                        matched_wt = None
+                        break
+                    else:
+                        print("Aborted.")
+                        sys.exit(0)
+                except (KeyboardInterrupt, EOFError):
+                    print("\nAborted.")
+                    sys.exit(1)
+            else:
+                matched_wt = None
+                break
 
         if matched_wt:
             from rich.console import Console
