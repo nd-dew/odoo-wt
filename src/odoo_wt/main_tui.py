@@ -1142,7 +1142,7 @@ class OdooWtApp(App):
                         fail_str = f" [red]{failed}f[/red]" if failed > 0 else " 0f"
                         
                         if running > 0:
-                            status = f"⏳ Running{warn_str}{fail_str}{time_suffix}"
+                            status = f"🏃 Running{warn_str}{fail_str}{time_suffix}"
                         elif failed > 0:
                             status = f"🔴 Failed{fail_str}{time_suffix}"
                         elif warning > 0:
