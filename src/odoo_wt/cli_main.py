@@ -435,13 +435,13 @@ def main():
                 
                 if current_tier < 2:
                     options.append("f")
-                    option_help.append("[f] Search more (fuzzy substring / words)")
+                    option_help.append("[[green]f[/green]] Search more (fuzzy substring / words)")
                 if current_tier < 3:
                     options.append("t")
-                    option_help.append("[t] Search more (typo / distance)")
+                    option_help.append("[[green]t[/green]] Search more (typo / distance)")
                     
                 options.append("c")
-                option_help.append("[c] Create brand new worktree")
+                option_help.append("[[green]c[/green]] Create brand new worktree")
                 
                 for opt in option_help:
                     console.print(f"  {opt}")
