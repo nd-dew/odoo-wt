@@ -350,7 +350,7 @@ class OdooWtApp(App):
         table.add_column("Branch Name", key="col-branch")
         table.add_column("Runbot Status", key="col-runbot")
         table.add_column("Link", key="col-link")
-        table.add_column("Last Review", key="col-comment")
+        table.add_column("Last Comment", key="col-comment")
 
         default_tab = self.config.get("default_tab", "tab-create")
         try:
@@ -937,8 +937,15 @@ class OdooWtApp(App):
                     user = comment_data["user"]
                     relative = comment_data["relative"]
                     link_url = comment_data["html_url"]
+                    body_clean = comment_data.get("body_clean", "")
                     prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
-                    comment_cell = f"[link={link_url}]💬 {prefix} {user} ({relative})[/link]"
+                    
+                    comment_text = f"{prefix} {user}"
+                    if body_clean:
+                        comment_text += f": {body_clean}"
+                    comment_text += f" ({relative})"
+                    
+                    comment_cell = f"[link={link_url}]{comment_text}[/link]"
                 else:
                     comment_cell = "[dim]⏳ Checking...[/dim]"
             else:
@@ -1153,8 +1160,15 @@ class OdooWtApp(App):
                                 user = comment_data["user"]
                                 relative = comment_data["relative"]
                                 link_url = comment_data["html_url"]
+                                body_clean = comment_data.get("body_clean", "")
                                 prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
-                                comment_cell = f"[link={link_url}]💬 {prefix} {user} ({relative})[/link]"
+                                
+                                comment_text = f"{prefix} {user}"
+                                if body_clean:
+                                    comment_text += f": {body_clean}"
+                                comment_text += f" ({relative})"
+                                
+                                comment_cell = f"[link={link_url}]{comment_text}[/link]"
                             else:
                                 comment_cell = "[dim]-[/dim]"
                         except Exception:
