@@ -37,6 +37,7 @@ SETTINGS_HELP = {
     "set-known-suffixes": "The default known/pinned developer suffixes displayed in the Creation dropdown.",
     "set-tech-terms": "Technical words or jargon to completely bypass during spell checking.",
     "set-next-port": "The starting port number for Odoo's debugging sessions (incremented on each run).",
+    "set-status-max-width": "Capping your CLI table output to a maximum width (default: 120 chars) prevents text wrapping on large screens.",
     "set-spell-check": "Toggle spellchecking on branch names to highlight potential typos.",
     "set-show-prefix": "Toggle visibility of the version dropdown in the Creation tab.",
     "set-show-suffix": "Toggle visibility of the suffix dropdown in the Creation tab.",
@@ -308,6 +309,9 @@ class OdooWtApp(App):
                         with Horizontal(classes="setting-item"):
                             yield Label("Next Debug Port:", classes="setting-label")
                             yield Input(value=str(self.config.get("next_debug_port", 8069)), id="set-next-port", classes="setting-input")
+                        with Horizontal(classes="setting-item"):
+                            yield Label("CLI Status Max Width:", classes="setting-label")
+                            yield Input(value=str(self.config.get("status_max_width", 120)), id="set-status-max-width", classes="setting-input")
                         with Horizontal(classes="setting-item"):
                             yield Label("Enable Spell Check:", classes="setting-label")
                             yield Switch(value=self.config.get("enable_spell_check", True), id="set-spell-check", classes="setting-input")
@@ -1005,6 +1009,7 @@ class OdooWtApp(App):
         self.query_one("#set-known-suffixes", Input).value = ",".join(self.config.get("known_suffixes", []))
         self.query_one("#set-tech-terms", Input).value = ",".join(self.config.get("technical_terms", []))
         self.query_one("#set-next-port", Input).value = str(self.config.get("next_debug_port", 8069))
+        self.query_one("#set-status-max-width", Input).value = str(self.config.get("status_max_width", 120))
         self.query_one("#set-spell-check", Switch).value = self.config.get("enable_spell_check", True)
         self.query_one("#set-config-path", Input).value = self.config.get("config_path", "")
         self.query_one("#set-log-path", Input).value = self.config.get("log_path", "")
@@ -1359,6 +1364,7 @@ class OdooWtApp(App):
     @on(Input.Changed, "#set-known-suffixes")
     @on(Input.Changed, "#set-tech-terms")
     @on(Input.Changed, "#set-next-port")
+    @on(Input.Changed, "#set-status-max-width")
     @on(Switch.Changed, "#set-spell-check")
     @on(Input.Changed, "#set-config-path")
     @on(Input.Changed, "#set-log-path")
@@ -1412,6 +1418,11 @@ class OdooWtApp(App):
         
         try:
             self.config["next_debug_port"] = int(self.query_one("#set-next-port", Input).value.strip())
+        except ValueError:
+            pass
+            
+        try:
+            self.config["status_max_width"] = int(self.query_one("#set-status-max-width", Input).value.strip())
         except ValueError:
             pass
             
