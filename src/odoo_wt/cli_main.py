@@ -759,7 +759,7 @@ def print_cli_status(config, mode="combined"):
                                 "success": res["success"], "failed": res["failed"], "warning": res["warning"], "running": res["running"],
                                 "time_str": time_suffix,
                                 "batch_url": res["batch_url"],
-                                "odoo_pr": res["odoo_pr"], "enterprise_pr": res["enterprise_pr"]
+                                "odoo_pr": res["odoo_pr"], "enterprise_pr": res["enterprise_pr"], "upgrade_pr": res["upgrade_pr"]
                             }
                             
                             if res["comment_data"]:
@@ -830,7 +830,7 @@ def print_cli_status(config, mode="combined"):
                 "success": 0, "failed": 0, "warning": 0, "running": 0,
                 "time_str": "",
                 "batch_url": f"https://runbot.odoo.com/runbot?search={name}",
-                "odoo_pr": None, "enterprise_pr": None
+                "odoo_pr": None, "enterprise_pr": None, "upgrade_pr": None
             })
             
             label = res["status_label"]
@@ -868,6 +868,7 @@ def print_cli_status(config, mode="combined"):
         table.add_column("Branch Name", style="cyan")
         table.add_column("Community PR")
         table.add_column("Enterprise PR")
+        table.add_column("Upgrade PR")
         table.add_column("Last Comment")
         
         for wt in sorted_wts:
@@ -877,11 +878,12 @@ def print_cli_status(config, mode="combined"):
                 "success": 0, "failed": 0, "warning": 0, "running": 0,
                 "time_str": "",
                 "batch_url": f"https://runbot.odoo.com/runbot?search={name}",
-                "odoo_pr": None, "enterprise_pr": None
+                "odoo_pr": None, "enterprise_pr": None, "upgrade_pr": None
             })
             
             odoo_pr_str = f"[link={res['odoo_pr']}]Open Comm PR[/link]" if res["odoo_pr"] else "-"
             ent_pr_str = f"[link={res['enterprise_pr']}]Open Ent PR[/link]" if res["enterprise_pr"] else "-"
+            upg_pr_str = f"[link={res['upgrade_pr']}]Open Upg PR[/link]" if res["upgrade_pr"] else "-"
             
             comment_data = comment_results.get(name)
             comment_str = "-"
@@ -892,12 +894,13 @@ def print_cli_status(config, mode="combined"):
                 body_clean = comment_data.get("body_clean", "")
                 
                 # Symmetrical adaptive layout truncation
-                is_ent = comment_data["is_ent"]
-                prefix_plain = "[Ent]" if is_ent else "[Comm]"
-                prefix = "[bold green][Ent][/bold green]" if is_ent else "[bold cyan][Comm][/bold cyan]"
+                is_ent = comment_data.get("is_ent", False)
+                is_upg = comment_data.get("is_upg", False)
+                prefix_plain = "[Ent]" if is_ent else ("[Upg]" if is_upg else "[Comm]")
+                prefix = "[bold green][Ent][/bold green]" if is_ent else ("[bold yellow][Upg][/bold yellow]" if is_upg else "[bold cyan][Comm][/bold cyan]")
                 
-                # Non-comment column overhead (Branch + Comm PR + Ent PR + padding) = 77
-                comment_col_max = tbl_width - 77
+                # Non-comment column overhead (Branch + Comm PR + Ent PR + Upg PR + padding) = 91
+                comment_col_max = tbl_width - 91
                 meta_len = len(prefix_plain) + len(user) + len(relative) + 8
                 allowed_body_len = comment_col_max - meta_len
                 
@@ -914,7 +917,7 @@ def print_cli_status(config, mode="combined"):
                 comment_text += f" ({relative})"
                 comment_str = f"[link={link_url}]{comment_text}[/link]"
                 
-            table.add_row(name, odoo_pr_str, ent_pr_str, comment_str)
+            table.add_row(name, odoo_pr_str, ent_pr_str, upg_pr_str, comment_str)
             
     else: # mode == "combined"
         table = Table(title=f"Odoo Worktree Status (v{VERSION})", title_style="bold cyan", header_style="bold magenta", box=None, width=tbl_width if tbl_width > 40 else None)
@@ -930,7 +933,7 @@ def print_cli_status(config, mode="combined"):
                 "success": 0, "failed": 0, "warning": 0, "running": 0,
                 "time_str": "",
                 "batch_url": f"https://runbot.odoo.com/runbot?search={name}",
-                "odoo_pr": None, "enterprise_pr": None
+                "odoo_pr": None, "enterprise_pr": None, "upgrade_pr": None
             })
             
             label = res["status_label"]
@@ -961,6 +964,8 @@ def print_cli_status(config, mode="combined"):
                     parts.append(f"[link={res['odoo_pr']}]Com[/link]")
                 if res["enterprise_pr"]:
                     parts.append(f"[link={res['enterprise_pr']}]Ent[/link]")
+                if res["upgrade_pr"]:
+                    parts.append(f"[link={res['upgrade_pr']}]Upg[/link]")
                     
             link_str = "|".join(parts) if parts else f"[link=https://runbot.odoo.com/runbot?search={name}]Search[/link]"
             
@@ -973,12 +978,13 @@ def print_cli_status(config, mode="combined"):
                 body_clean = comment_data.get("body_clean", "")
                 
                 # Symmetrical adaptive layout truncation
-                is_ent = comment_data["is_ent"]
-                prefix_plain = "[Ent]" if is_ent else "[Comm]"
-                prefix = "[bold green][Ent][/bold green]" if is_ent else "[bold cyan][Comm][/bold cyan]"
+                is_ent = comment_data.get("is_ent", False)
+                is_upg = comment_data.get("is_upg", False)
+                prefix_plain = "[Ent]" if is_ent else ("[Upg]" if is_upg else "[Comm]")
+                prefix = "[bold green][Ent][/bold green]" if is_ent else ("[bold yellow][Upg][/bold yellow]" if is_upg else "[bold cyan][Comm][/bold cyan]")
                 
-                # Non-comment column overhead (Branch + Runbot + Links + padding) = 80
-                comment_col_max = tbl_width - 80
+                # Non-comment column overhead (Branch + Runbot + Links + padding) = 85
+                comment_col_max = tbl_width - 85
                 meta_len = len(prefix_plain) + len(user) + len(relative) + 8
                 allowed_body_len = comment_col_max - meta_len
                 
