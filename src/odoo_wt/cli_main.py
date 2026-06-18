@@ -20,8 +20,7 @@ def show_help():
     print("\nA professional TUI-driven Git worktree manager for Odoo developers.")
     print("\nUsage:")
     print("  odoo-wt                      Launch the interactive TUI (Recommended)")
-    print("  odoo-wt status               Print the worktree and Runbot status table directly")
-    print("  odoo-wt //runbot             Fast, dash-free alias to print status table directly")
+    print("  odoo-wt status (or runbot)   Print the worktree and Runbot status table directly")
     print("  odoo-wt list                 Simply list existing worktree names, one per line (no formatting)")
     print("  odoo-wt <branch>             Smart Switcher/Creator: opens TUI if new, opens shell if existing")
     print("  odoo-wt create <branch>      Explicitly open TUI pre-filled in 'Creation' tab")
@@ -174,7 +173,7 @@ def main():
     # Check for status command typos (like 'statu', 'stats', 'stat')
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
         arg = sys.argv[1]
-        if arg not in ("status", "create", "wizard", "//runbot", "list") and get_edit_distance(arg, "status") <= 2:
+        if arg not in ("status", "create", "wizard", "runbot", "list") and get_edit_distance(arg, "status") <= 2:
             check_dependencies()
             # If interactive TTY, offer prompt
             if sys.stdout.isatty():
@@ -209,38 +208,15 @@ def main():
         config = app.run()
         sys.exit(0)
 
-    # Command-line Status mode (supporting status, --status, and //runbot)
-    if "--status" in sys.argv or "status" in sys.argv or "//runbot" in sys.argv:
+    # Command-line Status mode (supporting status, --status, and runbot)
+    if "--status" in sys.argv or "status" in sys.argv or "runbot" in sys.argv:
         if "--status" in sys.argv: sys.argv.remove("--status")
         if "status" in sys.argv: sys.argv.remove("status")
-        if "//runbot" in sys.argv: sys.argv.remove("//runbot")
+        if "runbot" in sys.argv: sys.argv.remove("runbot")
         
         check_dependencies()
         print_cli_status(config)
         sys.exit(0)
-
-    # Check for status command typos (like 'statu', 'stats', 'stat')
-    if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
-        arg = sys.argv[1]
-        # Skip checking recognized subcommands
-        if arg not in ("status", "create", "wizard", "//runbot"):
-            if get_edit_distance(arg, "status") <= 2:
-                check_dependencies()
-                if sys.stdout.isatty():
-                    try:
-                        ans = input(f"❌ Unknown command '{arg}'. Did you mean 'status'? [y/N]: ").strip().lower()
-                        if ans in ("y", "yes"):
-                            print_cli_status(config)
-                            sys.exit(0)
-                        else:
-                            print("Aborted.")
-                            sys.exit(1)
-                    except (KeyboardInterrupt, EOFError):
-                        print("\nAborted.")
-                        sys.exit(1)
-                else:
-                    print(f"❌ Error: Unknown command '{arg}'. Did you mean 'status'?")
-                    sys.exit(1)
 
     # Explicit direct action flags
     # -o, --open <branch>
