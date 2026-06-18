@@ -565,7 +565,8 @@ def test_cli_help_flag(monkeypatch, capsys):
     assert excinfo.value.code == 0
     captured = capsys.readouterr()
     assert "Usage:" in captured.out
-    assert "Options & Actions:" in captured.out
+    assert "Primary Subcommands" in captured.out
+    assert "Options & Flags" in captured.out
 
 def test_cli_version_flag(monkeypatch, capsys):
     from odoo_wt import cli_main
