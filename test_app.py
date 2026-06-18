@@ -702,3 +702,54 @@ def test_cli_delete_command(monkeypatch, tmp_path, capsys):
     assert "🧹 Deleting worktree" in captured.out
     assert "✨ Deleted successfully." in captured.out
 
+def test_cli_switcher_multiple_matches(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "debrief"])
+    
+    config_path = tmp_path / "odoo-wt.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock discover_system_data to return two debrief matching worktrees
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], [
+            {"name": "master-call_debrief-design-brd", "path": "/path/root/master-call_debrief-design-brd", "version": "master"},
+            {"name": "17.0-debrief-pian", "path": "/path/root/17.0-debrief-pian", "version": "17.0"}
+        ]
+    ))
+    
+    # Mock input to select the first one [1]
+    monkeypatch.setattr("builtins.input", lambda _: "1")
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    
+    # Mock query_branch_status to return None
+    monkeypatch.setattr("odoo_wt.runbot_client.query_branch_status", lambda name: None)
+    
+    chdir_called = None
+    def mock_chdir(path):
+        nonlocal chdir_called
+        chdir_called = path
+    monkeypatch.setattr("os.chdir", mock_chdir)
+    
+    execv_called = None
+    def mock_execv(shell, args):
+        nonlocal execv_called
+        execv_called = (shell, args)
+        raise SystemExit(0)
+    monkeypatch.setattr("os.execv", mock_execv)
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    assert chdir_called == "/path/root/master-call_debrief-design-brd"
+    assert execv_called is not None
+    captured = capsys.readouterr()
+    assert "Multiple worktrees matched" in captured.out
+
