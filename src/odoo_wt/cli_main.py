@@ -468,7 +468,7 @@ def main():
                     # 1. Propose Subcommand if any
                     if closest_cmd:
                         console.print(f"💡 [bold cyan]Proposing Subcommand[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
-                        console.print(f"  [[green]{closest_cmd}[/green]] Run the '{closest_cmd}' subcommand\n")
+                        console.print(f"  [[green]y[/green]] Run the '{closest_cmd}' subcommand\n")
                     
                     # 2. Print matches
                     tier_label = "Direct" if current_tier == 1 else ("Fuzzy" if current_tier == 2 else "Typo")
@@ -484,7 +484,7 @@ def main():
                     option_help = []
                     
                     if closest_cmd:
-                        options.append(f"{closest_cmd} (y)")
+                        options.append("y")
                     if matched_wts:
                         options.append(f"1-{len(matched_wts)}")
                         
