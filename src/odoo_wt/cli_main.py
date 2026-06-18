@@ -16,35 +16,43 @@ from .setup_wizard import WizardApp
 from .main_tui import OdooWtApp
 
 def show_help():
-    print(f"Odoo Worktree Assistant (odoo-wt) v{VERSION}")
-    print("\nA professional TUI-driven Git worktree manager for Odoo developers.")
-    print("\nUsage:")
-    print("  odoo-wt                       Launch the interactive TUI (Recommended)")
-    print("  odoo-wt status (or runbot)    Print worktree and Runbot status table directly")
-    print("  odoo-wt list                  Simply list existing worktree names, one per line (no formatting)")
-    print("  odoo-wt <branch>              Smart Switcher/Creator: opens TUI if new, shell if existing")
+    from rich.console import Console
+    console = Console()
     
-    print("\nPrimary Subcommands:")
-    print("  odoo-wt create <branch>       Explicitly open TUI pre-filled in 'Creation' tab")
-    print("  odoo-wt open <branch>         Directly open terminal shell in an existing worktree")
-    print("  odoo-wt code <branch>         Directly open VS Code in an existing worktree")
-    print("  odoo-wt delete/rm <branch>    Directly delete an existing worktree with CLI prompt")
+    console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) [cyan]v{VERSION}[/cyan]\n")
+    console.print("A professional TUI-driven Git worktree manager for Odoo developers.\n")
     
-    print("\nOptions & Flags:")
-    print("  -o, --open <branch>           Alias for 'open <branch>'")
-    print("  -c, --code <branch>           Alias for 'code <branch>'")
-    print("  -d, --delete <branch>         Alias for 'delete <branch>'")
-    print("  --no-magic                    Disable automatic 'Magic Fix' branch decomposition")
-    print("  --verbose                     Enable detailed, verbose command output during CLI deployment")
-    print("  --config-path                 Print the active odoo-wt.json configuration path")
-    print("  --log-path                    Print the active odoo-wt-logs.jsonl path")
-    print("  -h, --help                    Show this help message")
-    print("  -v, --version                 Show the current version")
-    print("\nEnvironment Variables:")
-    print("  SHELL                    Target shell when opening 'Terminal' from the app (default: /bin/bash)")
-    print("\nDocumentation: https://github.com/nd-dew/odoo-wt")
+    console.print("[bold yellow]Usage:[/bold yellow]")
+    console.print("  [bold green]odoo-wt[/bold green]                       Launch the interactive TUI [dim](Recommended)[/dim]")
+    console.print("  [bold green]odoo-wt status[/bold green] [dim](or runbot)[/dim]    Print worktree and Runbot status table directly")
+    console.print("  [bold green]odoo-wt list[/bold green]                  Simply list existing worktree names, one per line")
+    console.print("  [bold green]odoo-wt <branch>[/bold green]              Smart Switcher/Creator: opens TUI if new, shell if existing")
+    
+    console.print("\n[bold yellow]Primary Subcommands:[/bold yellow]")
+    console.print("  [bold green]odoo-wt create[/bold green] [cyan]<branch>[/cyan]       Explicitly open TUI pre-filled in 'Creation' tab")
+    console.print("  [bold green]odoo-wt open[/bold green] [cyan]<branch>[/cyan]         Directly open terminal shell in an existing worktree")
+    console.print("  [bold green]odoo-wt code[/bold green] [cyan]<branch>[/cyan]         Directly open VS Code in an existing worktree")
+    console.print("  [bold green]odoo-wt delete/rm[/bold green] [cyan]<branch>[/cyan]    Directly delete an existing worktree with CLI prompt")
+    
+    console.print("\n[bold yellow]Options & Flags:[/bold yellow]")
+    console.print("  [bold cyan]-o, --open[/bold cyan] [cyan]<branch>[/cyan]          Alias for 'open <branch>'")
+    console.print("  [bold cyan]-c, --code[/bold cyan] [cyan]<branch>[/cyan]          Alias for 'code <branch>'")
+    console.print("  [bold cyan]-d, --delete[/bold cyan] [cyan]<branch>[/cyan]        Alias for 'delete <branch>'")
+    console.print("  [bold cyan]--no-magic[/bold cyan]                    Disable automatic 'Magic Fix' branch decomposition")
+    console.print("  [bold cyan]--verbose[/bold cyan]                     Enable detailed, verbose command output during CLI deployment")
+    console.print("  [bold cyan]--config-path[/bold cyan]                 Print the active odoo-wt.json configuration path")
+    console.print("  [bold cyan]--log-path[/bold cyan]                    Print the active odoo-wt-logs.jsonl path")
+    console.print("  [bold cyan]-h, --help[/bold cyan]                    Show this help message")
+    console.print("  [bold cyan]-v, --version[/bold cyan]                 Show the current version")
+    
+    console.print("\n[bold yellow]Environment Variables:[/bold yellow]")
+    console.print("  [bold cyan]SHELL[/bold cyan]                         Target shell when opening terminal [dim](default: /bin/bash)[/dim]")
+    
+    console.print("\n[bold yellow]Documentation:[/bold yellow]")
+    console.print("  [underline blue]https://github.com/nd-dew/odoo-wt[/underline blue]\n")
 
 def check_dependencies():
+    from rich.console import Console
     missing = []
     if not shutil.which("git"):
         missing.append("git")
@@ -52,10 +60,11 @@ def check_dependencies():
         missing.append("uv")
     
     if missing:
-        print(f"❌ Error: Required dependencies not found in PATH: {', '.join(missing)}")
-        print("Please install them and try again.")
-        print("  - git: https://git-scm.com/")
-        print("  - uv:  https://docs.astral.sh/uv/")
+        console = Console()
+        console.print(f"❌ [bold red]Error: Required dependencies not found in PATH: {', '.join(missing)}[/bold red]")
+        console.print("Please install them and try again.")
+        console.print("  - [bold cyan]git[/bold cyan]: [underline blue]https://git-scm.com/[/underline blue]")
+        console.print("  - [bold cyan]uv[/bold cyan]:  [underline blue]https://docs.astral.sh/uv/[/underline blue]")
         sys.exit(1)
 
 def get_edit_distance(s1: str, s2: str) -> int:
