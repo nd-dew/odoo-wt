@@ -497,7 +497,7 @@ def main():
             from .runbot_client import query_branch_status
             
             console = Console()
-            console.print(f"✨ Worktree for '[cyan]{matched_wt['name']}[/cyan]' already exists locally!")
+            console.print(f"✨ Found worktree '[cyan]{matched_wt['name']}[/cyan]' locally!")
             
             with console.status("[cyan]Fetching live Runbot status..."):
                 res = query_branch_status(matched_wt["name"])
@@ -544,7 +544,7 @@ def main():
             config["worktree_recency"][matched_wt["path"]] = datetime.datetime.utcnow().isoformat()
             config_mgr.save(config)
             
-            console.print(f"🚀 Dropping you into [cyan]{matched_wt['path']}[/cyan]...\n")
+            console.print(f"🚀 Changing directory to [cyan]{matched_wt['path']}[/cyan]...\n")
             os.chdir(matched_wt["path"])
             shell = os.environ.get("SHELL", "/bin/bash")
             os.execv(shell, [shell])
