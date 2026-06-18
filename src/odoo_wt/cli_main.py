@@ -890,10 +890,24 @@ def print_cli_status(config, mode="combined"):
                 relative = comment_data["relative"]
                 link_url = comment_data["html_url"]
                 body_clean = comment_data.get("body_clean", "")
-                if len(body_clean) > 90:
-                    body_clean = body_clean[:90].strip() + "..."
+                
+                # Symmetrical adaptive layout truncation
+                is_ent = comment_data["is_ent"]
+                prefix_plain = "[Ent]" if is_ent else "[Comm]"
+                prefix = "[bold green][Ent][/bold green]" if is_ent else "[bold cyan][Comm][/bold cyan]"
+                
+                # Non-comment column overhead (Branch + Comm PR + Ent PR + padding) = 77
+                comment_col_max = tbl_width - 77
+                meta_len = len(prefix_plain) + len(user) + len(relative) + 8
+                allowed_body_len = comment_col_max - meta_len
+                
+                if allowed_body_len >= 10:
+                    max_len = min(allowed_body_len, 90)
+                    if len(body_clean) > max_len:
+                        body_clean = body_clean[:max_len].strip() + "..."
+                else:
+                    body_clean = "" # Hide body to prevent wrapping
                     
-                prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
                 comment_text = f"{prefix} {user}"
                 if body_clean:
                     comment_text += f": {body_clean}"
@@ -957,10 +971,24 @@ def print_cli_status(config, mode="combined"):
                 relative = comment_data["relative"]
                 link_url = comment_data["html_url"]
                 body_clean = comment_data.get("body_clean", "")
-                if len(body_clean) > 40:
-                    body_clean = body_clean[:40].strip() + "..."
+                
+                # Symmetrical adaptive layout truncation
+                is_ent = comment_data["is_ent"]
+                prefix_plain = "[Ent]" if is_ent else "[Comm]"
+                prefix = "[bold green][Ent][/bold green]" if is_ent else "[bold cyan][Comm][/bold cyan]"
+                
+                # Non-comment column overhead (Branch + Runbot + Links + padding) = 80
+                comment_col_max = tbl_width - 80
+                meta_len = len(prefix_plain) + len(user) + len(relative) + 8
+                allowed_body_len = comment_col_max - meta_len
+                
+                if allowed_body_len >= 10:
+                    max_len = min(allowed_body_len, 50)
+                    if len(body_clean) > max_len:
+                        body_clean = body_clean[:max_len].strip() + "..."
+                else:
+                    body_clean = "" # Hide body to prevent wrapping
                     
-                prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
                 comment_text = f"{prefix} {user}"
                 if body_clean:
                     comment_text += f": {body_clean}"
