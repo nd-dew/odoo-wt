@@ -110,6 +110,7 @@ class OdooWtApp(App):
         self.resolved_runbot_statuses = {}
         self.resolved_odoo_pr_urls = {}
         self.resolved_enterprise_pr_urls = {}
+        self.resolved_upgrade_pr_urls = {}
         self.resolved_pr_comments = {}
 
 
@@ -915,11 +916,11 @@ class OdooWtApp(App):
                 name = f"[strike]{name}[/strike] [bold red](Deleting...)[/bold red]"
                 
             # Read from local status and URL caches
-            status = self.resolved_runbot_statuses.get(name, "⏳ Checking Status...       ")
+            status = self.resolved_runbot_statuses.get(name, "⏳ checking... ")
             
             if is_base_branch(name):
-                status = "⚪ Base Branch"
-                link = "[link=https://runbot.odoo.com/runbot]Board               [/link]"
+                status = "⚪"
+                link = "[link=https://runbot.odoo.com/runbot]Board[/link]"
             elif name in self.resolved_runbot_urls:
                 batch_url = self.resolved_runbot_urls[name]
                 parts = [f"[link={batch_url}]CI[/link]"]
@@ -929,9 +930,12 @@ class OdooWtApp(App):
                 ent_pr = self.resolved_enterprise_pr_urls.get(name)
                 if ent_pr:
                     parts.append(f"[link={ent_pr}]Ent[/link]")
-                link = "  ".join(parts)
+                upg_pr = self.resolved_upgrade_pr_urls.get(name)
+                if upg_pr:
+                    parts.append(f"[link={upg_pr}]Upg[/link]")
+                link = "|".join(parts)
             else:
-                link = f"[link=https://runbot.odoo.com/runbot?search={name}]Search...          [/link]"
+                link = f"[link=https://runbot.odoo.com/runbot?search={name}]Search[/link]"
                 
             # Get latest PR comment cell
             comment_cell = ""
@@ -942,7 +946,10 @@ class OdooWtApp(App):
                     relative = comment_data["relative"]
                     link_url = comment_data["html_url"]
                     body_clean = comment_data.get("body_clean", "")
-                    prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
+                    
+                    is_ent = comment_data.get("is_ent", False)
+                    is_upg = comment_data.get("is_upg", False)
+                    prefix = "[bold green][Ent][/bold green]" if is_ent else ("[bold yellow][Upg][/bold yellow]" if is_upg else "[bold cyan][Comm][/bold cyan]")
                     
                     comment_text = f"{prefix} {user}"
                     if body_clean:
@@ -1134,26 +1141,29 @@ class OdooWtApp(App):
                             self.resolved_odoo_pr_urls[branch_name] = res["odoo_pr"]
                         if res["enterprise_pr"]:
                             self.resolved_enterprise_pr_urls[branch_name] = res["enterprise_pr"]
+                        if res["upgrade_pr"]:
+                            self.resolved_upgrade_pr_urls[branch_name] = res["upgrade_pr"]
                         
                         parts = [f"[link={res['batch_url']}]CI[/link]"]
                         if res["odoo_pr"]:
                             parts.append(f"[link={res['odoo_pr']}]Com[/link]")
                         if res["enterprise_pr"]:
                             parts.append(f"[link={res['enterprise_pr']}]Ent[/link]")
-                        link = "  ".join(parts)
+                        if res["upgrade_pr"]:
+                            parts.append(f"[link={res['upgrade_pr']}]Upg[/link]")
+                        link = "|".join(parts)
                         
                         time_suffix = f" {relative_time(res['ts_str'])}" if res["ts_str"] else ""
-                        warn_str = f" [yellow]{res['warning']}w[/yellow]" if res["warning"] > 0 else " 0w"
-                        fail_str = f" [red]{res['failed']}f[/red]" if res["failed"] > 0 else " 0f"
                         
+                        # Apply minimalist TUI status formatting
                         if res["running"] > 0:
-                            status = f"🏃 Running{warn_str}{fail_str}{time_suffix}"
+                            status = f"🏃{time_suffix}"
                         elif res["failed"] > 0:
-                            status = f"🔴 Failed{fail_str}{time_suffix}"
+                            status = f"🔴{time_suffix}"
                         elif res["warning"] > 0:
-                            status = f"🟡 Warning{warn_str}{time_suffix}"
+                            status = f"🟡{time_suffix}"
                         else:
-                            status = f"🟢 Passed{time_suffix}"
+                            status = f"🟢{time_suffix}"
                             
                         # Format latest PR comment cell
                         comment_data = res.get("comment_data")
