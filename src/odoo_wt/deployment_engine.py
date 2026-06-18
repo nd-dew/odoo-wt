@@ -121,7 +121,8 @@ class DeployEngine:
                     yield DeployUpdate(category=category, log_line=f"Creating new branch from {remote}/{self.base_v}...")
                     async for update in run_cmd_stream_gen(["git", "worktree", "add", "-b", self.branch_name, str(self.target_dir / dest_label), f"{remote}/{self.base_v}"], repo_path, category):
                         yield update
-                    async for update in run_cmd_stream_gen(["git", "branch", "--set-upstream-to", f"{remote}/{self.base_v}", self.branch_name], repo_path, category):
+                    # Unset upstream tracking to keep the local feature branch pristine with no mismatched tracking
+                    async for update in run_cmd_stream_gen(["git", "branch", "--unset-upstream", self.branch_name], repo_path, category):
                         yield update
             
             yield DeployUpdate(category=category, advance=1, log_line="✅ Done.")
