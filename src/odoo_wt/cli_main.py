@@ -68,6 +68,49 @@ def get_edit_distance(s1: str, s2: str) -> int:
         distances = distances_
     return distances[-1]
 
+async def run_cli_deployment(config, data):
+    from .deployment_engine import DeployEngine
+    from rich.console import Console
+    import asyncio
+    
+    console = Console()
+    console.print(f"🚀 [bold cyan]Starting Direct CLI Deployment for '{data['version']}-{data['desc']}-{data['suffix']}'...[/bold cyan]\n")
+    
+    engine = DeployEngine(config, data)
+    engine.target_dir.mkdir(parents=True, exist_ok=True)
+    
+    base_odoo = engine.wt_root / "master" / engine.comm_dir
+    base_ent = engine.wt_root / "master" / engine.ent_dir
+    
+    async def handle_updates(gen, label):
+        async for update in gen:
+            if update.log_line:
+                line = update.log_line.strip()
+                if line:
+                    console.print(f"[{label}] {line}")
+                    
+    # Run odoo, ent, and uv concurrently!
+    await asyncio.gather(
+        handle_updates(engine.deploy_repo(base_odoo, engine.comm_dir, "odoo"), "Community"),
+        handle_updates(engine.deploy_repo(base_ent, engine.ent_dir, "ent"), "Enterprise"),
+        handle_updates(engine.setup_uv(), "UV Env")
+    )
+    
+    try:
+        console.print("[VS Code] Generating VS Code launch configuration...")
+        await engine.setup_vscode()
+        console.print("[VS Code] ✅ VS Code launch configuration created.")
+    except Exception as e:
+        console.print(f"[VS Code] [bold red]Failed to create VS Code launch config: {e}[/bold red]")
+        
+    console.print(f"\n✨ [bold green]SUCCESS! Worktree ready at:[/bold green] [cyan]{engine.target_dir}[/cyan]")
+    
+    # Determine default exit action (terminal or VS Code)
+    action = "terminal"
+    # If VS Code code is selected in options, or if VS Code flag is passed, default to vscode.
+    # In CLI mode, we can default to Terminal (os.execv), unless they explicitly configure vscode or pass a flag.
+    return {"action": action, "path": str(engine.target_dir)}
+
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
         show_help()
@@ -479,14 +522,9 @@ def main():
             config["worktree_recency"][target_path] = datetime.datetime.utcnow().isoformat()
             config_mgr.save(config)
 
-            # Deploy directly in TUI progress bar with 0 extra clicks!
-            class FastModeApp(App):
-                CSS_PATH = "stylesheet.tcss"
-                def on_mount(self):
-                    self.push_screen(DeployScreen(data, config))
-
-            app = FastModeApp()
-            data = app.run()
+            # Deploy directly in pure CLI mode (stdout logs) with 0 extra clicks!
+            import asyncio
+            data = asyncio.run(run_cli_deployment(config, data))
     else:
         # Standard TUI App mode
         app = OdooWtApp(config, v_list, s_list, worktrees, VERSION)
