@@ -93,14 +93,17 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             # Parse linked Pull Requests from the entire HTML
             odoo_pr = None
             enterprise_pr = None
+            upgrade_pr = None
             pr_links = re.findall(r'href="(https://github.com/odoo(?:-dev)?/([^/]+)/pull/\d+)"', html)
             for url, repo in pr_links:
                 if repo == "odoo" and not odoo_pr:
                     odoo_pr = url
                 elif repo == "enterprise" and not enterprise_pr:
                     enterprise_pr = url
+                elif repo == "upgrade" and not upgrade_pr:
+                    upgrade_pr = url
             
-            return batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr
+            return batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr
             
         # Fallback if title is not present
         match_id = re.search(r'href="/runbot/batch/(\d+)"', html)
@@ -119,14 +122,17 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             # Parse linked Pull Requests from the entire HTML
             odoo_pr = None
             enterprise_pr = None
+            upgrade_pr = None
             pr_links = re.findall(r'href="(https://github.com/odoo(?:-dev)?/([^/]+)/pull/\d+)"', html)
             for url, repo in pr_links:
                 if repo == "odoo" and not odoo_pr:
                     odoo_pr = url
                 elif repo == "enterprise" and not enterprise_pr:
                     enterprise_pr = url
+                elif repo == "upgrade" and not upgrade_pr:
+                    upgrade_pr = url
             
-            return batch_url, "", success, failed, warning, running, odoo_pr, enterprise_pr
+            return batch_url, "", success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr
     except Exception:
         pass
     return None
@@ -180,7 +186,8 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
                                         "created_at": item.get("createdAt", ""),
                                         "html_url": item.get("url", ""),
                                         "body": item.get("body", ""),
-                                        "is_ent": "enterprise" in repo_name
+                                        "is_ent": "enterprise" in repo_name,
+                                        "is_upg": "upgrade" in repo_name
                                     })
                 # 2. Parse reviews
                 raw_reviews = data.get("reviews", [])
@@ -196,15 +203,16 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
                                         "created_at": item.get("submittedAt", ""),
                                         "html_url": f"https://github.com/{repo_name}/pull/{pr_number}",
                                         "body": item.get("body", ""),
-                                        "is_ent": "enterprise" in repo_name
+                                        "is_ent": "enterprise" in repo_name,
+                                        "is_upg": "upgrade" in repo_name
                                     })
     except Exception:
         pass
     return comments
 
-def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optional[str]) -> Optional[dict]:
+def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optional[str], upgrade_pr_url: Optional[str] = None) -> Optional[dict]:
     """
-    Fetches the absolute latest human PR comment from Odoo Community and/or Enterprise PRs.
+    Fetches the absolute latest human PR comment from Odoo Community, Enterprise, or Upgrade PRs.
     """
     if not is_gh_authenticated():
         return None
@@ -221,18 +229,26 @@ def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optiona
         if match:
             ent_pr_num = match.group(1)
             
-    if not odoo_pr_num and not ent_pr_num:
+    upg_pr_num = None
+    if upgrade_pr_url:
+        match = re.search(r'/pull/(\d+)', upgrade_pr_url)
+        if match:
+            upg_pr_num = match.group(1)
+            
+    if not odoo_pr_num and not ent_pr_num and not upg_pr_num:
         return None
         
     import concurrent.futures
     all_comments = []
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
         if odoo_pr_num:
             futures.append(executor.submit(fetch_repo_comments, "odoo/odoo", odoo_pr_num))
         if ent_pr_num:
             futures.append(executor.submit(fetch_repo_comments, "odoo/enterprise", ent_pr_num))
+        if upg_pr_num:
+            futures.append(executor.submit(fetch_repo_comments, "odoo/upgrade", upg_pr_num))
             
         for fut in concurrent.futures.as_completed(futures):
             try:
@@ -305,11 +321,11 @@ def check_branch_status_and_comments(branch_name: str, skip_comments: bool = Fal
         if not res:
             return None
             
-        batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr = res
+        batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr = res
         comment_data = None
         if not skip_comments:
             try:
-                comment_data = get_latest_pr_comment(odoo_pr, enterprise_pr)
+                comment_data = get_latest_pr_comment(odoo_pr, enterprise_pr, upgrade_pr)
             except Exception:
                 pass
                 
@@ -322,6 +338,7 @@ def check_branch_status_and_comments(branch_name: str, skip_comments: bool = Fal
             "running": running,
             "odoo_pr": odoo_pr,
             "enterprise_pr": enterprise_pr,
+            "upgrade_pr": upgrade_pr,
             "comment_data": comment_data
         }
     except Exception:
