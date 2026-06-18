@@ -139,6 +139,36 @@ def main():
     else:
         config = config_mgr.load()
 
+    # Check for subcommand typos (statu, lis, wzard, etc.)
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
+        arg = sys.argv[1]
+        reserved_cmds = ["status", "create", "wizard", "runbot", "list"]
+        
+        if arg not in reserved_cmds:
+            closest_cmd = None
+            for cmd in reserved_cmds:
+                max_dist = 1 if len(cmd) <= 4 else 2
+                if get_edit_distance(arg, cmd) <= max_dist:
+                    closest_cmd = cmd
+                    break
+                    
+            if closest_cmd:
+                check_dependencies()
+                if sys.stdout.isatty():
+                    try:
+                        ans = input(f"❌ Unknown command '{arg}'. Did you mean '{closest_cmd}'? [y/N]: ").strip().lower()
+                        if ans in ("y", "yes"):
+                            sys.argv[1] = closest_cmd
+                        else:
+                            # Let it proceed as a search query in the switcher!
+                            pass
+                    except (KeyboardInterrupt, EOFError):
+                        print("\nAborted.")
+                        sys.exit(1)
+                else:
+                    print(f"❌ Error: Unknown command '{arg}'. Did you mean '{closest_cmd}'?")
+                    sys.exit(1)
+
     # Simple list command (one branch name per line, no formatting, no titles, sorted by recency)
     if "list" in sys.argv:
         check_dependencies()
@@ -179,28 +209,6 @@ def main():
         check_dependencies()
         print_cli_status(config)
         sys.exit(0)
-
-    # Check for status command typos (like 'statu', 'stats', 'stat')
-    if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
-        arg = sys.argv[1]
-        if arg not in ("status", "create", "wizard", "runbot", "list") and get_edit_distance(arg, "status") <= 2:
-            check_dependencies()
-            # If interactive TTY, offer prompt
-            if sys.stdout.isatty():
-                try:
-                    ans = input(f"❌ Unknown command '{arg}'. Did you mean 'status'? [y/N]: ").strip().lower()
-                    if ans in ("y", "yes"):
-                        print_cli_status(config)
-                        sys.exit(0)
-                    else:
-                        print("Aborted.")
-                        sys.exit(1)
-                except (KeyboardInterrupt, EOFError):
-                    print("\nAborted.")
-                    sys.exit(1)
-            else:
-                print(f"❌ Error: Unknown command '{arg}'. Did you mean 'status'?")
-                sys.exit(1)
 
     # Utility metadata commands
     if "--config-path" in sys.argv:
