@@ -154,35 +154,52 @@ def is_gh_authenticated() -> bool:
 
 def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
     """
-    Fetches latest review comments and issue comments for a PR.
+    Fetches latest review comments and issue comments for a PR using high-speed GraphQL.
     """
     import subprocess
     import json
     
     comments = []
-    cmd_pull = ["gh", "api", f"repos/{repo_name}/pulls/{pr_number}/comments?per_page=100"]
-    cmd_issue = ["gh", "api", f"repos/{repo_name}/issues/{pr_number}/comments?per_page=100"]
-    
-    for cmd in (cmd_pull, cmd_issue):
-        try:
-            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            if res.stdout.strip():
-                data = json.loads(res.stdout)
-                if isinstance(data, list):
-                    for item in data:
+    cmd = ["gh", "pr", "view", pr_number, "-R", repo_name, "--json", "comments,reviews"]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        if res.stdout.strip():
+            data = json.loads(res.stdout)
+            if isinstance(data, dict):
+                # 1. Parse global comments
+                raw_comments = data.get("comments", [])
+                if isinstance(raw_comments, list):
+                    for item in raw_comments:
                         if isinstance(item, dict):
-                            user_obj = item.get("user")
-                            if user_obj and isinstance(user_obj, dict):
-                                login = user_obj.get("login")
+                            author_obj = item.get("author")
+                            if author_obj and isinstance(author_obj, dict):
+                                login = author_obj.get("login")
                                 if login:
                                     comments.append({
                                         "user": login,
-                                        "created_at": item.get("created_at", ""),
-                                        "html_url": item.get("html_url", ""),
+                                        "created_at": item.get("createdAt", ""),
+                                        "html_url": item.get("url", ""),
+                                        "body": item.get("body", ""),
                                         "is_ent": "enterprise" in repo_name
                                     })
-        except Exception:
-            continue
+                # 2. Parse reviews
+                raw_reviews = data.get("reviews", [])
+                if isinstance(raw_reviews, list):
+                    for item in raw_reviews:
+                        if isinstance(item, dict):
+                            author_obj = item.get("author")
+                            if author_obj and isinstance(author_obj, dict):
+                                login = author_obj.get("login")
+                                if login:
+                                    comments.append({
+                                        "user": login,
+                                        "created_at": item.get("submittedAt", ""),
+                                        "html_url": f"https://github.com/{repo_name}/pull/{pr_number}",
+                                        "body": item.get("body", ""),
+                                        "is_ent": "enterprise" in repo_name
+                                    })
+    except Exception:
+        pass
     return comments
 
 def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optional[str]) -> Optional[dict]:
