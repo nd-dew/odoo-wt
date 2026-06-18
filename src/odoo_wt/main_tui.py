@@ -109,6 +109,7 @@ class OdooWtApp(App):
         self.resolved_runbot_statuses = {}
         self.resolved_odoo_pr_urls = {}
         self.resolved_enterprise_pr_urls = {}
+        self.resolved_pr_comments = {}
 
 
         # Modern Textual Theme API
@@ -349,6 +350,7 @@ class OdooWtApp(App):
         table.add_column("Branch Name", key="col-branch")
         table.add_column("Runbot Status", key="col-runbot")
         table.add_column("Link", key="col-link")
+        table.add_column("Last Review", key="col-comment")
 
         default_tab = self.config.get("default_tab", "tab-create")
         try:
@@ -927,7 +929,22 @@ class OdooWtApp(App):
             else:
                 link = f"[link=https://runbot.odoo.com/runbot?search={name}]Search...          [/link]"
                 
-            table.add_row(name, status, link, key=path)
+            # Get latest PR comment cell
+            comment_cell = ""
+            if not is_base_branch(name):
+                comment_data = self.resolved_pr_comments.get(name)
+                if comment_data:
+                    user = comment_data["user"]
+                    relative = comment_data["relative"]
+                    link_url = comment_data["html_url"]
+                    prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
+                    comment_cell = f"[link={link_url}]💬 {prefix} {user} ({relative})[/link]"
+                else:
+                    comment_cell = "[dim]⏳ Checking...[/dim]"
+            else:
+                comment_cell = ""
+
+            table.add_row(name, status, link, comment_cell, key=path)
 
     @on(Input.Changed, "#wt-search")
     def on_wt_search_changed(self, event: Input.Changed) -> None:
@@ -1125,19 +1142,39 @@ class OdooWtApp(App):
                             status = f"🟡 Warning{warn_str}{time_suffix}"
                         else:
                             status = f"🟢 Passed{time_suffix}"
+                            
+                        # Fetch the latest PR comment concurrently in this thread!
+                        from .runbot_client import get_latest_pr_comment
+                        comment_cell = "[dim]-[/dim]"
+                        try:
+                            comment_data = get_latest_pr_comment(odoo_pr, enterprise_pr)
+                            if comment_data:
+                                self.resolved_pr_comments[branch_name] = comment_data
+                                user = comment_data["user"]
+                                relative = comment_data["relative"]
+                                link_url = comment_data["html_url"]
+                                prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
+                                comment_cell = f"[link={link_url}]💬 {prefix} {user} ({relative})[/link]"
+                            else:
+                                comment_cell = "[dim]-[/dim]"
+                        except Exception:
+                            comment_cell = "[dim]-[/dim]"
                     else:
                         status = "⚪ No batch"
                         link = f"[link=https://runbot.odoo.com/runbot?search={branch_name}]Search...          [/link]"
+                        comment_cell = "[dim]-[/dim]"
                     
                     self.resolved_runbot_statuses[branch_name] = status
                 except Exception as e:
                     config_mgr.append_log("Runbot Concurrent Checker Error", {"branch": branch_name, "error": str(e), "traceback": traceback.format_exc()})
                     status = "⚠️ Error"
                     link = f"[link=https://runbot.odoo.com/runbot?search={branch_name}]Search...          [/link]"
+                    comment_cell = "[dim]-[/dim]"
                     self.resolved_runbot_statuses[branch_name] = status
                     
                 self.call_from_thread(self.update_table_cell, path, "col-runbot", status)
                 self.call_from_thread(self.update_table_cell, path, "col-link", link)
+                self.call_from_thread(self.update_table_cell, path, "col-comment", comment_cell)
 
     def action_quit(self) -> None:
         config_mgr.append_log("App Quit")
