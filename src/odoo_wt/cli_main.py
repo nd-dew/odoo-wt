@@ -305,7 +305,7 @@ def main():
                 subprocess.run(["git", "worktree", "remove", "--force", "odoo"], cwd=target_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if (Path(target_path) / "enterprise").exists():
                     subprocess.run(["git", "worktree", "remove", "--force", "enterprise"], cwd=target_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["git", "worktree", "prune"], cwd=config["wt_root"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["git", "worktree", "prune"], cwd=os.path.expanduser(config["wt_root"]), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 try:
                     shutil.rmtree(target_path)
                 except Exception:
