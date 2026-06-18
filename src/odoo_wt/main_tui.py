@@ -1068,7 +1068,7 @@ class OdooWtApp(App):
 
     @work(exclusive=True, thread=True)
     def run_runbot_checker(self) -> None:
-        from .runbot_client import query_branch_status
+        from .runbot_client import check_branch_status_and_comments
         import traceback
         import datetime
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1112,7 +1112,7 @@ class OdooWtApp(App):
         # 2. Check all other branches in parallel concurrently
         with ThreadPoolExecutor(max_workers=6) as executor:
             future_to_wt = {
-                executor.submit(query_branch_status, wt["name"]): wt 
+                executor.submit(check_branch_status_and_comments, wt["name"]): wt 
                 for wt in to_check
             }
             
@@ -1123,60 +1123,55 @@ class OdooWtApp(App):
                 
                 status = "⚪ No batch"
                 link = f"[link=https://runbot.odoo.com/runbot?search={branch_name}]Search...          [/link]"
+                comment_cell = "[dim]-[/dim]"
                 
                 try:
                     res = future.result()
                     if res:
-                        batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr = res
-                        self.resolved_runbot_urls[branch_name] = batch_url
+                        self.resolved_runbot_urls[branch_name] = res["batch_url"]
                         
-                        if odoo_pr:
-                            self.resolved_odoo_pr_urls[branch_name] = odoo_pr
-                        if enterprise_pr:
-                            self.resolved_enterprise_pr_urls[branch_name] = enterprise_pr
+                        if res["odoo_pr"]:
+                            self.resolved_odoo_pr_urls[branch_name] = res["odoo_pr"]
+                        if res["enterprise_pr"]:
+                            self.resolved_enterprise_pr_urls[branch_name] = res["enterprise_pr"]
                         
-                        parts = [f"[link={batch_url}]CI[/link]"]
-                        if odoo_pr:
-                            parts.append(f"[link={odoo_pr}]Com[/link]")
-                        if enterprise_pr:
-                            parts.append(f"[link={enterprise_pr}]Ent[/link]")
+                        parts = [f"[link={res['batch_url']}]CI[/link]"]
+                        if res["odoo_pr"]:
+                            parts.append(f"[link={res['odoo_pr']}]Com[/link]")
+                        if res["enterprise_pr"]:
+                            parts.append(f"[link={res['enterprise_pr']}]Ent[/link]")
                         link = "  ".join(parts)
                         
-                        time_suffix = f" {relative_time(ts_str)}" if ts_str else ""
-                        warn_str = f" [yellow]{warning}w[/yellow]" if warning > 0 else " 0w"
-                        fail_str = f" [red]{failed}f[/red]" if failed > 0 else " 0f"
+                        time_suffix = f" {relative_time(res['ts_str'])}" if res["ts_str"] else ""
+                        warn_str = f" [yellow]{res['warning']}w[/yellow]" if res["warning"] > 0 else " 0w"
+                        fail_str = f" [red]{res['failed']}f[/red]" if res["failed"] > 0 else " 0f"
                         
-                        if running > 0:
+                        if res["running"] > 0:
                             status = f"🏃 Running{warn_str}{fail_str}{time_suffix}"
-                        elif failed > 0:
+                        elif res["failed"] > 0:
                             status = f"🔴 Failed{fail_str}{time_suffix}"
-                        elif warning > 0:
+                        elif res["warning"] > 0:
                             status = f"🟡 Warning{warn_str}{time_suffix}"
                         else:
                             status = f"🟢 Passed{time_suffix}"
                             
-                        # Fetch the latest PR comment concurrently in this thread!
-                        from .runbot_client import get_latest_pr_comment
-                        comment_cell = "[dim]-[/dim]"
-                        try:
-                            comment_data = get_latest_pr_comment(odoo_pr, enterprise_pr)
-                            if comment_data:
-                                self.resolved_pr_comments[branch_name] = comment_data
-                                user = comment_data["user"]
-                                relative = comment_data["relative"]
-                                link_url = comment_data["html_url"]
-                                body_clean = comment_data.get("body_clean", "")
-                                prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
-                                
-                                comment_text = f"{prefix} {user}"
-                                if body_clean:
-                                    comment_text += f": {body_clean}"
-                                comment_text += f" ({relative})"
-                                
-                                comment_cell = f"[link={link_url}]{comment_text}[/link]"
-                            else:
-                                comment_cell = "[dim]-[/dim]"
-                        except Exception:
+                        # Format latest PR comment cell
+                        comment_data = res.get("comment_data")
+                        if comment_data:
+                            self.resolved_pr_comments[branch_name] = comment_data
+                            user = comment_data["user"]
+                            relative = comment_data["relative"]
+                            link_url = comment_data["html_url"]
+                            body_clean = comment_data.get("body_clean", "")
+                            prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
+                            
+                            comment_text = f"{prefix} {user}"
+                            if body_clean:
+                                comment_text += f": {body_clean}"
+                            comment_text += f" ({relative})"
+                            
+                            comment_cell = f"[link={link_url}]{comment_text}[/link]"
+                        else:
                             comment_cell = "[dim]-[/dim]"
                     else:
                         status = "⚪ No batch"
