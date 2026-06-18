@@ -809,7 +809,13 @@ def test_get_latest_pr_comment(monkeypatch):
             ]
         elif repo_name == "odoo/enterprise":
             return [
-                {"user": "xavierbol", "created_at": "2026-06-18T09:00:00Z", "html_url": "link3", "is_ent": True}
+                {
+                    "user": "xavierbol", 
+                    "created_at": "2026-06-18T09:00:00Z", 
+                    "html_url": "link3", 
+                    "is_ent": True,
+                    "body": "This is an extremely long code review comment written by xavierbol to test the 50-char ellipses truncation guard inside odoo-wt!"
+                }
             ]
         return []
         
@@ -826,4 +832,6 @@ def test_get_latest_pr_comment(monkeypatch):
     assert latest["user"] == "xavierbol"
     assert latest["html_url"] == "link3"
     assert latest["is_ent"] is True
+    # Truncate at exactly 50 chars + "..."
+    assert latest["body_clean"] == "This is an extremely long code review comment writ..."
 
