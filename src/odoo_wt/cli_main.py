@@ -334,18 +334,56 @@ def main():
         sys.argv.pop(1)
 
     if branch_arg:
-        # Check if it already exists locally (Switcher Mode)
-        matched_wt = next((w for w in worktrees if w["name"] == branch_arg), None)
-        
-        if matched_wt and not explicit_create:
+        # Determine fuzzy matched worktrees (prioritize switcher over creator)
+        matched_wts = []
+        if not explicit_create:
+            query = branch_arg.strip().lower()
+            for wt in worktrees:
+                name = wt["name"].lower()
+                # 1. Direct substring match!
+                if query in name:
+                    matched_wts.append(wt)
+                    continue
+                # 2. Token-based Levenshtein match (distance <= 2)!
+                tokens = name.replace("-", " ").replace("_", " ").split()
+                if any(get_edit_distance(query, tok) <= 2 for tok in tokens):
+                    matched_wts.append(wt)
+                    
+        # Let's handle the decision routing:
+        matched_wt = None
+        if len(matched_wts) == 1:
+            matched_wt = matched_wts[0]
+        elif len(matched_wts) > 1:
+            from rich.console import Console
+            console = Console()
+            console.print(f"🔍 Multiple worktrees matched '[cyan]{branch_arg}[/cyan]':")
+            for idx, wt in enumerate(matched_wts, 1):
+                console.print(f"  [[green]{idx}[/green]] {wt['name']}")
+                
+            print()
+            try:
+                ans = input(f"Select a worktree to switch to [1-{len(matched_wts)}, or 'c' to create new]: ").strip().lower()
+                if ans.isdigit() and 1 <= int(ans) <= len(matched_wts):
+                    matched_wt = matched_wts[int(ans) - 1]
+                elif ans == 'c':
+                    # Explicitly trigger creator mode
+                    pass
+                else:
+                    print("Aborted.")
+                    sys.exit(0)
+            except (KeyboardInterrupt, EOFError):
+                print("\nAborted.")
+                sys.exit(1)
+
+        if matched_wt:
             from rich.console import Console
             from .runbot_client import query_branch_status
             
             console = Console()
-            console.print(f"✨ Worktree for '[cyan]{branch_arg}[/cyan]' already exists locally!")
+            console.print(f"✨ Worktree for '[cyan]{matched_wt['name']}[/cyan]' already exists locally!")
             
             with console.status("[cyan]Fetching live Runbot status..."):
-                res = query_branch_status(branch_arg)
+                res = query_branch_status(matched_wt["name"])
                 
             if res:
                 batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr = res
@@ -406,7 +444,6 @@ def main():
                 console.print(f"  - Description:    [cyan]{d or 'none'}[/cyan]")
                 console.print(f"  - Suffix:         [cyan]{s or 'none'}[/cyan]\n")
             else:
-                # No Magic: use raw string directly as description, version default, suffix default
                 if branch_arg[0].isdigit():
                     parts = branch_arg.split("-")
                     v = parts[0]
