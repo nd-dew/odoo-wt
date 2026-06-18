@@ -295,3 +295,34 @@ def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optiona
         
     latest["relative"] = relative
     return latest
+
+def check_branch_status_and_comments(branch_name: str, skip_comments: bool = False) -> Optional[dict]:
+    """
+    Unified high-speed worker function to fetch runbot status and comments sequentially in a single worker thread.
+    """
+    try:
+        res = query_branch_status(branch_name)
+        if not res:
+            return None
+            
+        batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr = res
+        comment_data = None
+        if not skip_comments:
+            try:
+                comment_data = get_latest_pr_comment(odoo_pr, enterprise_pr)
+            except Exception:
+                pass
+                
+        return {
+            "batch_url": batch_url,
+            "ts_str": ts_str,
+            "success": success,
+            "failed": failed,
+            "warning": warning,
+            "running": running,
+            "odoo_pr": odoo_pr,
+            "enterprise_pr": enterprise_pr,
+            "comment_data": comment_data
+        }
+    except Exception:
+        return None
