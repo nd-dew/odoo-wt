@@ -661,3 +661,44 @@ def test_cli_list_command(monkeypatch, tmp_path, capsys):
     assert "master-bug-pian" in lines
     assert "17.0-fix-pian" in lines
 
+def test_cli_delete_command(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "-d", "17.0-fix-pian"])
+    
+    config_path = tmp_path / "odoo-wt.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock discover_system_data to return existing worktrees
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], [{"name": "17.0-fix-pian", "path": "/path/root/17.0-fix-pian", "version": "17.0"}]
+    ))
+    
+    # Mock inputs to return yes
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    
+    # Mock subprocess.run to avoid actual shell command triggers
+    sub_called = []
+    def mock_run(cmd, **kwargs):
+        sub_called.append(cmd)
+    monkeypatch.setattr("subprocess.run", mock_run)
+    
+    # Mock shutil.rmtree to avoid directory deletion error
+    monkeypatch.setattr("shutil.rmtree", lambda *_, **__: None)
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    assert len(sub_called) > 0
+    captured = capsys.readouterr()
+    assert "🧹 Deleting worktree" in captured.out
+    assert "✨ Deleted successfully." in captured.out
+
