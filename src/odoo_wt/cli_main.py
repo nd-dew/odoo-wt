@@ -186,13 +186,24 @@ def main():
             print(wt["name"])
         sys.exit(0)
 
-    # Command-line Status mode
-    if "--status" in sys.argv or "status" in sys.argv:
-        if "--status" in sys.argv: sys.argv.remove("--status")
-        if "status" in sys.argv: sys.argv.remove("status")
-        
+    # Command-line Status, Runbot, and Reviews modes
+    if "status" in sys.argv or "runbot" in sys.argv or "reviews" in sys.argv:
+        mode = "combined"
+        if "status" in sys.argv:
+            idx = sys.argv.index("status")
+            if idx + 1 < len(sys.argv) and sys.argv[idx + 1] in ("runbot", "reviews"):
+                mode = sys.argv[idx + 1]
+                sys.argv.pop(idx + 1)
+            sys.argv.pop(idx)
+        elif "runbot" in sys.argv:
+            mode = "runbot"
+            sys.argv.remove("runbot")
+        elif "reviews" in sys.argv:
+            mode = "reviews"
+            sys.argv.remove("reviews")
+            
         check_dependencies()
-        print_cli_status(config)
+        print_cli_status(config, mode=mode)
         sys.exit(0)
 
     # Utility metadata commands
@@ -209,16 +220,6 @@ def main():
         check_dependencies()
         app = WizardApp()
         config = app.run()
-        sys.exit(0)
-
-    # Command-line Status mode (supporting status, --status, and runbot)
-    if "--status" in sys.argv or "status" in sys.argv or "runbot" in sys.argv:
-        if "--status" in sys.argv: sys.argv.remove("--status")
-        if "status" in sys.argv: sys.argv.remove("status")
-        if "runbot" in sys.argv: sys.argv.remove("runbot")
-        
-        check_dependencies()
-        print_cli_status(config)
         sys.exit(0)
 
     # Explicit direct action flags or subcommands
@@ -662,7 +663,7 @@ def main():
                 print("❌ VS Code ('code' command) not found in PATH.")
                 print(f"Directory is ready at: {target}")
 
-def print_cli_status(config):
+def print_cli_status(config, mode="combined"):
     from rich.console import Console
     from rich.table import Table
     from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -701,15 +702,17 @@ def print_cli_status(config):
     # 1. Initialize all base branches immediately (doesn't need network CI polling)
     results = {}
     comment_results = {}
-    resolved_urls = {}
-    resolved_odoo_prs = {}
-    resolved_ent_prs = {}
     
     for wt in worktrees:
         if is_base_branch(wt["name"]):
-            results[wt["name"]] = "⚪ Base Branch"
-            comment_results[wt["name"]] = ""
-            resolved_urls[wt["name"]] = "https://runbot.odoo.com/runbot"
+            results[wt["name"]] = {
+                "status_label": "base",
+                "success": 0, "failed": 0, "warning": 0, "running": 0,
+                "time_str": "",
+                "batch_url": "https://runbot.odoo.com/runbot",
+                "odoo_pr": None, "enterprise_pr": None
+            }
+            comment_results[wt["name"]] = None
             
     # Filter out base branches for concurrent checks
     to_check = [wt for wt in worktrees if not is_base_branch(wt["name"])]
@@ -728,74 +731,57 @@ def print_cli_status(config):
                     wt = future_to_wt[future]
                     branch_name = wt["name"]
                     
-                    status = "⚪ No batch"
-                    link_url = f"https://runbot.odoo.com/runbot?search={branch_name}"
-                    comment_cell = "-"
-                    
                     try:
                         res = future.result()
                         if res:
                             batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr = res
-                            link_url = batch_url
-                            resolved_urls[branch_name] = batch_url
-                            
-                            if odoo_pr:
-                                resolved_odoo_prs[branch_name] = odoo_pr
-                            if enterprise_pr:
-                                resolved_ent_prs[branch_name] = enterprise_pr
-                            
-                            time_suffix = f" {relative_time(ts_str)}" if ts_str else ""
-                            warn_str = f" [yellow]{warning}w[/yellow]" if warning > 0 else " 0w"
-                            fail_str = f" [red]{failed}f[/red]" if failed > 0 else " 0f"
+                            time_suffix = relative_time(ts_str) if ts_str else ""
                             
                             if running > 0:
-                                status = f"⏳ Running{warn_str}{fail_str}{time_suffix}"
+                                label = "running"
                             elif failed > 0:
-                                status = f"🔴 Failed{fail_str}{time_suffix}"
+                                label = "failed"
                             elif warning > 0:
-                                status = f"🟡 Warning{warn_str}{time_suffix}"
+                                label = "warning"
                             else:
-                                status = f"🟢 Passed{time_suffix}"
+                                label = "passed"
                                 
+                            results[branch_name] = {
+                                "status_label": label,
+                                "success": success, "failed": failed, "warning": warning, "running": running,
+                                "time_str": time_suffix,
+                                "batch_url": batch_url,
+                                "odoo_pr": odoo_pr, "enterprise_pr": enterprise_pr
+                            }
+                            
                             # Fetch PR comment!
                             from .runbot_client import get_latest_pr_comment
                             try:
                                 comment_data = get_latest_pr_comment(odoo_pr, enterprise_pr)
                                 if comment_data:
-                                    user = comment_data["user"]
-                                    relative = comment_data["relative"]
-                                    link_url = comment_data["html_url"]
-                                    body_clean = comment_data.get("body_clean", "")
-                                    prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
-                                    
-                                    comment_text = f"{prefix} {user}"
-                                    if body_clean:
-                                        comment_text += f": {body_clean}"
-                                    comment_text += f" ({relative})"
-                                    
-                                    comment_cell = f"[link={link_url}]{comment_text}[/link]"
-                                else:
-                                    comment_cell = "-"
+                                    self_comments = comment_results
+                                    comment_results[branch_name] = comment_data
                             except Exception:
-                                comment_cell = "-"
+                                pass
                         else:
-                            status = "⚪ No batch"
-                            comment_cell = "-"
+                            results[branch_name] = {
+                                "status_label": "no_batch",
+                                "success": 0, "failed": 0, "warning": 0, "running": 0,
+                                "time_str": "",
+                                "batch_url": f"https://runbot.odoo.com/runbot?search={branch_name}",
+                                "odoo_pr": None, "enterprise_pr": None
+                            }
                     except Exception:
-                        status = "⚠️ Error"
-                        comment_cell = "-"
+                        results[branch_name] = {
+                            "status_label": "error",
+                            "success": 0, "failed": 0, "warning": 0, "running": 0,
+                            "time_str": "",
+                            "batch_url": f"https://runbot.odoo.com/runbot?search={branch_name}",
+                            "odoo_pr": None, "enterprise_pr": None
+                        }
                         
-                    results[branch_name] = status
-                    comment_results[branch_name] = comment_cell
                     progress.advance(task_id)
                      
-    # 2. Render gorgeous Rich Table
-    table = Table(title=f"Odoo Worktree Status (v{VERSION})", title_style="bold cyan", header_style="bold magenta", box=None)
-    table.add_column("Branch Name", style="cyan")
-    table.add_column("Runbot Status")
-    table.add_column("Link")
-    table.add_column("Last Comment")
-    
     def version_sort_key(wt):
         v = wt["version"] or ""
         try:
@@ -816,31 +802,164 @@ def print_cli_status(config):
              
     sorted_wts = sorted(worktrees, key=recency_sort_key, reverse=True)
     
-    for wt in sorted_wts:
-        name = wt["name"]
-        status = results.get(name, "⚪ No batch")
+    # 2. Render Table depending on chosen Mode!
+    if mode == "runbot":
+        table = Table(title=f"Odoo Runbot Details (v{VERSION})", title_style="bold green", header_style="bold yellow", box=None)
+        table.add_column("Branch Name", style="cyan")
+        table.add_column("Status")
+        table.add_column("Success", style="green", justify="right")
+        table.add_column("Failed", style="red", justify="right")
+        table.add_column("Warning", style="yellow", justify="right")
+        table.add_column("Running", style="cyan", justify="right")
+        table.add_column("Age")
+        table.add_column("CI Link")
         
-        if is_base_branch(name):
-            link_str = "[link=https://runbot.odoo.com/runbot]Board[/link]"
-        elif name in resolved_urls:
-            batch_url = resolved_urls[name]
-            parts = [f"[link={batch_url}]CI[/link]"]
+        for wt in sorted_wts:
+            name = wt["name"]
+            res = results.get(name, {
+                "status_label": "no_batch",
+                "success": 0, "failed": 0, "warning": 0, "running": 0,
+                "time_str": "",
+                "batch_url": f"https://runbot.odoo.com/runbot?search={name}",
+                "odoo_pr": None, "enterprise_pr": None
+            })
             
-            odoo_pr = resolved_odoo_prs.get(name)
-            if odoo_pr:
-                parts.append(f"[link={odoo_pr}]Com[/link]")
-                
-            ent_pr = resolved_ent_prs.get(name)
-            if ent_pr:
-                parts.append(f"[link={ent_pr}]Ent[/link]")
-                
-            link_str = "  ".join(parts)
-        else:
-            link_str = f"[link=https://runbot.odoo.com/runbot?search={name}]Search[/link]"
+            label = res["status_label"]
+            time_str = res["time_str"] or "-"
             
-        comment_str = comment_results.get(name, "-")
-        table.add_row(name, status, link_str, comment_str)
-         
+            if label == "passed":
+                status_str = "🟢 Passed"
+            elif label == "failed":
+                status_str = "🔴 Failed"
+            elif label == "warning":
+                status_str = "🟡 Warning"
+            elif label == "running":
+                status_str = "🏃 Running"
+            elif label == "base":
+                status_str = "⚪ Base"
+                time_str = "-"
+            elif label == "error":
+                status_str = "⚠️ Error"
+            else:
+                status_str = "⚪ No batch"
+                
+            success_str = str(res["success"]) if label not in ("base", "no_batch", "error") else "-"
+            failed_str = str(res["failed"]) if label not in ("base", "no_batch", "error") else "-"
+            warning_str = str(res["warning"]) if label not in ("base", "no_batch", "error") else "-"
+            running_str = str(res["running"]) if label not in ("base", "no_batch", "error") else "-"
+            
+            link_str = f"[link={res['batch_url']}]Open CI[/link]" if "batch" in res.get("batch_url", "") else "-"
+            if is_base_branch(name):
+                link_str = "[link=https://runbot.odoo.com/runbot]Open Board[/link]"
+                
+            table.add_row(name, status_str, success_str, failed_str, warning_str, running_str, time_str, link_str)
+            
+    elif mode == "reviews":
+        table = Table(title=f"Odoo PR Reviews Dashboard (v{VERSION})", title_style="bold magenta", header_style="bold cyan", box=None)
+        table.add_column("Branch Name", style="cyan")
+        table.add_column("Community PR")
+        table.add_column("Enterprise PR")
+        table.add_column("Last Comment")
+        
+        for wt in sorted_wts:
+            name = wt["name"]
+            res = results.get(name, {
+                "status_label": "no_batch",
+                "success": 0, "failed": 0, "warning": 0, "running": 0,
+                "time_str": "",
+                "batch_url": f"https://runbot.odoo.com/runbot?search={name}",
+                "odoo_pr": None, "enterprise_pr": None
+            })
+            
+            odoo_pr_str = f"[link={res['odoo_pr']}]Open Comm PR[/link]" if res["odoo_pr"] else "-"
+            ent_pr_str = f"[link={res['enterprise_pr']}]Open Ent PR[/link]" if res["enterprise_pr"] else "-"
+            
+            comment_data = comment_results.get(name)
+            comment_str = "-"
+            if comment_data:
+                user = comment_data["user"]
+                relative = comment_data["relative"]
+                link_url = comment_data["html_url"]
+                body_clean = comment_data.get("body_clean", "")
+                if len(body_clean) > 90:
+                    body_clean = body_clean[:90].strip() + "..."
+                    
+                prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
+                comment_text = f"{prefix} {user}"
+                if body_clean:
+                    comment_text += f": {body_clean}"
+                comment_text += f" ({relative})"
+                comment_str = f"[link={link_url}]{comment_text}[/link]"
+                
+            table.add_row(name, odoo_pr_str, ent_pr_str, comment_str)
+            
+    else: # mode == "combined"
+        table = Table(title=f"Odoo Worktree Status (v{VERSION})", title_style="bold cyan", header_style="bold magenta", box=None)
+        table.add_column("Branch Name", style="cyan")
+        table.add_column("Runbot")
+        table.add_column("Links")
+        table.add_column("Last Comment")
+        
+        for wt in sorted_wts:
+            name = wt["name"]
+            res = results.get(name, {
+                "status_label": "no_batch",
+                "success": 0, "failed": 0, "warning": 0, "running": 0,
+                "time_str": "",
+                "batch_url": f"https://runbot.odoo.com/runbot?search={name}",
+                "odoo_pr": None, "enterprise_pr": None
+            })
+            
+            label = res["status_label"]
+            time_str = f" {res['time_str']}" if res["time_str"] else ""
+            
+            if label == "passed":
+                status_str = f"🟢{time_str}"
+            elif label == "failed":
+                status_str = f"🔴 {res['failed']}f{time_str}"
+            elif label == "warning":
+                status_str = f"🟡 {res['warning']}w{time_str}"
+            elif label == "running":
+                status_str = f"🏃 {res['running']}r{time_str}"
+            elif label == "base":
+                status_str = "⚪"
+            elif label == "error":
+                status_str = "⚠️ Error"
+            else:
+                status_str = "⚪"
+                
+            parts = []
+            if label == "base":
+                parts.append("[link=https://runbot.odoo.com/runbot]Board[/link]")
+            else:
+                if res["batch_url"] and "search=" not in res["batch_url"]:
+                    parts.append(f"[link={res['batch_url']}]CI[/link]")
+                if res["odoo_pr"]:
+                    parts.append(f"[link={res['odoo_pr']}]Com[/link]")
+                if res["enterprise_pr"]:
+                    parts.append(f"[link={res['enterprise_pr']}]Ent[/link]")
+                    
+            link_str = "|".join(parts) if parts else f"[link=https://runbot.odoo.com/runbot?search={name}]Search[/link]"
+            
+            comment_data = comment_results.get(name)
+            comment_str = "-"
+            if comment_data:
+                user = comment_data["user"]
+                relative = comment_data["relative"]
+                link_url = comment_data["html_url"]
+                body_clean = comment_data.get("body_clean", "")
+                if len(body_clean) > 40:
+                    body_clean = body_clean[:40].strip() + "..."
+                    
+                prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
+                comment_text = f"{prefix} {user}"
+                if body_clean:
+                    comment_text += f": {body_clean}"
+                comment_text += f" ({relative})"
+                comment_str = f"[link={link_url}]{comment_text}[/link]"
+                
+            table.add_row(name, status_str, link_str, comment_str)
+            
     console.print(table)
 
 if __name__ == "__main__":
