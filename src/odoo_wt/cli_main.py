@@ -139,36 +139,6 @@ def main():
     else:
         config = config_mgr.load()
 
-    # Check for subcommand typos (statu, lis, wzard, etc.)
-    if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
-        arg = sys.argv[1]
-        reserved_cmds = ["status", "create", "wizard", "runbot", "list"]
-        
-        if arg not in reserved_cmds:
-            closest_cmd = None
-            for cmd in reserved_cmds:
-                max_dist = 1 if len(cmd) <= 4 else 2
-                if get_edit_distance(arg, cmd) <= max_dist:
-                    closest_cmd = cmd
-                    break
-                    
-            if closest_cmd:
-                check_dependencies()
-                if sys.stdout.isatty():
-                    try:
-                        ans = input(f"❌ Unknown command '{arg}'. Did you mean '{closest_cmd}'? [y/N]: ").strip().lower()
-                        if ans in ("y", "yes"):
-                            sys.argv[1] = closest_cmd
-                        else:
-                            # Let it proceed as a search query in the switcher!
-                            pass
-                    except (KeyboardInterrupt, EOFError):
-                        print("\nAborted.")
-                        sys.exit(1)
-                else:
-                    print(f"❌ Error: Unknown command '{arg}'. Did you mean '{closest_cmd}'?")
-                    sys.exit(1)
-
     # Simple list command (one branch name per line, no formatting, no titles, sorted by recency)
     if "list" in sys.argv:
         check_dependencies()
@@ -377,6 +347,18 @@ def main():
         sys.argv.pop(1)
 
     if branch_arg:
+        # Check if the query is a typo of a reserved subcommand (e.g., "lis" -> "list")
+        closest_cmd = None
+        if not explicit_create:
+            query = branch_arg.strip().lower()
+            reserved_cmds = ["status", "create", "wizard", "runbot", "list"]
+            if query not in reserved_cmds:
+                for cmd in reserved_cmds:
+                    max_dist = 1 if len(cmd) <= 4 else 2
+                    if get_edit_distance(query, cmd) <= max_dist:
+                        closest_cmd = cmd
+                        break
+
         # Stateful multi-tiered progressive switcher loop
         current_tier = 1  # 1: Substring, 2: Fuzzy/Multi-Term, 3: Typo (Levenshtein)
         matched_wt = None
@@ -439,25 +421,39 @@ def main():
                         unique_matches.append(wt)
                 matched_wts = unique_matches
                 
-                # If exactly 1 match on Tier 1 (on startup), switch directly!
-                if len(matched_wts) == 1 and current_tier == 1:
+                # If exactly 1 match on Tier 1 (on startup) and NO subcommand typo proposal exists, switch directly!
+                if len(matched_wts) == 1 and current_tier == 1 and not closest_cmd:
                     matched_wt = matched_wts[0]
                     break
                     
                 # If multiple matches or we've expanded tiers, prompt interactive selector
-                if len(matched_wts) > 0 or current_tier < 3:
+                if len(matched_wts) > 0 or current_tier < 3 or closest_cmd:
                     from rich.console import Console
                     console = Console()
                     
+                    # 1. Propose Subcommand if any
+                    if closest_cmd:
+                        console.print(f"💡 [bold cyan]Proposing Subcommand[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
+                        console.print(f"  [[green]{closest_cmd}[/green]] Run the '{closest_cmd}' subcommand\n")
+                    
+                    # 2. Print matches
                     tier_label = "Direct" if current_tier == 1 else ("Fuzzy" if current_tier == 2 else "Typo")
                     console.print(f"🔍 [bold cyan]{tier_label} Matches[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
-                    for idx, wt in enumerate(matched_wts, 1):
-                        console.print(f"  [[green]{idx}[/green]] {wt['name']}")
+                    if matched_wts:
+                        for idx, wt in enumerate(matched_wts, 1):
+                            console.print(f"  [[green]{idx}[/green]] {wt['name']}")
+                    else:
+                        console.print("  [dim](No matching worktrees found)[/dim]")
                         
                     print()
-                    options = [f"1-{len(matched_wts)}"]
+                    options = []
                     option_help = []
                     
+                    if closest_cmd:
+                        options.append(closest_cmd)
+                    if matched_wts:
+                        options.append(f"1-{len(matched_wts)}")
+                        
                     if current_tier < 2:
                         options.append("f")
                         option_help.append("[[green]f[/green]] Search more (fuzzy substring / words)")
@@ -474,7 +470,12 @@ def main():
                     print()
                     try:
                         ans = input(f"Select an option [{', '.join(options)}]: ").strip().lower()
-                        if ans.isdigit() and 1 <= int(ans) <= len(matched_wts):
+                        if closest_cmd and ans == closest_cmd:
+                            sys.argv.append(closest_cmd)
+                            # Re-run main recursively to execute the corrected subcommand cleanly!
+                            main()
+                            sys.exit(0)
+                        elif ans.isdigit() and 1 <= int(ans) <= len(matched_wts):
                             matched_wt = matched_wts[int(ans) - 1]
                             break
                         elif ans == 'f' and current_tier < 2:
