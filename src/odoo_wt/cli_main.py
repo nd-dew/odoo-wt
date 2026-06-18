@@ -24,7 +24,7 @@ def show_help():
     
     console.print("[bold yellow]Usage:[/bold yellow]")
     console.print("  [bold green]odoo-wt[/bold green]                       Launch the interactive TUI [dim](Recommended)[/dim]")
-    console.print("  [bold green]odoo-wt status[/bold green]                  Print highly compressed combined status table")
+    console.print("  [bold green]odoo-wt status[/bold green]                  Show runbot build status & pull requests overview")
     console.print("  [bold green]odoo-wt runbot[/bold green]                  Print detailed Runbot CI status table")
     console.print("  [bold green]odoo-wt reviews[/bold green]                 Print detailed PR Reviews dashboard")
     console.print("  [bold green]odoo-wt list[/bold green]                  Simply list existing worktree names, one per line")
@@ -925,11 +925,11 @@ def print_cli_status(config, mode="combined"):
             if label == "passed":
                 status_str = f"🟢{time_str}"
             elif label == "failed":
-                status_str = f"🔴 {res['failed']}f{time_str}"
+                status_str = f"🔴{time_str}"
             elif label == "warning":
-                status_str = f"🟡 {res['warning']}w{time_str}"
+                status_str = f"🟡{time_str}"
             elif label == "running":
-                status_str = f"🏃 {res['running']}r{time_str}"
+                status_str = f"🏃{time_str}"
             elif label == "base":
                 status_str = "⚪"
             elif label == "error":
