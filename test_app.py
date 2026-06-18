@@ -794,3 +794,36 @@ def test_cli_subcommand_typo_correction(monkeypatch, tmp_path, capsys):
     captured = capsys.readouterr()
     assert "17.0-fix-pian" in captured.out
 
+def test_get_latest_pr_comment(monkeypatch):
+    from odoo_wt.runbot_client import get_latest_pr_comment
+    
+    # Mock authentication status
+    monkeypatch.setattr("odoo_wt.runbot_client.is_gh_authenticated", lambda: True)
+    
+    # Mock fetch_repo_comments to return custom fake comments
+    def mock_fetch_repo_comments(repo_name, pr_number):
+        if repo_name == "odoo/odoo":
+            return [
+                {"user": "robodoo", "created_at": "2026-06-18T10:00:00Z", "html_url": "link1", "is_ent": False},
+                {"user": "Matthieu", "created_at": "2026-06-18T08:00:00Z", "html_url": "link2", "is_ent": False}
+            ]
+        elif repo_name == "odoo/enterprise":
+            return [
+                {"user": "xavierbol", "created_at": "2026-06-18T09:00:00Z", "html_url": "link3", "is_ent": True}
+            ]
+        return []
+        
+    monkeypatch.setattr("odoo_wt.runbot_client.fetch_repo_comments", mock_fetch_repo_comments)
+    
+    # Call comment resolver with simulated Community and Enterprise links
+    latest = get_latest_pr_comment(
+        "https://github.com/odoo/odoo/pull/12345",
+        "https://github.com/odoo/enterprise/pull/5678"
+    )
+    
+    assert latest is not None
+    # xavierbol (09:00:00) is newer than Matthieu (08:00:00) and robodoo (10:00:00) is filtered as a bot!
+    assert latest["user"] == "xavierbol"
+    assert latest["html_url"] == "link3"
+    assert latest["is_ent"] is True
+

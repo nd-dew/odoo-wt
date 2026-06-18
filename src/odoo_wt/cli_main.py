@@ -700,6 +700,7 @@ def print_cli_status(config):
          
     # 1. Initialize all base branches immediately (doesn't need network CI polling)
     results = {}
+    comment_results = {}
     resolved_urls = {}
     resolved_odoo_prs = {}
     resolved_ent_prs = {}
@@ -707,6 +708,7 @@ def print_cli_status(config):
     for wt in worktrees:
         if is_base_branch(wt["name"]):
             results[wt["name"]] = "⚪ Base Branch"
+            comment_results[wt["name"]] = ""
             resolved_urls[wt["name"]] = "https://runbot.odoo.com/runbot"
             
     # Filter out base branches for concurrent checks
@@ -714,7 +716,7 @@ def print_cli_status(config):
     
     if to_check:
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console, transient=True) as progress:
-            task_id = progress.add_task("[cyan]Polling Runbot CI...", total=len(to_check))
+            task_id = progress.add_task("[cyan]Polling Runbot CI & PR Comments...", total=len(to_check))
             
             with ThreadPoolExecutor(max_workers=6) as executor:
                 future_to_wt = {
@@ -728,6 +730,7 @@ def print_cli_status(config):
                     
                     status = "⚪ No batch"
                     link_url = f"https://runbot.odoo.com/runbot?search={branch_name}"
+                    comment_cell = "-"
                     
                     try:
                         res = future.result()
@@ -753,12 +756,30 @@ def print_cli_status(config):
                                 status = f"🟡 Warning{warn_str}{time_suffix}"
                             else:
                                 status = f"🟢 Passed{time_suffix}"
+                                
+                            # Fetch PR comment!
+                            from .runbot_client import get_latest_pr_comment
+                            try:
+                                comment_data = get_latest_pr_comment(odoo_pr, enterprise_pr)
+                                if comment_data:
+                                    user = comment_data["user"]
+                                    relative = comment_data["relative"]
+                                    link_url = comment_data["html_url"]
+                                    prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
+                                    comment_cell = f"[link={link_url}]💬 {prefix} {user} ({relative})[/link]"
+                                else:
+                                    comment_cell = "-"
+                            except Exception:
+                                comment_cell = "-"
                         else:
                             status = "⚪ No batch"
+                            comment_cell = "-"
                     except Exception:
                         status = "⚠️ Error"
+                        comment_cell = "-"
                         
                     results[branch_name] = status
+                    comment_results[branch_name] = comment_cell
                     progress.advance(task_id)
                      
     # 2. Render gorgeous Rich Table
@@ -766,6 +787,7 @@ def print_cli_status(config):
     table.add_column("Branch Name", style="cyan")
     table.add_column("Runbot Status")
     table.add_column("Link")
+    table.add_column("Last Review")
     
     def version_sort_key(wt):
         v = wt["version"] or ""
@@ -809,7 +831,8 @@ def print_cli_status(config):
         else:
             link_str = f"[link=https://runbot.odoo.com/runbot?search={name}]Search[/link]"
             
-        table.add_row(name, status, link_str)
+        comment_str = comment_results.get(name, "-")
+        table.add_row(name, status, link_str, comment_str)
          
     console.print(table)
 
