@@ -19,23 +19,27 @@ def show_help():
     print(f"Odoo Worktree Assistant (odoo-wt) v{VERSION}")
     print("\nA professional TUI-driven Git worktree manager for Odoo developers.")
     print("\nUsage:")
-    print("  odoo-wt                      Launch the interactive TUI (Recommended)")
-    print("  odoo-wt status (or runbot)   Print the worktree and Runbot status table directly")
-    print("  odoo-wt list                 Simply list existing worktree names, one per line (no formatting)")
-    print("  odoo-wt <branch>             Smart Switcher/Creator: opens TUI if new, opens shell if existing")
-    print("  odoo-wt create <branch>      Explicitly open TUI pre-filled in 'Creation' tab")
-    print("\nOptions & Actions:")
-    print("  -o, --open <branch>          Directly open terminal shell in an existing worktree")
-    print("  -c, --code <branch>          Directly open VS Code in an existing worktree")
-    print("  -d, --delete <branch>        Directly delete an existing worktree with CLI prompt")
-    print("  --no-magic                   Disable automatic 'Magic Fix' branch decomposition")
-    print("  --verbose                    Enable detailed, verbose command output during CLI deployment")
-    print("  --config-path                Print the active odoo-wt.json configuration path")
-    print("  --log-path                   Print the active odoo-wt-logs.jsonl path")
-    print("  --create                     Force start TUI in the 'Creation' tab")
-    print("  --manage                     Force start TUI in the 'Existing / Removal' tab")
-    print("  -h, --help                   Show this help message")
-    print("  -v, --version                Show the current version")
+    print("  odoo-wt                       Launch the interactive TUI (Recommended)")
+    print("  odoo-wt status (or runbot)    Print worktree and Runbot status table directly")
+    print("  odoo-wt list                  Simply list existing worktree names, one per line (no formatting)")
+    print("  odoo-wt <branch>              Smart Switcher/Creator: opens TUI if new, shell if existing")
+    
+    print("\nPrimary Subcommands:")
+    print("  odoo-wt create <branch>       Explicitly open TUI pre-filled in 'Creation' tab")
+    print("  odoo-wt open <branch>         Directly open terminal shell in an existing worktree")
+    print("  odoo-wt code <branch>         Directly open VS Code in an existing worktree")
+    print("  odoo-wt delete/rm <branch>    Directly delete an existing worktree with CLI prompt")
+    
+    print("\nOptions & Flags:")
+    print("  -o, --open <branch>           Alias for 'open <branch>'")
+    print("  -c, --code <branch>           Alias for 'code <branch>'")
+    print("  -d, --delete <branch>         Alias for 'delete <branch>'")
+    print("  --no-magic                    Disable automatic 'Magic Fix' branch decomposition")
+    print("  --verbose                     Enable detailed, verbose command output during CLI deployment")
+    print("  --config-path                 Print the active odoo-wt.json configuration path")
+    print("  --log-path                    Print the active odoo-wt-logs.jsonl path")
+    print("  -h, --help                    Show this help message")
+    print("  -v, --version                 Show the current version")
     print("\nEnvironment Variables:")
     print("  SHELL                    Target shell when opening 'Terminal' from the app (default: /bin/bash)")
     print("\nDocumentation: https://github.com/nd-dew/odoo-wt")
@@ -208,33 +212,48 @@ def main():
         print_cli_status(config)
         sys.exit(0)
 
-    # Explicit direct action flags
-    # -o, --open <branch>
+    # Explicit direct action flags or subcommands
+    # -o, --open <branch> or open <branch>
     open_branch = None
-    if "--open" in sys.argv or "-o" in sys.argv:
-        idx = sys.argv.index("--open") if "--open" in sys.argv else sys.argv.index("-o")
-        if idx + 1 < len(sys.argv):
-            open_branch = sys.argv[idx + 1]
-            sys.argv.pop(idx + 1)
-        sys.argv.pop(idx)
+    if "open" in sys.argv or "--open" in sys.argv or "-o" in sys.argv:
+        for marker in ("open", "--open", "-o"):
+            if marker in sys.argv:
+                idx = sys.argv.index(marker)
+                if marker == "open" and idx != 1:
+                    continue
+                if idx + 1 < len(sys.argv):
+                    open_branch = sys.argv[idx + 1]
+                    sys.argv.pop(idx + 1)
+                sys.argv.pop(idx)
+                break
 
-    # -c, --code <branch>
+    # -c, --code <branch> or code <branch>
     code_branch = None
-    if "--code" in sys.argv or "-c" in sys.argv:
-        idx = sys.argv.index("--code") if "--code" in sys.argv else sys.argv.index("-c")
-        if idx + 1 < len(sys.argv):
-            code_branch = sys.argv[idx + 1]
-            sys.argv.pop(idx + 1)
-        sys.argv.pop(idx)
+    if "code" in sys.argv or "--code" in sys.argv or "-c" in sys.argv:
+        for marker in ("code", "--code", "-c"):
+            if marker in sys.argv:
+                idx = sys.argv.index(marker)
+                if marker == "code" and idx != 1:
+                    continue
+                if idx + 1 < len(sys.argv):
+                    code_branch = sys.argv[idx + 1]
+                    sys.argv.pop(idx + 1)
+                sys.argv.pop(idx)
+                break
 
-    # -d, --delete <branch>
+    # -d, --delete <branch> or delete/rm <branch>
     delete_branch = None
-    if "--delete" in sys.argv or "-d" in sys.argv:
-        idx = sys.argv.index("--delete") if "--delete" in sys.argv else sys.argv.index("-d")
-        if idx + 1 < len(sys.argv):
-            delete_branch = sys.argv[idx + 1]
-            sys.argv.pop(idx + 1)
-        sys.argv.pop(idx)
+    if "delete" in sys.argv or "rm" in sys.argv or "--delete" in sys.argv or "-d" in sys.argv:
+        for marker in ("delete", "rm", "--delete", "-d"):
+            if marker in sys.argv:
+                idx = sys.argv.index(marker)
+                if marker in ("delete", "rm") and idx != 1:
+                    continue
+                if idx + 1 < len(sys.argv):
+                    delete_branch = sys.argv[idx + 1]
+                    sys.argv.pop(idx + 1)
+                sys.argv.pop(idx)
+                break
 
     # --no-magic flag
     no_magic = False
