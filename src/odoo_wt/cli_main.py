@@ -720,8 +720,15 @@ def print_cli_status(config, mode="combined"):
     to_check = [wt for wt in worktrees if not is_base_branch(wt["name"])]
     
     if to_check:
+        if mode == "runbot":
+            task_desc = "[cyan]Polling Runbot CI..."
+        elif mode == "reviews":
+            task_desc = "[cyan]Polling PR Comments..."
+        else:
+            task_desc = "[cyan]Polling Runbot CI & PR Comments..."
+
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console, transient=True) as progress:
-            task_id = progress.add_task("[cyan]Polling Runbot CI & PR Comments...", total=len(to_check))
+            task_id = progress.add_task(task_desc, total=len(to_check))
             
             with ThreadPoolExecutor(max_workers=6) as executor:
                 future_to_wt = {
@@ -756,15 +763,15 @@ def print_cli_status(config, mode="combined"):
                                 "odoo_pr": odoo_pr, "enterprise_pr": enterprise_pr
                             }
                             
-                            # Fetch PR comment!
-                            from .runbot_client import get_latest_pr_comment
-                            try:
-                                comment_data = get_latest_pr_comment(odoo_pr, enterprise_pr)
-                                if comment_data:
-                                    self_comments = comment_results
-                                    comment_results[branch_name] = comment_data
-                            except Exception:
-                                pass
+                            # Fetch PR comment only if mode is not runbot!
+                            if mode != "runbot":
+                                from .runbot_client import get_latest_pr_comment
+                                try:
+                                    comment_data = get_latest_pr_comment(odoo_pr, enterprise_pr)
+                                    if comment_data:
+                                        comment_results[branch_name] = comment_data
+                                except Exception:
+                                    pass
                         else:
                             results[branch_name] = {
                                 "status_label": "no_batch",
