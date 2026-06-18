@@ -484,7 +484,7 @@ def main():
                     option_help = []
                     
                     if closest_cmd:
-                        options.append(closest_cmd)
+                        options.append(f"{closest_cmd} (y)")
                     if matched_wts:
                         options.append(f"1-{len(matched_wts)}")
                         
@@ -504,7 +504,7 @@ def main():
                     print()
                     try:
                         ans = input(f"Select an option [{', '.join(options)}]: ").strip().lower()
-                        if closest_cmd and ans == closest_cmd:
+                        if closest_cmd and (ans == closest_cmd or ans in ("y", "yes")):
                             sys.argv.append(closest_cmd)
                             # Re-run main recursively to execute the corrected subcommand cleanly!
                             main()
