@@ -43,7 +43,8 @@ class ConfigManager:
             "show_desc": True,
             "dark_mode": True,
             "auto_magic_fix": True,
-            "use_count": 0
+            "use_count": 0,
+            "status_max_width": 120
         }
 
     def append_log(self, action: str, details: dict = None):
