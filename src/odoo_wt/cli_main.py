@@ -370,9 +370,10 @@ def main():
             except Exception:
                 return (0, 0, 0)
                 
-        while True:
-            matched_wts = []
-            if not explicit_create:
+        matched_wt = None
+        if not explicit_create:
+            while True:
+                matched_wts = []
                 query = branch_arg.strip().lower()
                 
                 # --- TIER 1: Contiguous Substring Matches ---
@@ -397,81 +398,83 @@ def main():
                         if any(get_edit_distance(query, tok) <= 2 for tok in tokens):
                             matched_wts.append(wt)
                             
-            # Sort matches consistently
-            def recency_sort_key(wt_dict):
-                path_str = wt_dict["path"]
-                ts = config.get("worktree_recency", {}).get(path_str, "")
-                return (ts, local_version_sort_key(wt_dict), wt_dict["name"])
-                
-            matched_wts = sorted(matched_wts, key=recency_sort_key, reverse=True)
-            
-            # Remove duplicate matches while preserving sorted order
-            seen = set()
-            unique_matches = []
-            for wt in matched_wts:
-                if wt["path"] not in seen:
-                    seen.add(wt["path"])
-                    unique_matches.append(wt)
-            matched_wts = unique_matches
-            
-            # If exactly 1 match on Tier 1 (on startup), switch directly!
-            if len(matched_wts) == 1 and current_tier == 1:
-                matched_wt = matched_wts[0]
-                break
-                
-            # If multiple matches or we've expanded tiers, prompt interactive selector
-            if len(matched_wts) > 0 or current_tier < 3:
-                from rich.console import Console
-                console = Console()
-                
-                tier_label = "Direct" if current_tier == 1 else ("Fuzzy" if current_tier == 2 else "Typo")
-                console.print(f"🔍 [bold cyan]{tier_label} Matches[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
-                for idx, wt in enumerate(matched_wts, 1):
-                    console.print(f"  [[green]{idx}[/green]] {wt['name']}")
+                # Sort matches consistently
+                def recency_sort_key(wt_dict):
+                    path_str = wt_dict["path"]
+                    ts = config.get("worktree_recency", {}).get(path_str, "")
+                    return (ts, local_version_sort_key(wt_dict), wt_dict["name"])
                     
-                print()
-                options = [f"1-{len(matched_wts)}"]
-                option_help = []
+                matched_wts = sorted(matched_wts, key=recency_sort_key, reverse=True)
                 
-                if current_tier < 2:
-                    options.append("f")
-                    option_help.append("[[green]f[/green]] Search more (fuzzy substring / words)")
-                if current_tier < 3:
-                    options.append("t")
-                    option_help.append("[[green]t[/green]] Search more (typo / distance)")
-                    
-                options.append("c")
-                option_help.append("[[green]c[/green]] Create brand new worktree")
+                # Remove duplicate matches while preserving sorted order
+                seen = set()
+                unique_matches = []
+                for wt in matched_wts:
+                    if wt["path"] not in seen:
+                        seen.add(wt["path"])
+                        unique_matches.append(wt)
+                matched_wts = unique_matches
                 
-                for opt in option_help:
-                    console.print(f"  {opt}")
+                # If exactly 1 match on Tier 1 (on startup), switch directly!
+                if len(matched_wts) == 1 and current_tier == 1:
+                    matched_wt = matched_wts[0]
+                    break
                     
-                print()
-                try:
-                    ans = input(f"Select an option [{', '.join(options)}]: ").strip().lower()
-                    if ans.isdigit() and 1 <= int(ans) <= len(matched_wts):
-                        matched_wt = matched_wts[int(ans) - 1]
-                        break
-                    elif ans == 'f' and current_tier < 2:
-                        current_tier = 2
-                        console.print("\n✨ Running [bold yellow]Fuzzy Substring Matcher[/bold yellow]...")
-                        continue
-                    elif ans == 't' and current_tier < 3:
-                        current_tier = 3
-                        console.print("\n✨ Running [bold yellow]Levenshtein Typo Matcher[/bold yellow]...")
-                        continue
-                    elif ans == 'c':
-                        matched_wt = None
-                        break
-                    else:
-                        print("Aborted.")
-                        sys.exit(0)
-                except (KeyboardInterrupt, EOFError):
-                    print("\nAborted.")
-                    sys.exit(1)
-            else:
-                matched_wt = None
-                break
+                # If multiple matches or we've expanded tiers, prompt interactive selector
+                if len(matched_wts) > 0 or current_tier < 3:
+                    from rich.console import Console
+                    console = Console()
+                    
+                    tier_label = "Direct" if current_tier == 1 else ("Fuzzy" if current_tier == 2 else "Typo")
+                    console.print(f"🔍 [bold cyan]{tier_label} Matches[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
+                    for idx, wt in enumerate(matched_wts, 1):
+                        console.print(f"  [[green]{idx}[/green]] {wt['name']}")
+                        
+                    print()
+                    options = [f"1-{len(matched_wts)}"]
+                    option_help = []
+                    
+                    if current_tier < 2:
+                        options.append("f")
+                        option_help.append("[[green]f[/green]] Search more (fuzzy substring / words)")
+                    if current_tier < 3:
+                        options.append("t")
+                        option_help.append("[[green]t[/green]] Search more (typo / distance)")
+                        
+                    options.append("c")
+                    option_help.append("[[green]c[/green]] Create brand new worktree")
+                    
+                    for opt in option_help:
+                        console.print(f"  {opt}")
+                        
+                    print()
+                    try:
+                        ans = input(f"Select an option [{', '.join(options)}]: ").strip().lower()
+                        if ans.isdigit() and 1 <= int(ans) <= len(matched_wts):
+                            matched_wt = matched_wts[int(ans) - 1]
+                            break
+                        elif ans == 'f' and current_tier < 2:
+                            current_tier = 2
+                            console.print("\n✨ Running [bold yellow]Fuzzy Substring Matcher[/bold yellow]...")
+                            continue
+                        elif ans == 't' and current_tier < 3:
+                            current_tier = 3
+                            console.print("\n✨ Running [bold yellow]Levenshtein Typo Matcher[/bold yellow]...")
+                            continue
+                        elif ans == 'c':
+                            matched_wt = None
+                            break
+                        else:
+                            print("Aborted.")
+                            sys.exit(0)
+                    except (KeyboardInterrupt, EOFError):
+                        print("\nAborted.")
+                        sys.exit(1)
+                else:
+                    matched_wt = None
+                    break
+        else:
+            matched_wt = None
 
         if matched_wt:
             from rich.console import Console
