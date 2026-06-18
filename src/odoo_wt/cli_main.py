@@ -29,6 +29,7 @@ def show_help():
     print("  -c, --code <branch>          Directly open VS Code in an existing worktree")
     print("  -d, --delete <branch>        Directly delete an existing worktree with CLI prompt")
     print("  --no-magic                   Disable automatic 'Magic Fix' branch decomposition")
+    print("  --verbose                    Enable detailed, verbose command output during CLI deployment")
     print("  --config-path                Print the active odoo-wt.json configuration path")
     print("  --log-path                   Print the active odoo-wt-logs.jsonl path")
     print("  --create                     Force start TUI in the 'Creation' tab")
@@ -67,7 +68,7 @@ def get_edit_distance(s1: str, s2: str) -> int:
         distances = distances_
     return distances[-1]
 
-async def run_cli_deployment(config, data):
+async def run_cli_deployment(config, data, verbose=False):
     from .deployment_engine import DeployEngine
     from rich.console import Console
     import asyncio
@@ -86,6 +87,15 @@ async def run_cli_deployment(config, data):
             if update.log_line:
                 line = update.log_line.strip()
                 if line:
+                    if not verbose:
+                        # Filter out verbose progress/git details by default
+                        skip_markers = [
+                            "Updating files:", "From github.com", "FETCH_HEAD", 
+                            "remote: ", "Receiving objects:", "Resolving deltas:",
+                            "* branch", " branch '", "HEAD is now at"
+                        ]
+                        if any(marker in line for marker in skip_markers):
+                            continue
                     console.print(f"[{label}] {line}")
                     
     # Run odoo, ent, and uv concurrently!
@@ -251,6 +261,12 @@ def main():
     if "--no-magic" in sys.argv:
         no_magic = True
         sys.argv.remove("--no-magic")
+
+    # --verbose flag
+    verbose = False
+    if "--verbose" in sys.argv:
+        verbose = True
+        sys.argv.remove("--verbose")
 
     # Simple flag parsing for tab selection
     forced_tab = None
@@ -582,7 +598,7 @@ def main():
 
             # Deploy directly in pure CLI mode (stdout logs) with 0 extra clicks!
             import asyncio
-            data = asyncio.run(run_cli_deployment(config, data))
+            data = asyncio.run(run_cli_deployment(config, data, verbose=verbose))
     else:
         # Standard TUI App mode
         app = OdooWtApp(config, v_list, s_list, worktrees, VERSION)
