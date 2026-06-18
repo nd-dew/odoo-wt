@@ -516,7 +516,7 @@ def test_cli_typo_correction(monkeypatch, tmp_path):
     
     # Track if print_cli_status was called
     called = False
-    def mock_print_cli_status(config):
+    def mock_print_cli_status(config, *args, **kwargs):
         nonlocal called
         called = True
         
