@@ -465,7 +465,8 @@ def test_query_branch_status(monkeypatch):
         "2026-06-17 06:14:59", 
         1, 1, 0, 1,
         "https://github.com/odoo-dev/odoo/pull/5161",
-        "https://github.com/odoo-dev/enterprise/pull/1356"
+        "https://github.com/odoo-dev/enterprise/pull/1356",
+        None
     )
 
 def test_print_cli_status(monkeypatch, tmp_path):
@@ -481,7 +482,7 @@ def test_print_cli_status(monkeypatch, tmp_path):
         {"name": "17.0-fix-pian", "path": "/path/17.0-fix-pian", "version": "17.0"}
     ]))
     
-    monkeypatch.setattr("odoo_wt.runbot_client.query_branch_status", lambda name: ("https://runbot.odoo.com/runbot/batch/1", "2026-06-17 12:00:00", 10, 0, 0, 0, "https://github.com/odoo/odoo/pull/1", "https://github.com/odoo/enterprise/pull/1"))
+    monkeypatch.setattr("odoo_wt.runbot_client.query_branch_status", lambda name: ("https://runbot.odoo.com/runbot/batch/1", "2026-06-17 12:00:00", 10, 0, 0, 0, "https://github.com/odoo/odoo/pull/1", "https://github.com/odoo/enterprise/pull/1", None))
     
     # Invoke CLI status function to verify it runs error-free
     print_cli_status(config)
