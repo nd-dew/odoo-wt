@@ -765,8 +765,15 @@ def print_cli_status(config):
                                     user = comment_data["user"]
                                     relative = comment_data["relative"]
                                     link_url = comment_data["html_url"]
+                                    body_clean = comment_data.get("body_clean", "")
                                     prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
-                                    comment_cell = f"[link={link_url}]💬 {prefix} {user} ({relative})[/link]"
+                                    
+                                    comment_text = f"{prefix} {user}"
+                                    if body_clean:
+                                        comment_text += f": {body_clean}"
+                                    comment_text += f" ({relative})"
+                                    
+                                    comment_cell = f"[link={link_url}]{comment_text}[/link]"
                                 else:
                                     comment_cell = "-"
                             except Exception:
@@ -787,7 +794,7 @@ def print_cli_status(config):
     table.add_column("Branch Name", style="cyan")
     table.add_column("Runbot Status")
     table.add_column("Link")
-    table.add_column("Last Review")
+    table.add_column("Last Comment")
     
     def version_sort_key(wt):
         v = wt["version"] or ""
