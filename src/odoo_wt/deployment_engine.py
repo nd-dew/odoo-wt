@@ -186,14 +186,13 @@ class DeployEngine:
         else:
             addons_path = f"{self.comm_dir}/addons"
 
-        # Detect modified modules via git diff against origin/{base_v}
-        def get_modified_modules(repo_path, base_v):
+        # Detect modified modules via git diff against {remote}/{base_v}
+        def get_modified_modules(repo_path, base_v, remote):
             if not repo_path.exists():
                 return set()
             cmds = [
-                ["git", "diff", "--name-only", f"origin/{base_v}..."],
-                ["git", "diff", "--name-only", f"origin/{base_v}...HEAD"],
-                ["git", "diff", "--name-only", "HEAD~1"]
+                ["git", "diff", "--name-only", f"{remote}/{base_v}..."],
+                ["git", "diff", "--name-only", f"{remote}/{base_v}...HEAD"]
             ]
             output = ""
             for cmd in cmds:
@@ -224,9 +223,9 @@ class DeployEngine:
         
         modules = set()
         if comm_repo.exists():
-            modules.update(get_modified_modules(comm_repo, self.base_v))
+            modules.update(get_modified_modules(comm_repo, self.base_v, get_remote(comm_repo)))
         if ent_repo.exists():
-            modules.update(get_modified_modules(ent_repo, self.base_v))
+            modules.update(get_modified_modules(ent_repo, self.base_v, get_remote(ent_repo)))
 
         # Filter to keep only actual, valid Odoo modules (must contain a __manifest__.py)
         valid_modules = []
