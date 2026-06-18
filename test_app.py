@@ -748,8 +748,8 @@ def test_cli_switcher_multiple_matches(monkeypatch, tmp_path, capsys):
         cli_main.main()
         
     assert excinfo.value.code == 0
-    assert chdir_called == "/path/root/master-call_debrief-design-brd"
+    assert chdir_called == "/path/root/17.0-debrief-pian"
     assert execv_called is not None
     captured = capsys.readouterr()
-    assert "Multiple worktrees matched" in captured.out
+    assert "Direct Matches" in captured.out
 
