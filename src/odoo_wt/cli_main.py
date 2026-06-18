@@ -387,10 +387,11 @@ def main():
                 if query in name:
                     matched_wts.append(wt)
                     continue
-                # 2. Token-based Levenshtein match (distance <= 2)!
-                tokens = name.replace("-", " ").replace("_", " ").split()
-                if any(get_edit_distance(query, tok) <= 2 for tok in tokens):
-                    matched_wts.append(wt)
+                # 2. Token-based Levenshtein match (distance <= 2) only if query length >= 5!
+                if len(query) >= 5:
+                    tokens = name.replace("-", " ").replace("_", " ").split()
+                    if any(get_edit_distance(query, tok) <= 2 for tok in tokens):
+                        matched_wts.append(wt)
                     
         # Let's handle the decision routing:
         matched_wt = None
