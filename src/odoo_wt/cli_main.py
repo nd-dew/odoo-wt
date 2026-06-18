@@ -670,7 +670,7 @@ def print_cli_status(config, mode="combined"):
     from rich.table import Table
     from rich.progress import Progress, SpinnerColumn, TextColumn
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    from .runbot_client import query_branch_status
+    from .runbot_client import check_branch_status_and_comments
     import datetime
     
     console = Console()
@@ -732,7 +732,7 @@ def print_cli_status(config, mode="combined"):
             
             with ThreadPoolExecutor(max_workers=6) as executor:
                 future_to_wt = {
-                    executor.submit(query_branch_status, wt["name"]): wt 
+                    executor.submit(check_branch_status_and_comments, wt["name"], mode == "runbot"): wt 
                     for wt in to_check
                 }
                 
@@ -743,35 +743,27 @@ def print_cli_status(config, mode="combined"):
                     try:
                         res = future.result()
                         if res:
-                            batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr = res
-                            time_suffix = relative_time(ts_str) if ts_str else ""
+                            time_suffix = relative_time(res["ts_str"]) if res["ts_str"] else ""
                             
-                            if running > 0:
+                            if res["running"] > 0:
                                 label = "running"
-                            elif failed > 0:
+                            elif res["failed"] > 0:
                                 label = "failed"
-                            elif warning > 0:
+                            elif res["warning"] > 0:
                                 label = "warning"
                             else:
                                 label = "passed"
                                 
                             results[branch_name] = {
                                 "status_label": label,
-                                "success": success, "failed": failed, "warning": warning, "running": running,
+                                "success": res["success"], "failed": res["failed"], "warning": res["warning"], "running": res["running"],
                                 "time_str": time_suffix,
-                                "batch_url": batch_url,
-                                "odoo_pr": odoo_pr, "enterprise_pr": enterprise_pr
+                                "batch_url": res["batch_url"],
+                                "odoo_pr": res["odoo_pr"], "enterprise_pr": res["enterprise_pr"]
                             }
                             
-                            # Fetch PR comment only if mode is not runbot!
-                            if mode != "runbot":
-                                from .runbot_client import get_latest_pr_comment
-                                try:
-                                    comment_data = get_latest_pr_comment(odoo_pr, enterprise_pr)
-                                    if comment_data:
-                                        comment_results[branch_name] = comment_data
-                                except Exception:
-                                    pass
+                            if res["comment_data"]:
+                                comment_results[branch_name] = res["comment_data"]
                         else:
                             results[branch_name] = {
                                 "status_label": "no_batch",
