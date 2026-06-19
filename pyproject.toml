@@ -1,6 +1,6 @@
 [project]
 name = "odoo-wt"
-version = "2.14.0"
+version = "2.14.1"
 description = "Modern TUI-driven Odoo Worktree Manager"
 readme = "README.md"
 license = { text = "MIT" }
