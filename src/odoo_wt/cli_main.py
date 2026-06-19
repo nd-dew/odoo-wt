@@ -41,11 +41,17 @@ def show_help():
     console.print("  [bold cyan]-c, --code[/bold cyan] [cyan]<branch>[/cyan]          Alias for 'code <branch>'")
     console.print("  [bold cyan]-d, --delete[/bold cyan] [cyan]<branch>[/cyan]        Alias for 'delete <branch>'")
     console.print("  [bold cyan]--no-magic[/bold cyan]                    Disable automatic 'Magic Fix' branch decomposition")
+    console.print("  [bold cyan]-s, --sort[/bold cyan] [cyan]<criteria>[/cyan]        Sort status tables by: recency, version, name, runbot, reviews")
     console.print("  [bold cyan]--verbose[/bold cyan]                     Enable detailed, verbose command output during CLI deployment")
     console.print("  [bold cyan]--config-path[/bold cyan]                 Print the active odoo-wt.json configuration path")
     console.print("  [bold cyan]--log-path[/bold cyan]                    Print the active odoo-wt-logs.jsonl path")
     console.print("  [bold cyan]-h, --help[/bold cyan]                    Show this help message")
     console.print("  [bold cyan]-v, --version[/bold cyan]                 Show the current version")
+    
+    console.print("\n[bold yellow]Recency Sorting:[/bold yellow]")
+    console.print("  Worktrees are sorted by default by recency. Any action that deploys, opens,")
+    console.print("  or accesses a worktree (e.g. create, open, code, selecting in TUI) updates")
+    console.print("  its local access timestamp and makes it most recent.")
     
     console.print("\n[bold yellow]Environment Variables:[/bold yellow]")
     console.print("  [bold cyan]SHELL[/bold cyan]                         Target shell when opening terminal [dim](default: /bin/bash)[/dim]")
@@ -146,6 +152,28 @@ def main():
         print(f"odoo-wt v{VERSION}")
         sys.exit(0)
 
+    # --sort or -s flag
+    sort_mode = "recency"
+    if "--sort" in sys.argv or "-s" in sys.argv:
+        for marker in ("--sort", "-s"):
+            if marker in sys.argv:
+                idx = sys.argv.index(marker)
+                if idx + 1 < len(sys.argv):
+                    val = sys.argv[idx + 1].strip().lower()
+                    if val in ("recency", "recent"):
+                        sort_mode = "recency"
+                    elif val in ("version", "ver"):
+                        sort_mode = "version"
+                    elif val in ("name", "alphabetical", "alpha"):
+                        sort_mode = "name"
+                    elif val in ("runbot", "ci", "status"):
+                        sort_mode = "runbot"
+                    elif val in ("comments", "reviews", "comment"):
+                        sort_mode = "reviews"
+                    sys.argv.pop(idx + 1)
+                sys.argv.pop(idx)
+                break
+
     # Initialize configuration first (required for all CLI commands)
     if not config_mgr.config_file.exists():
         check_dependencies()
@@ -205,7 +233,7 @@ def main():
             sys.argv.remove("reviews")
             
         check_dependencies()
-        print_cli_status(config, mode=mode)
+        print_cli_status(config, mode=mode, sort_mode=sort_mode)
         sys.exit(0)
 
     # Utility metadata commands
@@ -665,7 +693,7 @@ def main():
                 print("❌ VS Code ('code' command) not found in PATH.")
                 print(f"Directory is ready at: {target}")
 
-def print_cli_status(config, mode="combined"):
+def print_cli_status(config, mode="combined", sort_mode="recency"):
     from rich.console import Console
     from rich.table import Table
     from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -795,13 +823,33 @@ def print_cli_status(config, mode="combined"):
         except Exception:
             return (0, 0, 0)
              
-    # Sort by recency timestamp first (descending), falling back to version and name
-    def recency_sort_key(wt_dict):
-        path_str = wt_dict["path"]
-        ts = config.get("worktree_recency", {}).get(path_str, "")
-        return (ts, version_sort_key(wt_dict), wt_dict["name"])
-             
-    sorted_wts = sorted(worktrees, key=recency_sort_key, reverse=True)
+    # Symmetrical multi-mode sorting
+    if sort_mode == "version":
+        sorted_wts = sorted(worktrees, key=version_sort_key, reverse=True)
+    elif sort_mode == "name":
+        # Alphabetical sort ascending
+        sorted_wts = sorted(worktrees, key=lambda wt: wt["name"].lower())
+    elif sort_mode == "runbot":
+        # Sort by Runbot build timestamp descending (newest builds first!)
+        def runbot_sort_key(wt_dict):
+            name = wt_dict["name"]
+            res = results.get(name)
+            # Extracted ts_str inside results
+            return res.get("ts_str", "") if res else ""
+        sorted_wts = sorted(worktrees, key=runbot_sort_key, reverse=True)
+    elif sort_mode == "reviews":
+        # Sort by last human PR comment timestamp descending (active reviews first!)
+        def comment_sort_key(wt_dict):
+            name = wt_dict["name"]
+            comment_data = comment_results.get(name)
+            return comment_data.get("created_at", "") if comment_data else ""
+        sorted_wts = sorted(worktrees, key=comment_sort_key, reverse=True)
+    else: # sort_mode == "recency"
+        def recency_sort_key(wt_dict):
+            path_str = wt_dict["path"]
+            ts = config.get("worktree_recency", {}).get(path_str, "")
+            return (ts, version_sort_key(wt_dict), wt_dict["name"])
+        sorted_wts = sorted(worktrees, key=recency_sort_key, reverse=True)
     
     # Calculate target column widths dynamically based on config and terminal width
     max_w = config.get("status_max_width", 150)
@@ -1006,6 +1054,16 @@ def print_cli_status(config, mode="combined"):
             table.add_row(name, status_str, link_str, comment_str)
             
     console.print(table)
+    
+    # Print the explanatory footnote
+    sort_labels = {
+        "recency": "most recently deployed, opened, or accessed worktrees first (Default)",
+        "version": "Odoo release version descending",
+        "name": "alphabetical branch name ascending",
+        "runbot": "most recently triggered Runbot builds first",
+        "reviews": "most recently active human PR comments first"
+    }
+    console.print(f"[dim]Sorted by: {sort_labels.get(sort_mode, sort_mode)}[/dim]")
 
 if __name__ == "__main__":
     main()
