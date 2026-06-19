@@ -863,13 +863,13 @@ def print_cli_status(config, mode="combined", sort_mode="recency"):
     if mode == "runbot":
         table = Table(title=f"Odoo Runbot Details (v{VERSION})", title_style="bold green", header_style="bold yellow", box=None, width=tbl_width if tbl_width > 40 else None)
         table.add_column("Branch Name", style="cyan", no_wrap=True)
-        table.add_column("Status", no_wrap=True)
-        table.add_column("Success", style="green", justify="right", no_wrap=True)
-        table.add_column("Failed", style="red", justify="right", no_wrap=True)
-        table.add_column("Warning", style="yellow", justify="right", no_wrap=True)
-        table.add_column("Running", style="cyan", justify="right", no_wrap=True)
-        table.add_column("Age", no_wrap=True)
-        table.add_column("CI Link", no_wrap=True)
+        table.add_column("Status", no_wrap=True, min_width=12)
+        table.add_column("Success", style="green", justify="right", no_wrap=True, min_width=8)
+        table.add_column("Failed", style="red", justify="right", no_wrap=True, min_width=8)
+        table.add_column("Warning", style="yellow", justify="right", no_wrap=True, min_width=8)
+        table.add_column("Running", style="cyan", justify="right", no_wrap=True, min_width=8)
+        table.add_column("Age", no_wrap=True, min_width=10)
+        table.add_column("CI Link", no_wrap=True, min_width=12)
         
         for wt in sorted_wts:
             name = wt["name"]
@@ -914,9 +914,9 @@ def print_cli_status(config, mode="combined", sort_mode="recency"):
     elif mode == "reviews":
         table = Table(title=f"Odoo PR Reviews Dashboard (v{VERSION})", title_style="bold magenta", header_style="bold cyan", box=None, width=tbl_width if tbl_width > 40 else None)
         table.add_column("Branch Name", style="cyan", no_wrap=True)
-        table.add_column("Community PR", no_wrap=True)
-        table.add_column("Enterprise PR", no_wrap=True)
-        table.add_column("Upgrade PR", no_wrap=True)
+        table.add_column("Community PR", no_wrap=True, min_width=14)
+        table.add_column("Enterprise PR", no_wrap=True, min_width=14)
+        table.add_column("Upgrade PR", no_wrap=True, min_width=14)
         table.add_column("Last Comment", no_wrap=True)
         
         for wt in sorted_wts:
@@ -974,8 +974,8 @@ def print_cli_status(config, mode="combined", sort_mode="recency"):
     else: # mode == "combined"
         table = Table(title=f"Odoo Worktree Status (v{VERSION})", title_style="bold cyan", header_style="bold magenta", box=None, width=tbl_width if tbl_width > 40 else None)
         table.add_column("Branch Name", style="cyan", no_wrap=True)
-        table.add_column("Runbot", no_wrap=True)
-        table.add_column("Links", no_wrap=True)
+        table.add_column("Runbot", no_wrap=True, min_width=12)
+        table.add_column("Links", no_wrap=True, min_width=15)
         table.add_column("Last Comment", no_wrap=True)
         
         for wt in sorted_wts:
