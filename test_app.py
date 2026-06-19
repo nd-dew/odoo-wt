@@ -709,8 +709,8 @@ def test_cli_delete_command(monkeypatch, tmp_path, capsys):
     assert excinfo.value.code == 0
     assert len(sub_called) > 0
     captured = capsys.readouterr()
-    assert "🧹 Deleting worktree" in captured.out
-    assert "✨ Deleted successfully." in captured.out
+    assert "Deleting worktree" in captured.out
+    assert "Success: Deleted successfully." in captured.out
 
 def test_cli_switcher_multiple_matches(monkeypatch, tmp_path, capsys):
     from odoo_wt import cli_main
