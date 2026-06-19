@@ -44,7 +44,7 @@ class ConfigManager:
             "dark_mode": True,
             "auto_magic_fix": True,
             "use_count": 0,
-            "status_max_width": 120
+            "status_max_width": 150
         }
 
     def append_log(self, action: str, details: dict = None):
