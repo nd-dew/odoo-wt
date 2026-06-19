@@ -868,3 +868,39 @@ def test_get_latest_pr_comment(monkeypatch):
     # Truncate at exactly 50 chars + "..."
     assert latest["body_clean"] == "This is an extremely long code review comment writ..."
 
+def test_tui_base_branch_minimal_status(monkeypatch):
+    from odoo_wt.main_tui import OdooWtApp
+    
+    app = OdooWtApp(
+        config={"wt_root": "/path/root", "suffix": "pian"},
+        v_list=["17.0"], s_list=["pian"],
+        worktrees=[{"name": "master", "path": "/path/root/master", "version": "master"}],
+        version_str="dev"
+    )
+    
+    # Mock DataTable and Input elements for synchronous run
+    rows_added = []
+    class MockDataTable:
+        def clear(self): pass
+        def add_row(self, *args, **kwargs):
+            rows_added.append(args)
+            
+    def mock_query_one(selector, *args, **kwargs):
+        if selector == "#wt-table":
+            return MockDataTable()
+        class MockSearch:
+            value = ""
+        return MockSearch()
+        
+    app.query_one = mock_query_one
+    
+    # Run the synchronous table populator
+    app.populate_table()
+    
+    # Verify that base branches get minimal symbols
+    assert len(rows_added) == 1
+    branch_name, status, link, comment = rows_added[0]
+    assert branch_name == "master"
+    assert status == "⚪"
+    assert "Board" in link
+
