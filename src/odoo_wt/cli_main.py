@@ -903,8 +903,8 @@ def print_cli_status(config, mode="combined"):
                 prefix_plain = "[Ent]" if is_ent else ("[Upg]" if is_upg else "[Comm]")
                 prefix = "[bold green][Ent][/bold green]" if is_ent else ("[bold yellow][Upg][/bold yellow]" if is_upg else "[bold cyan][Comm][/bold cyan]")
                 
-                # Non-comment column overhead (Branch + Comm PR + Ent PR + Upg PR + padding) = 91
-                comment_col_max = tbl_width - 91
+                # Non-comment column overhead (Branch + Comm PR + Ent PR + Upg PR + padding) = 62
+                comment_col_max = tbl_width - 62
                 meta_len = len(prefix_plain) + len(user) + len(relative) + 8
                 allowed_body_len = comment_col_max - meta_len
                 
@@ -991,8 +991,8 @@ def print_cli_status(config, mode="combined"):
                 prefix_plain = "[Ent]" if is_ent else ("[Upg]" if is_upg else "[Comm]")
                 prefix = "[bold green][Ent][/bold green]" if is_ent else ("[bold yellow][Upg][/bold yellow]" if is_upg else "[bold cyan][Comm][/bold cyan]")
                 
-                # Non-comment column overhead (Branch + Runbot + Links + padding) = 85
-                comment_col_max = tbl_width - 85
+                # Non-comment column overhead (Branch + Runbot + Links + padding) = 68
+                comment_col_max = tbl_width - 68
                 meta_len = len(prefix_plain) + len(user) + len(relative) + 8
                 allowed_body_len = comment_col_max - meta_len
                 
