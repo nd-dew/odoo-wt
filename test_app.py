@@ -942,3 +942,34 @@ def test_cli_switcher_mode_with_runbot_details(monkeypatch, tmp_path, capsys):
     assert "Passed" in captured.out
     assert "https://runbot.odoo.com/batch/999" in captured.out
 
+def test_cli_switcher_unpacking_safety_with_tuple(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "17.0-fix-pian"])
+    
+    config_path = tmp_path / "odoo-wt-8.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root", "suffix": "pian"
+    })
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], [{"name": "17.0-fix-pian", "path": "/path/root/17.0-fix-pian", "version": "17.0"}]
+    ))
+    
+    # Mock returning 8-element tuple (backward-compatibility fallback!)
+    monkeypatch.setattr("odoo_wt.runbot_client.query_branch_status", lambda name: (
+        "https://runbot.odoo.com/batch/123", "2026-06-18 10:00:00",
+        1, 0, 0, 0, None, None
+    ))
+    
+    monkeypatch.setattr("os.chdir", lambda path: None)
+    import sys
+    monkeypatch.setattr("os.execv", lambda shell, args: sys.exit(0))
+    
+    with pytest.raises(SystemExit):
+        cli_main.main()
+        
+    captured = capsys.readouterr()
+    assert "Passed" in captured.out
+
