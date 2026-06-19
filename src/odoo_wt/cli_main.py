@@ -574,7 +574,15 @@ def main():
                 res = query_branch_status(matched_wt["name"])
                 
             if res:
-                batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr = res
+                batch_url = res.get("batch_url")
+                ts_str = res.get("ts_str", "")
+                success = res.get("success", 0)
+                failed = res.get("failed", 0)
+                warning = res.get("warning", 0)
+                running = res.get("running", 0)
+                odoo_pr = res.get("odoo_pr")
+                enterprise_pr = res.get("enterprise_pr")
+                
                 warn_str = f"[yellow]{warning}w[/yellow]" if warning > 0 else "0w"
                 fail_str = f"[red]{failed}f[/red]" if failed > 0 else "0f"
                 
