@@ -923,13 +923,11 @@ def test_cli_switcher_mode_with_runbot_details(monkeypatch, tmp_path, capsys):
         ["17.0"], ["pian"], [{"name": "17.0-fix-pian", "path": "/path/root/17.0-fix-pian", "version": "17.0"}]
     ))
     
-    # Mock query_branch_status to return a valid dict
-    monkeypatch.setattr("odoo_wt.runbot_client.query_branch_status", lambda name: {
-        "batch_url": "https://runbot.odoo.com/batch/999",
-        "ts_str": "2026-06-18 10:00:00",
-        "success": 10, "failed": 0, "warning": 0, "running": 0,
-        "odoo_pr": None, "enterprise_pr": None, "upgrade_pr": None
-    })
+    # Mock query_branch_status to return a valid 9-element tuple (matching real-world behavior!)
+    monkeypatch.setattr("odoo_wt.runbot_client.query_branch_status", lambda name: (
+        "https://runbot.odoo.com/batch/999", "2026-06-18 10:00:00",
+        10, 0, 0, 0, None, None, None
+    ))
     
     monkeypatch.setattr("os.chdir", lambda path: None)
     import sys
