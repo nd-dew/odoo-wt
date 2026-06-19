@@ -71,6 +71,7 @@ class OdooWtApp(App):
         Binding("ctrl+tab", "next_tab", "", show=False),
         Binding("c", "copy_text", "Copy", key_display="C"),
         Binding("ctrl+b", "open_runbot", "Runbot", key_display="^B"),
+        Binding("ctrl+y", "toggle_sort", "Sort: Cycle", key_display="^Y"),
         Binding("escape", "quit", "", show=False),
         Binding("ctrl+q", "quit", "Quit", show=True, key_display="^Q"),
         Binding("ctrl+c", "quit", "Quit", show=False),
@@ -112,6 +113,8 @@ class OdooWtApp(App):
         self.resolved_enterprise_pr_urls = {}
         self.resolved_upgrade_pr_urls = {}
         self.resolved_pr_comments = {}
+        self.resolved_runbot_timestamps = {}
+        self.active_sort_mode = "recency"
 
 
         # Modern Textual Theme API
@@ -127,6 +130,14 @@ class OdooWtApp(App):
         parts = ["^S Create", "^X Delete", "^R Refresh", "^T Tab", "^Q Quit"]
         if active_tab == "tab-manage":
             parts.append("^B Runbot")
+            sort_labels = {
+                "recency": "Rec",
+                "version": "Ver",
+                "name": "Name",
+                "runbot": "CI",
+                "reviews": "PR"
+            }
+            parts.append(f"^Y Sort: {sort_labels.get(self.active_sort_mode, self.active_sort_mode)}")
             parts.append("Enter Open")
         return "  ".join(parts)
 
@@ -896,13 +907,28 @@ class OdooWtApp(App):
         except Exception:
             search_term = ""
 
-        # Sort by recency timestamp first (descending), falling back to version and name
-        def recency_sort_key(wt_dict):
-            path_str = wt_dict["path"]
-            ts = self.config.get("worktree_recency", {}).get(path_str, "")
-            return (ts, self._version_sort_key(wt_dict), wt_dict["name"])
-
-        sorted_wts = sorted(self.worktrees, key=recency_sort_key, reverse=True)
+        # Symmetrical multi-mode sorting inside TUI
+        if self.active_sort_mode == "version":
+            sorted_wts = sorted(self.worktrees, key=self._version_sort_key, reverse=True)
+        elif self.active_sort_mode == "name":
+            sorted_wts = sorted(self.worktrees, key=lambda wt: wt["name"].lower())
+        elif self.active_sort_mode == "runbot":
+            def runbot_sort_key(wt_dict):
+                name = wt_dict["name"]
+                return self.resolved_runbot_timestamps.get(name, "")
+            sorted_wts = sorted(self.worktrees, key=runbot_sort_key, reverse=True)
+        elif self.active_sort_mode == "reviews":
+            def comment_sort_key(wt_dict):
+                name = wt_dict["name"]
+                comment_data = self.resolved_pr_comments.get(name)
+                return comment_data.get("created_at", "") if comment_data else ""
+            sorted_wts = sorted(self.worktrees, key=comment_sort_key, reverse=True)
+        else: # recency
+            def recency_sort_key(wt_dict):
+                path_str = wt_dict["path"]
+                ts = self.config.get("worktree_recency", {}).get(path_str, "")
+                return (ts, self._version_sort_key(wt_dict), wt_dict["name"])
+            sorted_wts = sorted(self.worktrees, key=recency_sort_key, reverse=True)
 
         for wt in sorted_wts:
             name = wt["name"]
@@ -1139,6 +1165,8 @@ class OdooWtApp(App):
                         if res["upgrade_pr"]:
                             self.resolved_upgrade_pr_urls[branch_name] = res["upgrade_pr"]
                         
+                        self.resolved_runbot_timestamps[branch_name] = res.get("ts_str", "")
+                        
                         parts = [f"[link={res['batch_url']}]CI[/link]"]
                         if res["odoo_pr"]:
                             parts.append(f"[link={res['odoo_pr']}]Com[/link]")
@@ -1195,6 +1223,30 @@ class OdooWtApp(App):
     def action_quit(self) -> None:
         config_mgr.append_log("App Quit")
         self.exit()
+
+    def action_toggle_sort(self) -> None:
+        modes = ["recency", "version", "name", "runbot", "reviews"]
+        curr_idx = modes.index(self.active_sort_mode)
+        next_idx = (curr_idx + 1) % len(modes)
+        self.active_sort_mode = modes[next_idx]
+        
+        mode_labels = {
+            "recency": "Recency (last accessed/deployed first)",
+            "version": "Odoo release version descending",
+            "name": "Alphabetical branch name ascending",
+            "runbot": "Most recently active Runbot builds first",
+            "reviews": "Most recently active human PR comments first"
+        }
+        
+        self.notify(f"Sorting Mode: {mode_labels[self.active_sort_mode]}", timeout=3)
+        self.populate_table()
+        
+        # Update the help bar display with the new sort label
+        try:
+            help_bar = self.query_one("#global-help-bar", Static)
+            help_bar.update(self.get_footer_text())
+        except Exception:
+            pass
 
     @on(Button.Pressed, "#magic-btn")
     def on_magic_btn_pressed(self) -> None:
