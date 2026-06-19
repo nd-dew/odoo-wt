@@ -1128,9 +1128,9 @@ class OdooWtApp(App):
         # 1. Update all base branches immediately (doesn't need network CI polling)
         for wt in wts:
             if is_base_branch(wt["name"]):
-                self.call_from_thread(self.update_table_cell, wt["path"], "col-runbot", "⚪ Base Branch")
-                self.call_from_thread(self.update_table_cell, wt["path"], "col-link", "[link=https://runbot.odoo.com/runbot]Board               [/link]")
-                self.resolved_runbot_statuses[wt["name"]] = "⚪ Base Branch"
+                self.call_from_thread(self.update_table_cell, wt["path"], "col-runbot", "⚪")
+                self.call_from_thread(self.update_table_cell, wt["path"], "col-link", "[link=https://runbot.odoo.com/runbot]Board[/link]")
+                self.resolved_runbot_statuses[wt["name"]] = "⚪"
 
         # Filter out base branches for concurrent web checks
         to_check = [wt for wt in wts if not is_base_branch(wt["name"])]
