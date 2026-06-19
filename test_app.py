@@ -904,3 +904,43 @@ def test_tui_base_branch_minimal_status(monkeypatch):
     assert status == "⚪"
     assert "Board" in link
 
+def test_cli_switcher_mode_with_runbot_details(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "17.0-fix-pian"])
+    
+    config_path = tmp_path / "odoo-wt.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock discover_system_data to return existing worktree
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], [{"name": "17.0-fix-pian", "path": "/path/root/17.0-fix-pian", "version": "17.0"}]
+    ))
+    
+    # Mock query_branch_status to return a valid dict
+    monkeypatch.setattr("odoo_wt.runbot_client.query_branch_status", lambda name: {
+        "batch_url": "https://runbot.odoo.com/batch/999",
+        "ts_str": "2026-06-18 10:00:00",
+        "success": 10, "failed": 0, "warning": 0, "running": 0,
+        "odoo_pr": None, "enterprise_pr": None, "upgrade_pr": None
+    })
+    
+    monkeypatch.setattr("os.chdir", lambda path: None)
+    import sys
+    monkeypatch.setattr("os.execv", lambda shell, args: sys.exit(0))
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "Found worktree" in captured.out
+    assert "Passed" in captured.out
+    assert "https://runbot.odoo.com/batch/999" in captured.out
+
