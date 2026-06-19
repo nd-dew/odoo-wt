@@ -328,17 +328,20 @@ def main():
 
     # Handle direct commands (open, code, delete)
     if open_branch:
-        match = next((w for w in worktrees if w["name"] == open_branch), None)
-        if match:
-            if "worktree_recency" not in config: config["worktree_recency"] = {}
-            import datetime
-            config["worktree_recency"][match["path"]] = datetime.datetime.utcnow().isoformat()
-            config_mgr.save(config)
-            
-            os.environ["OLDPWD"] = original_cwd
-            os.chdir(match["path"])
-            shell = os.environ.get("SHELL", "/bin/bash")
-            os.execv(shell, [shell])
+        # Handle direct commands (open, code, delete)
+        if open_branch:
+            match = next((w for w in worktrees if w["name"] == open_branch), None)
+            if match:
+                if "worktree_recency" not in config: config["worktree_recency"] = {}
+                import datetime
+                config["worktree_recency"][match["path"]] = datetime.datetime.utcnow().isoformat()
+                config_mgr.save(config)
+
+                os.environ["OLDPWD"] = original_cwd
+                os.chdir(match["path"])
+                os.environ["PWD"] = match["path"]
+                shell = os.environ.get("SHELL", "/bin/bash")
+                os.execv(shell, [shell])
         else:
             print(f"❌ Error: Worktree '{open_branch}' does not exist locally.")
             sys.exit(1)
@@ -619,6 +622,7 @@ def main():
             console.print(f"🚀 Changing directory to [cyan]{matched_wt['path']}[/cyan]...\n")
             os.environ["OLDPWD"] = original_cwd
             os.chdir(matched_wt["path"])
+            os.environ["PWD"] = matched_wt["path"]
             shell = os.environ.get("SHELL", "/bin/bash")
             os.execv(shell, [shell])
 
@@ -684,6 +688,7 @@ def main():
             target = data["path"]
             os.environ["OLDPWD"] = original_cwd
             os.chdir(target)
+            os.environ["PWD"] = target
             shell = os.environ.get("SHELL", "/bin/bash")
             os.execv(shell, [shell])
         elif action == "vscode":
