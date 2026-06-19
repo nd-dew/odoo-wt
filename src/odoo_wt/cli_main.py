@@ -881,9 +881,13 @@ def print_cli_status(config, mode="combined"):
                 "odoo_pr": None, "enterprise_pr": None, "upgrade_pr": None
             })
             
-            odoo_pr_str = f"[link={res['odoo_pr']}]Open Comm PR[/link]" if res["odoo_pr"] else "-"
-            ent_pr_str = f"[link={res['enterprise_pr']}]Open Ent PR[/link]" if res["enterprise_pr"] else "-"
-            upg_pr_str = f"[link={res['upgrade_pr']}]Open Upg PR[/link]" if res["upgrade_pr"] else "-"
+            odoo_pr = res.get("odoo_pr")
+            ent_pr = res.get("enterprise_pr")
+            upg_pr = res.get("upgrade_pr")
+            
+            odoo_pr_str = f"[link={odoo_pr}]Open Comm PR[/link]" if odoo_pr else "-"
+            ent_pr_str = f"[link={ent_pr}]Open Ent PR[/link]" if ent_pr else "-"
+            upg_pr_str = f"[link={upg_pr}]Open Upg PR[/link]" if upg_pr else "-"
             
             comment_data = comment_results.get(name)
             comment_str = "-"
@@ -958,14 +962,18 @@ def print_cli_status(config, mode="combined"):
             if label == "base":
                 parts.append("[link=https://runbot.odoo.com/runbot]Board[/link]")
             else:
-                if res["batch_url"] and "search=" not in res["batch_url"]:
-                    parts.append(f"[link={res['batch_url']}]CI[/link]")
-                if res["odoo_pr"]:
-                    parts.append(f"[link={res['odoo_pr']}]Com[/link]")
-                if res["enterprise_pr"]:
-                    parts.append(f"[link={res['enterprise_pr']}]Ent[/link]")
-                if res["upgrade_pr"]:
-                    parts.append(f"[link={res['upgrade_pr']}]Upg[/link]")
+                batch_url = res.get("batch_url")
+                if batch_url and "search=" not in batch_url:
+                    parts.append(f"[link={batch_url}]CI[/link]")
+                odoo_pr = res.get("odoo_pr")
+                if odoo_pr:
+                    parts.append(f"[link={odoo_pr}]Com[/link]")
+                ent_pr = res.get("enterprise_pr")
+                if ent_pr:
+                    parts.append(f"[link={ent_pr}]Ent[/link]")
+                upg_pr = res.get("upgrade_pr")
+                if upg_pr:
+                    parts.append(f"[link={upg_pr}]Upg[/link]")
                     
             link_str = "|".join(parts) if parts else f"[link=https://runbot.odoo.com/runbot?search={name}]Search[/link]"
             
