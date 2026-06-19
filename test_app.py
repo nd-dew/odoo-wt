@@ -973,3 +973,44 @@ def test_cli_switcher_unpacking_safety_with_tuple(monkeypatch, tmp_path, capsys)
     captured = capsys.readouterr()
     assert "Passed" in captured.out
 
+def test_shell_history_pwd_oldpwd_injection(monkeypatch, tmp_path):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "17.0-fix-pian"])
+    
+    config_path = tmp_path / "odoo-wt-pwd.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], [{"name": "17.0-fix-pian", "path": "/path/root/17.0-fix-pian", "version": "17.0"}]
+    ))
+    
+    # Mock status to avoid real requests
+    monkeypatch.setattr("odoo_wt.runbot_client.query_branch_status", lambda name: None)
+    monkeypatch.setattr("os.chdir", lambda path: None)
+    
+    # Track injected env variables
+    captured_env = {}
+    def mock_execv(shell, args):
+        captured_env["PWD"] = os.environ.get("PWD")
+        captured_env["OLDPWD"] = os.environ.get("OLDPWD")
+        import sys
+        sys.exit(0)
+        
+    monkeypatch.setattr("os.execv", mock_execv)
+    
+    # Track starting directory
+    import os
+    original_cwd = os.getcwd()
+    
+    with pytest.raises(SystemExit):
+        cli_main.main()
+        
+    # Assert that both PWD and OLDPWD are set perfectly to keep shell history cd - in line
+    assert captured_env["OLDPWD"] == original_cwd
+    assert captured_env["PWD"] == "/path/root/17.0-fix-pian"
+
