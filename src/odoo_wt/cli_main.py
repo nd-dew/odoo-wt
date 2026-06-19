@@ -63,7 +63,7 @@ def check_dependencies():
     
     if missing:
         console = Console()
-        console.print(f"❌ [bold red]Error: Required dependencies not found in PATH: {', '.join(missing)}[/bold red]")
+        console.print(f"[bold red]Error: Required dependencies not found in PATH: {', '.join(missing)}[/bold red]")
         console.print("Please install them and try again.")
         console.print("  - [bold cyan]git[/bold cyan]: [underline blue]https://git-scm.com/[/underline blue]")
         console.print("  - [bold cyan]uv[/bold cyan]:  [underline blue]https://docs.astral.sh/uv/[/underline blue]")
@@ -339,7 +339,7 @@ def main():
             ans = "n"
             if sys.stdout.isatty():
                 try:
-                    ans = input(f"⚠️ Are you sure you want to delete worktree '{delete_branch}'? [y/N]: ").strip().lower()
+                    ans = input(f"Are you sure you want to delete worktree '{delete_branch}'? [y/N]: ").strip().lower()
                 except (KeyboardInterrupt, EOFError):
                     print("\nAborted.")
                     sys.exit(1)
@@ -347,7 +347,7 @@ def main():
                 ans = "y"
                 
             if ans in ("y", "yes"):
-                print(f"🧹 Deleting worktree '{delete_branch}'...")
+                print(f"Deleting worktree '{delete_branch}'...")
                 target_path = match["path"]
                 subprocess.run(["git", "worktree", "remove", "--force", "odoo"], cwd=target_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if (Path(target_path) / "enterprise").exists():
@@ -357,7 +357,7 @@ def main():
                     shutil.rmtree(target_path)
                 except Exception:
                     pass
-                print("✨ Deleted successfully.")
+                print("Success: Deleted successfully.")
                 sys.exit(0)
             else:
                 print("Aborted.")
@@ -467,12 +467,12 @@ def main():
                     
                     # 1. Propose Subcommand if any
                     if closest_cmd:
-                        console.print(f"💡 [bold cyan]Proposing Subcommand[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
+                        console.print(f"[bold cyan]Proposing Subcommand[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
                         console.print(f"  [[green]y[/green]] Run the '{closest_cmd}' subcommand\n")
                     
                     # 2. Print matches
                     tier_label = "Direct" if current_tier == 1 else ("Fuzzy" if current_tier == 2 else "Typo")
-                    console.print(f"🔍 [bold cyan]{tier_label} Matches[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
+                    console.print(f"[bold cyan]{tier_label} Matches[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
                     if matched_wts:
                         for idx, wt in enumerate(matched_wts, 1):
                             console.print(f"  [[green]{idx}[/green]] {wt['name']}")
