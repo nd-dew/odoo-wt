@@ -986,14 +986,9 @@ def print_cli_status(config, mode="combined"):
                 body_clean = comment_data.get("body_clean", "")
                 
                 # Symmetrical adaptive layout truncation
-                is_ent = comment_data.get("is_ent", False)
-                is_upg = comment_data.get("is_upg", False)
-                prefix_plain = "[Ent]" if is_ent else ("[Upg]" if is_upg else "[Comm]")
-                prefix = "[bold green][Ent][/bold green]" if is_ent else ("[bold yellow][Upg][/bold yellow]" if is_upg else "[bold cyan][Comm][/bold cyan]")
-                
-                # Non-comment column overhead (Branch + Runbot + Links + padding) = 68
-                comment_col_max = tbl_width - 68
-                meta_len = len(prefix_plain) + len(user) + len(relative) + 8
+                # Non-comment column overhead (Branch + Runbot + Links + padding) = 54
+                comment_col_max = tbl_width - 54
+                meta_len = len(user) + len(relative) + 6
                 allowed_body_len = comment_col_max - meta_len
                 
                 if allowed_body_len >= 10:
@@ -1003,10 +998,9 @@ def print_cli_status(config, mode="combined"):
                 else:
                     body_clean = "" # Hide body to prevent wrapping
                     
-                comment_text = f"{prefix} {user}"
+                comment_text = f"{user} ({relative})"
                 if body_clean:
                     comment_text += f": {body_clean}"
-                comment_text += f" ({relative})"
                 comment_str = f"[link={link_url}]{comment_text}[/link]"
                 
             table.add_row(name, status_str, link_str, comment_str)
