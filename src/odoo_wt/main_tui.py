@@ -947,14 +947,9 @@ class OdooWtApp(App):
                     link_url = comment_data["html_url"]
                     body_clean = comment_data.get("body_clean", "")
                     
-                    is_ent = comment_data.get("is_ent", False)
-                    is_upg = comment_data.get("is_upg", False)
-                    prefix = "[bold green][Ent][/bold green]" if is_ent else ("[bold yellow][Upg][/bold yellow]" if is_upg else "[bold cyan][Comm][/bold cyan]")
-                    
-                    comment_text = f"{prefix} {user}"
+                    comment_text = f"{user} ({relative})"
                     if body_clean:
                         comment_text += f": {body_clean}"
-                    comment_text += f" ({relative})"
                     
                     comment_cell = f"[link={link_url}]{comment_text}[/link]"
                 else:
@@ -1165,7 +1160,6 @@ class OdooWtApp(App):
                         else:
                             status = f"🟢{time_suffix}"
                             
-                        # Format latest PR comment cell
                         comment_data = res.get("comment_data")
                         if comment_data:
                             self.resolved_pr_comments[branch_name] = comment_data
@@ -1173,12 +1167,10 @@ class OdooWtApp(App):
                             relative = comment_data["relative"]
                             link_url = comment_data["html_url"]
                             body_clean = comment_data.get("body_clean", "")
-                            prefix = "[bold green][Ent][/bold green]" if comment_data["is_ent"] else "[bold cyan][Comm][/bold cyan]"
                             
-                            comment_text = f"{prefix} {user}"
+                            comment_text = f"{user} ({relative})"
                             if body_clean:
                                 comment_text += f": {body_clean}"
-                            comment_text += f" ({relative})"
                             
                             comment_cell = f"[link={link_url}]{comment_text}[/link]"
                         else:
