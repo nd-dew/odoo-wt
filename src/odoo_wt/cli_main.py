@@ -1024,9 +1024,7 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
     elif mode == "reviews":
         table = Table(title=f"Odoo PR Reviews Dashboard (v{VERSION})", title_style="bold magenta", header_style="bold cyan", box=None, width=tbl_width if tbl_width > 40 else None)
         table.add_column("Branch Name", style="cyan", no_wrap=True)
-        table.add_column("Community PR", no_wrap=True, min_width=14)
-        table.add_column("Enterprise PR", no_wrap=True, min_width=14)
-        table.add_column("Upgrade PR", no_wrap=True, min_width=14)
+        table.add_column("Pull Requests", no_wrap=True, min_width=18)
         table.add_column("Last Comment", no_wrap=True)
         
         for wt in sorted_wts:
@@ -1043,9 +1041,12 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
             ent_pr = res.get("enterprise_pr")
             upg_pr = res.get("upgrade_pr")
             
-            odoo_pr_str = f"[link={odoo_pr}]Open Comm PR[/link]" if odoo_pr else "-"
-            ent_pr_str = f"[link={ent_pr}]Open Ent PR[/link]" if ent_pr else "-"
-            upg_pr_str = f"[link={upg_pr}]Open Upg PR[/link]" if upg_pr else "-"
+            # Combine PR links into a single, compact column
+            parts = []
+            if odoo_pr: parts.append(f"[link={odoo_pr}]Comm[/link]")
+            if ent_pr: parts.append(f"[link={ent_pr}]Ent[/link]")
+            if upg_pr: parts.append(f"[link={upg_pr}]Upg[/link]")
+            pr_str = " | ".join(parts) if parts else "-"
             
             comment_data = comment_results.get(name)
             comment_str = "-"
@@ -1061,8 +1062,8 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
                 prefix_plain = "[Ent]" if is_ent else ("[Upg]" if is_upg else "[Comm]")
                 prefix = "[bold green][Ent][/bold green]" if is_ent else ("[bold yellow][Upg][/bold yellow]" if is_upg else "[bold cyan][Comm][/bold cyan]")
                 
-                # Non-comment column overhead (Branch + Comm PR + Ent PR + Upg PR + padding) = 62
-                comment_col_max = tbl_width - 62
+                # Non-comment column overhead (Branch + Pull Requests + padding) = 45
+                comment_col_max = tbl_width - 45
                 meta_len = len(prefix_plain) + len(user) + len(relative) + 8
                 allowed_body_len = comment_col_max - meta_len
                 
@@ -1079,7 +1080,7 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
                 comment_text += f" ({relative})"
                 comment_str = f"[link={link_url}]{comment_text}[/link]"
                 
-            table.add_row(name, odoo_pr_str, ent_pr_str, upg_pr_str, comment_str)
+            table.add_row(name, pr_str, comment_str)
             
     else: # mode == "combined"
         table = Table(title=f"Odoo Worktree Status (v{VERSION})", title_style="bold cyan", header_style="bold magenta", box=None, width=tbl_width if tbl_width > 40 else None)
