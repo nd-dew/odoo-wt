@@ -649,6 +649,15 @@ def main():
                 console.print(f"  [bold]Runbot Status:[/bold] {status}")
                 console.print(f"  [bold]Batch URL:[/bold]     [link={batch_url}]{batch_url}[/link]")
                 
+                # Failing tests summary if any
+                failing_tests = res.get("failing_tests", [])
+                if failing_tests:
+                    console.print("  [bold red]Failing Tests:[/bold red]")
+                    for t in failing_tests[:3]:
+                        console.print(f"    - [red]{t}[/red]")
+                    if len(failing_tests) > 3:
+                        console.print(f"    - [dim]... and {len(failing_tests) - 3} more[/dim]")
+                
                 # Linked pull requests
                 parts = []
                 if odoo_pr: parts.append(f"[link={odoo_pr}]Comm[/link]")
@@ -1191,6 +1200,15 @@ def print_single_branch_detailed_status(config, branch_name):
         
     console.print(f"  [bold]Runbot Status:[/bold] {status_line}")
     console.print(f"  [bold]Batch URL:[/bold]     [link={res['batch_url']}]{res['batch_url']}[/link]")
+    
+    # Failing tests summary if any
+    failing_tests = res.get("failing_tests", [])
+    if failing_tests:
+        console.print("\n  [bold red]❌ Failing Tests:[/bold red]")
+        for t in failing_tests[:3]:
+            console.print(f"    - [red]{t}[/red]")
+        if len(failing_tests) > 3:
+            console.print(f"    - [dim]... and {len(failing_tests) - 3} more (Check the Batch URL for the full list)[/dim]")
     
     if not is_base:
         odoo_pr = res["odoo_pr"]
