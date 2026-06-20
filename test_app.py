@@ -1227,3 +1227,50 @@ def test_cli_single_branch_detailed_status_with_failing_tests(monkeypatch, tmp_p
     assert "... and 1 more" in captured.out
     assert "TestExtra.test_more_failures" not in captured.out
 
+def test_cli_status_cwd_path_prefix_collision(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "status"])
+    
+    config_path = tmp_path / "odoo-wt-collision.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root", "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock system worktrees containing both "master" base branch and "master-pdp-fix"
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], [
+            {"name": "master", "path": "/path/root/master", "version": "master"},
+            {"name": "master-pdp-fix", "path": "/path/root/master-pdp-fix", "version": "master"}
+        ]
+    ))
+    
+    # Mock CWD to be inside the feature branch subfolder (which contains the base path as a string prefix!)
+    monkeypatch.setattr("os.getcwd", lambda: "/path/root/master-pdp-fix/odoo")
+    
+    # Mock status check to avoid real requests
+    monkeypatch.setattr("odoo_wt.runbot_client.check_branch_status_and_comments", lambda name, **kwargs: {
+        "batch_url": "https://runbot.odoo.com/runbot/batch/2592876",
+        "ts_str": "2026-06-18 10:00:00",
+        "success": 2,
+        "failed": 0,
+        "warning": 0,
+        "running": 0,
+        "odoo_pr": None,
+        "enterprise_pr": None,
+        "upgrade_pr": None,
+        "comment_data": None
+    })
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    # It must have successfully matched master-pdp-fix and NOT master!
+    assert "Detailed Status for" in captured.out
+    assert "master-pdp-fix" in captured.out
+
