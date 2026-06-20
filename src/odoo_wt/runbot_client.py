@@ -310,6 +310,41 @@ def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optiona
         relative = "yesterday" if days == 1 else f"{days}d ago"
         
     latest["relative"] = relative
+    
+    # Symmetrically extract the history of the last 10 comments chronologically
+    history = []
+    for c in human_comments[:10]:
+        c_body = c.get("body", "")
+        c_body_clean = " ".join(c_body.split())
+        if len(c_body_clean) > 90:
+            c_body_clean = c_body_clean[:90].strip() + "..."
+            
+        c_time = parse_time(c)
+        c_delta = now - c_time
+        c_seconds = int(c_delta.total_seconds())
+        if c_seconds < 0: c_seconds = 0
+        
+        if c_seconds < 60:
+            c_relative = "just now"
+        elif c_seconds < 3600:
+            c_relative = f"{c_seconds // 60}m ago"
+        elif c_seconds < 86400:
+            c_relative = f"{c_seconds // 3600}h ago"
+        else:
+            c_days = c_seconds // 86400
+            c_relative = "yesterday" if c_days == 1 else f"{c_days}d ago"
+            
+        history.append({
+            "user": c["user"],
+            "relative": c_relative,
+            "body": c_body,
+            "body_clean": c_body_clean,
+            "html_url": c["html_url"],
+            "is_ent": c.get("is_ent", False),
+            "is_upg": c.get("is_upg", False)
+        })
+        
+    latest["history"] = history
     return latest
 
 def fetch_failing_tests_from_batch(batch_url: str) -> list:
