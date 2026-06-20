@@ -23,13 +23,13 @@ def show_help():
     console.print("A premium terminal tool to manage, deploy, and monitor Odoo developer worktrees.\n")
     
     console.print("[bold yellow]Usage:[/bold yellow]")
-    console.print("  [bold green]odoo-wt[/bold green] [cyan][subcommand][/cyan] [cyan][options][/cyan]\n")
+    console.print("  [bold green]odoo-wt[/bold green] [cyan]\\[subcommand\\][/cyan] [cyan]\\[options\\][/cyan]\n")
     console.print("  (If no subcommand is passed, launches the full-screen interactive TUI)\n")
     
     console.print("[bold yellow]Subcommands:[/bold yellow]")
-    console.print("  [bold green]status[/bold green] [cyan][all/-a/branch][/cyan]    Show Runbot build status & GitHub PR reviews [dim](Combined)[/dim]")
-    console.print("  [bold green]runbot[/bold green] [cyan][all/-a/branch][/cyan]    Show Runbot build details & failing tests [dim](CI-focused)[/dim]")
-    console.print("  [bold green]reviews[/bold green] [cyan][all/-a/branch][/cyan]   Show linked Pull Requests & latest peer comments [dim](PR-focused)[/dim]")
+    console.print("  [bold green]status[/bold green] [cyan]\\[all/-a/branch\\][/cyan]    Show Runbot build status & GitHub PR reviews [dim](Combined)[/dim]")
+    console.print("  [bold green]runbot[/bold green] [cyan]\\[all/-a/branch\\][/cyan]    Show Runbot build details & failing tests [dim](CI-focused)[/dim]")
+    console.print("  [bold green]reviews[/bold green] [cyan]\\[all/-a/branch\\][/cyan]   Show linked Pull Requests & latest peer comments [dim](PR-focused)[/dim]")
     console.print("  [bold green]list[/bold green]                         Simply list all local worktree branch names")
     console.print("  [bold green]create[/bold green] [cyan]<branch>[/cyan]          Open the TUI pre-filled in the 'Creation' tab")
     console.print("  [bold green]open[/bold green] [cyan]<branch>[/cyan]            Directly change your shell directory into a worktree")
@@ -42,12 +42,12 @@ def show_help():
     console.print("  [bold cyan]-c, --code[/bold cyan] [cyan]<branch>[/cyan]          Alias for 'code <branch>'")
     console.print("  [bold cyan]-d, --delete[/bold cyan] [cyan]<branch>[/cyan]        Alias for 'delete <branch>'")
     console.print("  [bold cyan]-s, --sort[/bold cyan] [cyan]<mode>[/cyan]           Sort status tables by: recency, version, name, runbot, reviews")
-    console.print("  [bold cyan]--verbose[/bold cyan]                     Show all failing tests (grouped by module) / verbose deployment logs")
+    console.print("  [bold cyan]-v, --verbose[/bold cyan]                 Show all failing tests (grouped by module) / verbose deployment logs")
     console.print("  [bold cyan]--no-magic[/bold cyan]                    Disable automatic 'Magic Fix' branch decomposition")
     console.print("  [bold cyan]--config-path[/bold cyan]                 Print the active odoo-wt.json configuration path")
     console.print("  [bold cyan]--log-path[/bold cyan]                    Print the active odoo-wt-logs.jsonl path")
     console.print("  [bold cyan]-h, --help[/bold cyan]                    Show this help message")
-    console.print("  [bold cyan]-v, --version[/bold cyan]                 Show the current version")
+    console.print("  [bold cyan]-V, --version[/bold cyan]                 Show the current version")
     
     console.print("\n[bold yellow]Detailed Explanations:[/bold yellow]")
     console.print("\n  [bold cyan]1. The Smart Switcher: odoo-wt <branch>[/bold cyan]")
@@ -61,7 +61,7 @@ def show_help():
     console.print("     - [bold]Inside a worktree folder:[/bold] Displays a deeply detailed diagnostic card")
     console.print("       specifically for your active branch (failed tests, PR reviewers, last human feedback).")
     console.print("     - [bold]Outside any worktree:[/bold] Displays a high-level summary table of ALL your branches.")
-    console.print("     - You can force the full table inside a worktree by running 'status all', or query")
+    console.print("     - You can force the full table inside a worktree by running 'status -a', or query")
     console.print("       any specific branch from anywhere by running 'status <branch>'.")
     
     console.print("\n  [bold cyan]3. Symmetrical Diagnostics:[/bold cyan]")
@@ -170,9 +170,11 @@ def main():
     
     # --verbose flag
     verbose = False
-    if "--verbose" in sys.argv:
+    if "--verbose" in sys.argv or "-v" in sys.argv:
         verbose = True
-        sys.argv.remove("--verbose")
+        for marker in ("--verbose", "-v"):
+            if marker in sys.argv:
+                sys.argv.remove(marker)
     
     # Check for subcommand-specific help first!
     if "--help" in sys.argv or "-h" in sys.argv:
@@ -190,7 +192,7 @@ def main():
             show_help()
         sys.exit(0)
     
-    if "--version" in sys.argv:
+    if "--version" in sys.argv or "-V" in sys.argv:
         print(f"odoo-wt v{VERSION}")
         sys.exit(0)
 
@@ -1355,7 +1357,7 @@ def show_subcommand_help(subcommand):
         console.print("[bold yellow]Usage:[/bold yellow]")
         console.print("  [bold green]odoo-wt status[/bold green]                       Show combined status of the active branch (if inside a worktree)")
         console.print("  [bold green]odoo-wt status[/bold green] [cyan]<branch_name>[/cyan]          Show combined status of a specific branch from anywhere")
-        console.print("  [bold green]odoo-wt status[/bold green] [cyan][all/-a][/cyan]             Show combined overview table of all local branches\n")
+        console.print("  [bold green]odoo-wt status[/bold green] [cyan]\\[all/-a\\][/cyan]             Show combined overview table of all local branches\n")
         
         console.print("[bold yellow]Description:[/bold yellow]")
         console.print("  Fetches both the Runbot CI build status (including failed/warned build counts)")
@@ -1385,7 +1387,7 @@ def show_subcommand_help(subcommand):
         console.print("[bold yellow]Usage:[/bold yellow]")
         console.print("  [bold green]odoo-wt runbot[/bold green]                       Show CI status of the active branch (if inside a worktree)")
         console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]<branch_name>[/cyan]          Show CI status of a specific branch from anywhere")
-        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan][all/-a][/cyan]             Show CI overview table of all local branches\n")
+        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]\\[all/-a\\][/cyan]             Show CI overview table of all local branches\n")
         
         console.print("[bold yellow]Description:[/bold yellow]")
         console.print("  A high-performance diagnostic command that focuses exclusively on Runbot CI build counts,")
@@ -1418,7 +1420,7 @@ def show_subcommand_help(subcommand):
         console.print("[bold yellow]Usage:[/bold yellow]")
         console.print("  [bold green]odoo-wt reviews[/bold green]                      Show PR reviews of the active branch (if inside a worktree)")
         console.print("  [bold green]odoo-wt reviews[/bold green] [cyan]<branch_name>[/cyan]         Show PR reviews of a specific branch from anywhere")
-        console.print("  [bold green]odoo-wt reviews[/bold green] [cyan][all/-a][/cyan]            Show PR reviews table of all local branches\n")
+        console.print("  [bold green]odoo-wt reviews[/bold green] [cyan]\\[all/-a\\][/cyan]            Show PR reviews table of all local branches\n")
         
         console.print("[bold yellow]Description:[/bold yellow]")
         console.print("  A focused PR diagnostic command that displays linked community, enterprise, and upgrade")
