@@ -1141,6 +1141,18 @@ def print_single_branch_detailed_status(config, branch_name):
     
     console = Console()
     
+    # Symmetrically resolve full branch name from worktrees list if possible
+    _, _, worktrees = discover_system_data(
+        config["wt_root"], 
+        config["suffix"],
+        known_versions=config.get("known_versions", []),
+        known_suffixes=config.get("known_suffixes", [])
+    )
+    for wt in worktrees:
+        if branch_name.lower() in wt["name"].lower():
+            branch_name = wt["name"]
+            break
+            
     is_base = is_base_branch(branch_name)
     title_label = "Base Branch" if is_base else "Detailed Status"
     console.print(f"📊 [bold cyan]{title_label} for[/bold cyan] '[cyan]{branch_name}[/cyan]':\n")
