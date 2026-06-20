@@ -321,7 +321,17 @@ def check_branch_status_and_comments(branch_name: str, skip_comments: bool = Fal
         if not res:
             return None
             
-        batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr = res
+        # Safely unpack supporting both 8-element and 9-element tuple formats
+        batch_url = res[0]
+        ts_str = res[1]
+        success = res[2]
+        failed = res[3]
+        warning = res[4]
+        running = res[5]
+        odoo_pr = res[6] if len(res) > 6 else None
+        enterprise_pr = res[7] if len(res) > 7 else None
+        upgrade_pr = res[8] if len(res) > 8 else None
+        
         comment_data = None
         if not skip_comments:
             try:
