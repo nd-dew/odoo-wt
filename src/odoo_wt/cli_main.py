@@ -1270,43 +1270,44 @@ def print_single_branch_detailed_status(config, branch_name, verbose=False, mode
         console.print(f"  [bold]Runbot Status:[/bold] {status_line}")
         console.print(f"  [bold]Batch URL:[/bold]     [link={res['batch_url']}]{res['batch_url']}[/link]")
         
-        # Failing tests summary if any
-        failing_tests = res.get("failing_tests", [])
-        if failing_tests:
-            if verbose:
-                # Group by module/addon
-                grouped = {}
-                for t in failing_tests:
-                    addon = "core/base"
-                    if "addons." in t:
-                        parts = t.split("addons.")[1].split(".")
-                        if parts: addon = parts[0]
-                    elif "addons/" in t:
-                        parts = t.split("addons/")[1].split("/")
-                        if parts: addon = parts[0]
-                    elif "." in t:
-                        parts = t.split(".")
-                        if parts[0] not in ("odoo", "src"):
-                            addon = parts[0]
-                            
-                    if addon not in grouped:
-                        grouped[addon] = []
-                    grouped[addon].append(t)
-                    
-                console.print("\n  [bold red]❌ Failing Tests by Module:[/bold red]")
-                for addon, tests in sorted(grouped.items()):
-                    console.print(f"    [bold cyan]{addon}[/bold cyan]:")
-                    for t in tests:
-                        # Print cleanly with no hyphens/bullets, indented with exactly 6 spaces for easy double-click copying!
-                        console.print(f"      [red]{t}[/red]")
-            else:
-                # Symmetrical non-verbose Top 5 failure summary
-                console.print("\n  [bold red]❌ Failing Tests (top 5):[/bold red]")
-                for t in failing_tests[:5]:
-                    # Print cleanly with no hyphens/bullets, indented with exactly 4 spaces for easy double-click copying!
-                    console.print(f"    [red]{t}[/red]")
-                if len(failing_tests) > 5:
-                    console.print(f"    - [dim]... and {len(failing_tests) - 5} more (Check the Batch URL or run with --verbose)[/dim]")
+        # Failing tests summary if any (only on dedicated runbot subcommand cards)
+        if mode == "runbot":
+            failing_tests = res.get("failing_tests", [])
+            if failing_tests:
+                if verbose:
+                    # Group by module/addon
+                    grouped = {}
+                    for t in failing_tests:
+                        addon = "core/base"
+                        if "addons." in t:
+                            parts = t.split("addons.")[1].split(".")
+                            if parts: addon = parts[0]
+                        elif "addons/" in t:
+                            parts = t.split("addons/")[1].split("/")
+                            if parts: addon = parts[0]
+                        elif "." in t:
+                            parts = t.split(".")
+                            if parts[0] not in ("odoo", "src"):
+                                addon = parts[0]
+                                
+                        if addon not in grouped:
+                            grouped[addon] = []
+                        grouped[addon].append(t)
+                        
+                    console.print("\n  [bold red]❌ Failing Tests by Module:[/bold red]")
+                    for addon, tests in sorted(grouped.items()):
+                        console.print(f"    [bold cyan]{addon}[/bold cyan]:")
+                        for t in tests:
+                            # Print cleanly with no hyphens/bullets, indented with exactly 6 spaces for easy double-click copying!
+                            console.print(f"      [red]{t}[/red]")
+                else:
+                    # Symmetrical non-verbose Top 5 failure summary
+                    console.print("\n  [bold red]❌ Failing Tests (top 5):[/bold red]")
+                    for t in failing_tests[:5]:
+                        # Print cleanly with no hyphens/bullets, indented with exactly 4 spaces for easy double-click copying!
+                        console.print(f"    [red]{t}[/red]")
+                    if len(failing_tests) > 5:
+                        console.print(f"    - [dim]... and {len(failing_tests) - 5} more (Check the Batch URL or run with --verbose)[/dim]")
     
     if mode != "runbot" and not is_base:
         odoo_pr = res["odoo_pr"]
@@ -1356,7 +1357,7 @@ def show_subcommand_help(subcommand):
         console.print("  [bold green]odoo-wt status[/bold green] [cyan]all[/cyan]                  Show combined overview table of all local branches\n")
         
         console.print("[bold yellow]Description:[/bold yellow]")
-        console.print("  Fetches both the Runbot CI build status (including failed/warned build counts and failing tests)")
+        console.print("  Fetches both the Runbot CI build status (including failed/warned build counts)")
         console.print("  and the latest GitHub PR comments/reviews in a single, comprehensive diagnostic view.\n")
         
         console.print("[bold yellow]Context-Aware Directory Sensing:[/bold yellow]")
@@ -1364,16 +1365,14 @@ def show_subcommand_help(subcommand):
         console.print("  it automatically detects your path, resolves the full branch name, and prints its dedicated detailed diagnostic card.")
         console.print("  This saves you from constantly viewing the full global table or typing out long branch names!\n")
         
-        console.print("[bold yellow]Failing Tests & Linter Scraper:[/bold yellow]")
-        console.print("  If there are failing builds on the branch, odoo-wt automatically downloads the batch pages and detailed static logs,")
-        console.print("  extracting the exact names of failing unittests or linter checks (like 'check_semgrep_security') and listing them.")
-        console.print("  - Default: Shows the top 5 failing tests on clean, hyphen-free lines for [bold cyan]easy double-click copying[/bold cyan].")
-        console.print("  - `--verbose` or `-v`: Displays all failing tests [bold cyan]grouped by their Odoo module/addon[/bold cyan] under bold headers.\n")
+        console.print("[bold yellow]⚠️  GitHub CLI Authentication Required:[/bold yellow]")
+        console.print("  This command relies on the GitHub CLI ('gh' tool) being installed, alive, and")
+        console.print("  authenticated ('gh auth status') to fetch Pull Request links and human review comments.")
+        console.print("  If you are not logged in, reviews and comments will be skipped gracefully.\n")
         
         console.print("[bold yellow]Examples:[/bold yellow]")
         console.print("  [bold green]odoo-wt status[/bold green]                    [dim]# Show combined card of current worktree branch[/dim]")
         console.print("  [bold green]odoo-wt status[/bold green] [cyan]all[/cyan]                [dim]# Force display the high-level combined table of all branches[/dim]")
-        console.print("  [bold green]odoo-wt status[/bold green] [cyan]fix-paymob --verbose[/cyan]  [dim]# Show all failing tests of 'fix-paymob' grouped by module[/dim]\n")
         
     elif subcommand == "runbot":
         console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'runbot'[/cyan]\n")
@@ -1425,6 +1424,11 @@ def show_subcommand_help(subcommand):
         console.print("[bold yellow]Context-Aware Directory Sensing:[/bold yellow]")
         console.print("  If you run this command inside any subdirectory of an active worktree folder (including 'odoo' or 'enterprise'),")
         console.print("  it automatically detects your path, resolves the full branch name, and prints its dedicated detailed PR reviews card.\n")
+        
+        console.print("[bold yellow]⚠️  GitHub CLI Authentication Required:[/bold yellow]")
+        console.print("  This command relies on the GitHub CLI ('gh' tool) being installed, alive, and")
+        console.print("  authenticated ('gh auth status') to fetch Pull Request links and human review comments.")
+        console.print("  If you are not logged in, reviews and comments will be skipped gracefully.\n")
         
         console.print("[bold yellow]Examples:[/bold yellow]")
         console.print("  [bold green]odoo-wt reviews[/bold green]                   [dim]# Show PR reviews card of current worktree branch[/dim]")
