@@ -286,11 +286,9 @@ def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optiona
     human_comments.sort(key=parse_time, reverse=True)
     latest = human_comments[0]
     
-    # Sanitize and truncate the body text to exactly 50 characters with ellipses
+    # Sanitize the body text to a flat, single-line format
     body = latest.get("body", "")
     body_clean = " ".join(body.split())
-    if len(body_clean) > 50:
-        body_clean = body_clean[:50].strip() + "..."
     latest["body_clean"] = body_clean
     
     now = datetime.datetime.utcnow()
