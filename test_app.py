@@ -1290,3 +1290,62 @@ def test_cli_subcommand_help(monkeypatch, capsys):
     assert "Description:" in captured.out
     assert "Context-Aware" in captured.out
 
+def test_cli_single_branch_reviews_history_with_verbose(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "status", "17.0-fix-pian", "--verbose"])
+    
+    config_path = tmp_path / "odoo-wt-history.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root", "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock return values with comments history
+    monkeypatch.setattr("odoo_wt.runbot_client.check_branch_status_and_comments", lambda name, **kwargs: {
+        "batch_url": "https://runbot.odoo.com/runbot/batch/2592876",
+        "ts_str": "2026-06-18 10:00:00",
+        "success": 2,
+        "failed": 0,
+        "warning": 0,
+        "running": 0,
+        "odoo_pr": None,
+        "enterprise_pr": None,
+        "upgrade_pr": None,
+        "comment_data": {
+            "user": "pmah-odoo",
+            "relative": "2h ago",
+            "body": "Comment 2",
+            "html_url": "https://github.com/link2",
+            "history": [
+                {
+                    "user": "pmah-odoo",
+                    "relative": "2h ago",
+                    "body": "Comment 2",
+                    "html_url": "https://github.com/link2",
+                    "is_ent": False, "is_upg": False
+                },
+                {
+                    "user": "xavierbol",
+                    "relative": "1d ago",
+                    "body": "Comment 1",
+                    "html_url": "https://github.com/link1",
+                    "is_ent": True, "is_upg": False
+                }
+            ]
+        }
+    })
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "PR Reviews History (last 10 comments):" in captured.out
+    assert "pmah-odoo" in captured.out
+    assert "Comment 2" in captured.out
+    assert "xavierbol" in captured.out
+    assert "Comment 1" in captured.out
+
