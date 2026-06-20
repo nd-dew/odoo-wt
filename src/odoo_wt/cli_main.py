@@ -1126,19 +1126,29 @@ def print_cli_status(config, mode="combined", sort_mode="recency"):
 def print_single_branch_detailed_status(config, branch_name):
     from rich.console import Console
     from .runbot_client import check_branch_status_and_comments
+    from .system_discovery import is_base_branch
     import datetime
     import textwrap
     
     console = Console()
-    console.print(f"📊 [bold cyan]Detailed Status for[/bold cyan] '[cyan]{branch_name}[/cyan]':\n")
     
-    with console.status("[cyan]Fetching live Runbot and GitHub PR details..."):
-        res = check_branch_status_and_comments(branch_name, skip_comments=False)
+    is_base = is_base_branch(branch_name)
+    title_label = "Base Branch" if is_base else "Detailed Status"
+    console.print(f"📊 [bold cyan]{title_label} for[/bold cyan] '[cyan]{branch_name}[/cyan]':\n")
+    
+    with console.status("[cyan]Fetching live Runbot details..."):
+        res = check_branch_status_and_comments(branch_name, skip_comments=is_base)
         
     if not res:
         console.print("  [bold]Runbot Status:[/bold] ⚪ No batch (not found on Runbot)")
         print()
         return
+        
+    if is_base:
+        res["odoo_pr"] = None
+        res["enterprise_pr"] = None
+        res["upgrade_pr"] = None
+        res["comment_data"] = None
         
     success = res["success"]
     failed = res["failed"]
@@ -1173,6 +1183,8 @@ def print_single_branch_detailed_status(config, branch_name):
         status_line = f"⏳ [bold cyan]Running[/bold cyan] {status_suffix}{time_suffix}"
     elif failed > 0:
         status_line = f"🔴 [bold red]Failed[/bold red] {status_suffix}{time_suffix}"
+        if is_base:
+            status_line += "\n  [bold red]⚠️  Note: Some upstream builds are currently FAILING on this base branch![/bold red]"
     elif warning > 0:
         status_line = f"🟡 [bold yellow]Warning[/bold yellow] {status_suffix}{time_suffix}"
     else:
@@ -1181,35 +1193,36 @@ def print_single_branch_detailed_status(config, branch_name):
     console.print(f"  [bold]Runbot Status:[/bold] {status_line}")
     console.print(f"  [bold]Batch URL:[/bold]     [link={res['batch_url']}]{res['batch_url']}[/link]")
     
-    odoo_pr = res["odoo_pr"]
-    ent_pr = res["enterprise_pr"]
-    upg_pr = res["upgrade_pr"]
-    
-    console.print("\n  [bold yellow]Pull Requests:[/bold yellow]")
-    if not odoo_pr and not ent_pr and not upg_pr:
-        console.print("    [dim]No linked pull requests found on Runbot.[/dim]")
-    else:
-        if odoo_pr:
-            console.print(f"    - Community:  [link={odoo_pr}]{odoo_pr}[/link]")
-        if ent_pr:
-            console.print(f"    - Enterprise: [link={ent_pr}]{ent_pr}[/link]")
-        if upg_pr:
-            console.print(f"    - Upgrade:    [link={upg_pr}]{upg_pr}[/link]")
-            
-    comment_data = res["comment_data"]
-    console.print("\n  [bold yellow]Latest Review/Comment:[/bold yellow]")
-    if not comment_data:
-        console.print("    [dim]No review comments found or GitHub authentication not active.[/dim]")
-    else:
-        user = comment_data["user"]
-        relative = comment_data["relative"]
-        body = comment_data["body"]
-        link_url = comment_data["html_url"]
+    if not is_base:
+        odoo_pr = res["odoo_pr"]
+        ent_pr = res["enterprise_pr"]
+        upg_pr = res["upgrade_pr"]
         
-        console.print(f"    👤 [bold cyan]@{user}[/bold cyan] [dim]({relative}):[/dim]")
-        wrapped_body = textwrap.indent(textwrap.fill(body, width=80), "      ")
-        console.print(f"[italic]{wrapped_body}[/italic]")
-        console.print(f"    🔗 [underline blue]{link_url}[/underline blue]")
+        console.print("\n  [bold yellow]Pull Requests:[/bold yellow]")
+        if not odoo_pr and not ent_pr and not upg_pr:
+            console.print("    [dim]No linked pull requests found on Runbot.[/dim]")
+        else:
+            if odoo_pr:
+                console.print(f"    - Community:  [link={odoo_pr}]{odoo_pr}[/link]")
+            if ent_pr:
+                console.print(f"    - Enterprise: [link={ent_pr}]{ent_pr}[/link]")
+            if upg_pr:
+                console.print(f"    - Upgrade:    [link={upg_pr}]{upg_pr}[/link]")
+                
+        comment_data = res["comment_data"]
+        console.print("\n  [bold yellow]Latest Review/Comment:[/bold yellow]")
+        if not comment_data:
+            console.print("    [dim]No review comments found or GitHub authentication not active.[/dim]")
+        else:
+            user = comment_data["user"]
+            relative = comment_data["relative"]
+            body = comment_data["body"]
+            link_url = comment_data["html_url"]
+            
+            console.print(f"    👤 [bold cyan]@{user}[/bold cyan] [dim]({relative}):[/dim]")
+            wrapped_body = textwrap.indent(textwrap.fill(body, width=80), "      ")
+            console.print(f"[italic]{wrapped_body}[/italic]")
+            console.print(f"    🔗 [underline blue]{link_url}[/underline blue]")
     print()
 
 if __name__ == "__main__":
