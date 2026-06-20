@@ -1144,3 +1144,73 @@ def test_cli_status_cwd_inside_worktree(monkeypatch, tmp_path, capsys):
     assert "Detailed Status for" in captured.out
     assert "17.0-fix-pian" in captured.out
 
+def test_fetch_failing_tests_from_batch(monkeypatch):
+    from odoo_wt.runbot_client import fetch_failing_tests_from_batch
+    
+    import io
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def read(self):
+            return self.content.encode("utf-8")
+            
+    monkeypatch.setattr("urllib.request.urlopen", lambda *args, **kwargs: MockResponse(
+        'Some test logs... TestMail.test_mail_sending is failing... '
+        'also TestDiscuss.test_channel_creation was a error. test_options is not a real test.'
+    ))
+    
+    tests = fetch_failing_tests_from_batch("https://runbot.odoo.com/batch/123")
+    assert "TestMail.test_mail_sending" in tests
+    assert "TestDiscuss.test_channel_creation" in tests
+    assert "test_options" not in tests
+
+def test_cli_single_branch_detailed_status_with_failing_tests(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "status", "17.0-fix-pian"])
+    
+    config_path = tmp_path / "odoo-wt-fail.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root", "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock return values for live runbot details + pr comments + failing tests
+    monkeypatch.setattr("odoo_wt.runbot_client.check_branch_status_and_comments", lambda name, **kwargs: {
+        "batch_url": "https://runbot.odoo.com/runbot/batch/2592876",
+        "ts_str": "2026-06-18 10:00:00",
+        "success": 2,
+        "failed": 2,
+        "warning": 0,
+        "running": 0,
+        "odoo_pr": None,
+        "enterprise_pr": None,
+        "upgrade_pr": None,
+        "comment_data": None,
+        "failing_tests": [
+            "TestMail.test_mail_sending",
+            "TestDiscuss.test_channel_creation",
+            "TestSales.test_order_total",
+            "TestExtra.test_more_failures"
+        ]
+    })
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "Failing Tests:" in captured.out
+    assert "TestMail.test_mail_sending" in captured.out
+    assert "TestDiscuss.test_channel_creation" in captured.out
+    assert "TestSales.test_order_total" in captured.out
+    # Symmetrical adaptive limit checks: should show max 3 items and summaries
+    assert "... and 1 more" in captured.out
+    assert "TestExtra.test_more_failures" not in captured.out
+

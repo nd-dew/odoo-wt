@@ -312,6 +312,37 @@ def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optiona
     latest["relative"] = relative
     return latest
 
+def fetch_failing_tests_from_batch(batch_url: str) -> list:
+    """
+    Downloads the Runbot batch page and extracts the names of any failing unit tests.
+    """
+    if not batch_url:
+        return []
+        
+    req = urllib.request.Request(
+        batch_url, 
+        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            html = response.read().decode('utf-8')
+            
+        tests = []
+        matches_class = re.findall(r'\b(Test[A-Za-z0-9_]+\.test_[A-Za-z0-9_]+)\b', html)
+        for m in matches_class:
+            if m not in tests:
+                tests.append(m)
+                
+        matches_raw = re.findall(r'\b(test_[A-Za-z0-9_]{6,})\b', html)
+        for m in matches_raw:
+            if m not in tests and not any(m in existing for existing in tests):
+                if not any(fw in m.lower() for fw in ("test_option", "test_config", "test_success", "test_param")):
+                    tests.append(m)
+                    
+        return tests
+    except Exception:
+        return []
+
 def check_branch_status_and_comments(branch_name: str, skip_comments: bool = False) -> Optional[dict]:
     """
     Unified high-speed worker function to fetch runbot status and comments sequentially in a single worker thread.
@@ -339,6 +370,13 @@ def check_branch_status_and_comments(branch_name: str, skip_comments: bool = Fal
             except Exception:
                 pass
                 
+        failing_tests = []
+        if failed > 0:
+            try:
+                failing_tests = fetch_failing_tests_from_batch(batch_url)
+            except Exception:
+                pass
+                
         return {
             "batch_url": batch_url,
             "ts_str": ts_str,
@@ -349,7 +387,8 @@ def check_branch_status_and_comments(branch_name: str, skip_comments: bool = Fal
             "odoo_pr": odoo_pr,
             "enterprise_pr": enterprise_pr,
             "upgrade_pr": upgrade_pr,
-            "comment_data": comment_data
+            "comment_data": comment_data,
+            "failing_tests": failing_tests
         }
     except Exception:
         return None
