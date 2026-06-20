@@ -984,6 +984,41 @@ class OdooWtApp(App):
                 comment_cell = ""
 
             table.add_row(name, status, link, comment_cell, key=path)
+            
+        self.adjust_column_widths()
+
+    def adjust_column_widths(self) -> None:
+        try:
+            table = self.query_one("#wt-table", DataTable)
+            W = table.size.width
+            if W <= 10:
+                return
+                
+            # Symmetrical dynamic grid calculation:
+            # - Runbot Status takes 14 cells.
+            # - Link takes 18 cells.
+            # - Branch Name gets up to 35% of W, minimum 25, maximum 45.
+            # - Last Comment gets the absolute remaining width to prevent truncation and overflow!
+            runbot_w = 14
+            link_w = 18
+            branch_w = max(25, min(45, int(W * 0.35)))
+            comment_w = max(20, W - branch_w - runbot_w - link_w - 6)
+            
+            if "col-branch" in table.columns:
+                table.columns["col-branch"].width = branch_w
+            if "col-runbot" in table.columns:
+                table.columns["col-runbot"].width = runbot_w
+            if "col-link" in table.columns:
+                table.columns["col-link"].width = link_w
+            if "col-comment" in table.columns:
+                table.columns["col-comment"].width = comment_w
+                
+            table.refresh()
+        except Exception:
+            pass
+
+    def on_resize(self, event) -> None:
+        self.adjust_column_widths()
 
     @on(Input.Changed, "#wt-search")
     def on_wt_search_changed(self, event: Input.Changed) -> None:
@@ -1068,6 +1103,7 @@ class OdooWtApp(App):
         self.resolved_runbot_statuses.clear()
         self.resolved_odoo_pr_urls.clear()
         self.resolved_enterprise_pr_urls.clear()
+        self.resolved_upgrade_pr_urls.clear()
         _, _, self.worktrees = discover_system_data(
             self.config["wt_root"], 
             self.config["suffix"],
