@@ -1277,3 +1277,16 @@ def test_cli_status_cwd_path_prefix_collision(monkeypatch, tmp_path, capsys):
     assert "Detailed Status for" in captured.out
     assert "master-pdp-fix" in captured.out
 
+def test_cli_subcommand_help(monkeypatch, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "status", "-h"])
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "Subcommand Help: 'status'" in captured.out
+    assert "Diagnostic Modes:" in captured.out
+    assert "Context-Aware" in captured.out
+

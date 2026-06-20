@@ -174,8 +174,20 @@ def main():
         verbose = True
         sys.argv.remove("--verbose")
     
+    # Check for subcommand-specific help first!
     if "--help" in sys.argv or "-h" in sys.argv:
-        show_help()
+        # Check if there is a subcommand keyword in sys.argv
+        reserved_cmds = ["status", "runbot", "reviews", "list", "create", "open", "code", "delete", "rm"]
+        target_cmd = None
+        for cmd in reserved_cmds:
+            if cmd in sys.argv:
+                target_cmd = cmd
+                break
+                
+        if target_cmd:
+            show_subcommand_help(target_cmd)
+        else:
+            show_help()
         sys.exit(0)
     
     if "--version" in sys.argv:
@@ -1327,6 +1339,86 @@ def print_single_branch_detailed_status(config, branch_name, verbose=False, mode
             console.print(f"[italic]{wrapped_body}[/italic]")
             console.print(f"    🔗 [underline blue]{link_url}[/underline blue]")
     print()
+
+def show_subcommand_help(subcommand):
+    from rich.console import Console
+    console = Console()
+    
+    subcommand = subcommand.lower()
+    
+    if subcommand in ("status", "runbot", "reviews"):
+        console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'{subcommand}'[/cyan]\n")
+        console.print(f"The [bold green]{subcommand}[/bold green] command displays the live Runbot CI build status and peer reviews.\n")
+        
+        console.print("[bold yellow]Usage:[/bold yellow]")
+        console.print(f"  [bold green]odoo-wt {subcommand}[/bold green]                       Show detailed status of the [bold cyan]active branch[/bold cyan] (if inside a worktree)")
+        console.print(f"  [bold green]odoo-wt {subcommand}[/bold green] [cyan]<branch_name>[/cyan]          Show detailed status of a [bold cyan]specific branch[/bold cyan] from anywhere")
+        console.print(f"  [bold green]odoo-wt {subcommand}[/bold green] [cyan]all[/cyan]                  Show high-level overview table of [bold cyan]all local branches[/bold cyan]\n")
+        
+        console.print("[bold yellow]Diagnostic Modes:[/bold yellow]")
+        console.print("  - [bold]status:[/bold]  Combined view showing both Runbot CI build details and GitHub PR comments.")
+        console.print("  - [bold]runbot:[/bold]  CI-focused view showing build counts and failing tests list. [bold green]Skips GitHub calls for speed![/bold green]")
+        console.print("  - [bold]reviews:[/bold] Reviews-focused view showing linked Pull Requests and latest human feedback.\n")
+        
+        console.print("[bold yellow]Context-Aware Directory Sensing:[/bold yellow]")
+        console.print("  If you run this command inside any subdirectory of an active worktree folder (including 'odoo' or 'enterprise'),")
+        console.print("  it automatically detects your path, resolves the full branch name, and prints its dedicated detailed diagnostic card.")
+        console.print("  This saves you from constantly viewing the full global table or typing out long branch names!\n")
+        
+        console.print("[bold yellow]Failing Tests & Linter Scraper:[/bold yellow]")
+        console.print("  If there are failing builds on the branch, odoo-wt automatically downloads the batch pages and detailed static logs,")
+        console.print("  extracting the exact names of failing unittests or linter checks (like 'check_semgrep_security') and listing them.")
+        console.print("  - Default: Shows the top 5 failing tests on clean, hyphen-free lines for [bold cyan]easy double-click copying[/bold cyan].")
+        console.print("  - `--verbose` or `-v`: Displays all failing tests [bold cyan]grouped by their Odoo module/addon[/bold cyan] under bold headers.\n")
+        
+        console.print("[bold yellow]Examples:[/bold yellow]")
+        console.print(f"  [bold green]odoo-wt {subcommand}[/bold green]                    [dim]# Show detailed card of current worktree branch[/dim]")
+        console.print(f"  [bold green]odoo-wt {subcommand}[/bold green] [cyan]all[/cyan]                [dim]# Force display the high-level table of all branches[/dim]")
+        console.print(f"  [bold green]odoo-wt {subcommand}[/bold green] [cyan]fix-paymob --verbose[/cyan]  [dim]# Show all failing tests of 'fix-paymob' grouped by module[/dim]\n")
+        
+    elif subcommand in ("create", "open", "code", "delete", "rm"):
+        console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'{subcommand}'[/cyan]\n")
+        
+        if subcommand == "create":
+            console.print("The [bold green]create[/bold green] subcommand explicitly opens the TUI pre-filled in the 'Creation' tab to deploy a new worktree.\n")
+            console.print("[bold yellow]Usage:[/bold yellow]")
+            console.print("  [bold green]odoo-wt create[/bold green] [cyan]<branch_name>[/cyan]\n")
+            console.print("[bold yellow]Description:[/bold yellow]")
+            console.print("  Analyzes the requested branch name using [bold cyan]Magic Fix branch decomposition[/bold cyan] to automatically detect the target Odoo version,")
+            console.print("  description, developer suffix, and base remote. Then, launches the TUI Creator pre-filled and ready to scaffold.")
+        elif subcommand == "open":
+            console.print("The [bold green]open[/bold green] subcommand directly changes your shell directory into an existing worktree.\n")
+            console.print("[bold yellow]Usage:[/bold yellow]")
+            console.print("  [bold green]odoo-wt open[/bold green] [cyan]<branch_name>[/cyan]\n")
+            console.print("[bold yellow]Description:[/bold yellow]")
+            console.print("  Searches your local worktrees for the best matching branch name. If found, unsets its core tracking branch,")
+            console.print("  configures PWD and OLDPWD environment variables to keep your shell history in line, and directly swaps your shell directory.")
+        elif subcommand == "code":
+            console.print("The [bold green]code[/bold green] subcommand directly opens VS Code inside an existing worktree.\n")
+            console.print("[bold yellow]Usage:[/bold yellow]")
+            console.print("  [bold green]odoo-wt code[/bold green] [cyan]<branch_name>[/cyan]\n")
+            console.print("[bold yellow]Description:[/bold yellow]")
+            console.print("  Locates the matching worktree directory and invokes the VS Code 'code' binary on that path. It automatically")
+            console.print("  ensures Odoo core and Enterprise folders are correctly mapped inside your launch configuration.")
+        elif subcommand in ("delete", "rm"):
+            console.print(f"The [bold green]{subcommand}[/bold green] subcommand directly deletes a local worktree directory.\n")
+            console.print(f"[bold yellow]Usage:[/bold yellow]")
+            console.print(f"  [bold green]odoo-wt {subcommand}[/bold green] [cyan]<branch_name>[/cyan]\n")
+            console.print("[bold yellow]Description:[/bold yellow]")
+            console.print("  Locates the matching worktree directory, cleanly unregisters the worktree from Git's metadata database,")
+            console.print("  and deletes the physical folder from your disk. A safety confirmation prompt is shown before taking any action.")
+            
+        console.print("\n[bold yellow]Examples:[/bold yellow]")
+        console.print(f"  [bold green]odoo-wt {subcommand}[/bold green] [cyan]master-crm_lead-pian[/cyan]\n")
+        
+    elif subcommand == "list":
+        console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'list'[/cyan]\n")
+        console.print("The [bold green]list[/bold green] subcommand simply lists all registered local worktree branch names.\n")
+        console.print("[bold yellow]Usage:[/bold yellow]")
+        console.print("  [bold green]odoo-wt list[/bold green]\n")
+        console.print("[bold yellow]Description:[/bold yellow]")
+        console.print("  Prints a bare, unformatted list of all local worktree names, sorted by recency, one branch per line.")
+        console.print("  This command is highly optimized for scripting, auto-completions, and pipeline utilities.\n")
 
 if __name__ == "__main__":
     main()
