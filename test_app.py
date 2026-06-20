@@ -1194,7 +1194,7 @@ def test_cli_single_branch_detailed_status_with_failing_tests(monkeypatch, tmp_p
     
     monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
     
-    # Mock return values for live runbot details + pr comments + failing tests
+    # Mock return values for live runbot details + pr comments + failing tests (7 items)
     monkeypatch.setattr("odoo_wt.runbot_client.check_branch_status_and_comments", lambda name, **kwargs: {
         "batch_url": "https://runbot.odoo.com/runbot/batch/2592876",
         "ts_str": "2026-06-18 10:00:00",
@@ -1210,7 +1210,10 @@ def test_cli_single_branch_detailed_status_with_failing_tests(monkeypatch, tmp_p
             "TestMail.test_mail_sending",
             "TestDiscuss.test_channel_creation",
             "TestSales.test_order_total",
-            "TestExtra.test_more_failures"
+            "TestExtra.test_more_failures",
+            "Test5.test_5",
+            "Test6.test_6",
+            "Test7.test_7"
         ]
     })
     
@@ -1219,13 +1222,13 @@ def test_cli_single_branch_detailed_status_with_failing_tests(monkeypatch, tmp_p
         
     assert excinfo.value.code == 0
     captured = capsys.readouterr()
-    assert "Failing Tests:" in captured.out
+    assert "Failing Tests" in captured.out
     assert "TestMail.test_mail_sending" in captured.out
     assert "TestDiscuss.test_channel_creation" in captured.out
     assert "TestSales.test_order_total" in captured.out
-    # Symmetrical adaptive limit checks: should show max 3 items and summaries
-    assert "... and 1 more" in captured.out
-    assert "TestExtra.test_more_failures" not in captured.out
+    # Symmetrical adaptive limit checks: should show max 5 items and summaries
+    assert "... and 2 more" in captured.out
+    assert "Test7.test_7" not in captured.out
 
 def test_cli_status_cwd_path_prefix_collision(monkeypatch, tmp_path, capsys):
     from odoo_wt import cli_main
