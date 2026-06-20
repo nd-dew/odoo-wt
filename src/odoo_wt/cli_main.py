@@ -147,6 +147,12 @@ def main():
     except FileNotFoundError:
         original_cwd = os.path.expanduser("~")
     
+    # --verbose flag
+    verbose = False
+    if "--verbose" in sys.argv:
+        verbose = True
+        sys.argv.remove("--verbose")
+    
     if "--help" in sys.argv or "-h" in sys.argv:
         show_help()
         sys.exit(0)
@@ -264,9 +270,9 @@ def main():
                     break
                     
         if target_branch:
-            print_single_branch_detailed_status(config, target_branch)
+            print_single_branch_detailed_status(config, target_branch, verbose=verbose)
         else:
-            print_cli_status(config, mode=mode, sort_mode=sort_mode)
+            print_cli_status(config, mode=mode, sort_mode=sort_mode, verbose=verbose)
         sys.exit(0)
 
     # Utility metadata commands
@@ -333,12 +339,6 @@ def main():
     if "--no-magic" in sys.argv:
         no_magic = True
         sys.argv.remove("--no-magic")
-
-    # --verbose flag
-    verbose = False
-    if "--verbose" in sys.argv:
-        verbose = True
-        sys.argv.remove("--verbose")
 
     # Simple flag parsing for tab selection
     forced_tab = None
@@ -763,7 +763,7 @@ def main():
                 print("❌ VS Code ('code' command) not found in PATH.")
                 print(f"Directory is ready at: {target}")
 
-def print_cli_status(config, mode="combined", sort_mode="recency"):
+def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False):
     from rich.console import Console
     from rich.table import Table
     from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -1135,7 +1135,7 @@ def print_cli_status(config, mode="combined", sort_mode="recency"):
     }
     console.print(f"[dim]Sorted by: {sort_labels.get(sort_mode, sort_mode)}[/dim]")
 
-def print_single_branch_detailed_status(config, branch_name):
+def print_single_branch_detailed_status(config, branch_name, verbose=False):
     from rich.console import Console
     from .runbot_client import check_branch_status_and_comments
     from .system_discovery import is_base_branch
@@ -1229,11 +1229,40 @@ def print_single_branch_detailed_status(config, branch_name):
     # Failing tests summary if any
     failing_tests = res.get("failing_tests", [])
     if failing_tests:
-        console.print("\n  [bold red]❌ Failing Tests:[/bold red]")
-        for t in failing_tests[:3]:
-            console.print(f"    - [red]{t}[/red]")
-        if len(failing_tests) > 3:
-            console.print(f"    - [dim]... and {len(failing_tests) - 3} more (Check the Batch URL for the full list)[/dim]")
+        if verbose:
+            # Group by module/addon
+            grouped = {}
+            for t in failing_tests:
+                addon = "core/base"
+                if "addons." in t:
+                    parts = t.split("addons.")[1].split(".")
+                    if parts: addon = parts[0]
+                elif "addons/" in t:
+                    parts = t.split("addons/")[1].split("/")
+                    if parts: addon = parts[0]
+                elif "." in t:
+                    parts = t.split(".")
+                    if parts[0] not in ("odoo", "src"):
+                        addon = parts[0]
+                        
+                if addon not in grouped:
+                    grouped[addon] = []
+                grouped[addon].append(t)
+                
+            console.print("\n  [bold red]❌ Failing Tests by Module:[/bold red]")
+            for addon, tests in sorted(grouped.items()):
+                console.print(f"    [bold cyan]{addon}[/bold cyan]:")
+                for t in tests:
+                    # Print cleanly with no hyphens/bullets, indented with exactly 6 spaces for easy double-click copying!
+                    console.print(f"      [red]{t}[/red]")
+        else:
+            # Symmetrical non-verbose Top 5 failure summary
+            console.print("\n  [bold red]❌ Failing Tests (top 5):[/bold red]")
+            for t in failing_tests[:5]:
+                # Print cleanly with no hyphens/bullets, indented with exactly 4 spaces for easy double-click copying!
+                console.print(f"    [red]{t}[/red]")
+            if len(failing_tests) > 5:
+                console.print(f"    - [dim]... and {len(failing_tests) - 5} more (Check the Batch URL or run with --verbose)[/dim]")
     
     if not is_base:
         odoo_pr = res["odoo_pr"]
