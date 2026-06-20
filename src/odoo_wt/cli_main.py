@@ -1158,9 +1158,8 @@ def print_single_branch_detailed_status(config, branch_name):
     warn_str = f"[bold yellow]{warning}w[/bold yellow]" if warning > 0 else "0w"
     fail_str = f"[bold red]{failed}f[/bold red]" if failed > 0 else "0f"
     run_str = f"[bold cyan]{running}r[/bold cyan]" if running > 0 else "0r"
-    pass_str = f"[bold green]{success}p[/bold green]" if success > 0 else "0p"
     
-    status_suffix = f"({pass_str}, {warn_str}, {fail_str}, {run_str})"
+    status_suffix = f"({warn_str}, {fail_str}, {run_str})"
     ts_str = res["ts_str"]
     
     def relative_time(ts):
