@@ -142,7 +142,10 @@ async def run_cli_deployment(config, data, verbose=False):
     return {"action": action, "path": str(engine.target_dir)}
 
 def main():
-    original_cwd = os.getcwd()
+    try:
+        original_cwd = os.getcwd()
+    except FileNotFoundError:
+        original_cwd = os.path.expanduser("~")
     
     if "--help" in sys.argv or "-h" in sys.argv:
         show_help()
