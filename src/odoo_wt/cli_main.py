@@ -1330,19 +1330,31 @@ def print_single_branch_detailed_status(config, branch_name, verbose=False, mode
                 console.print(f"    - Upgrade:    [link={upg_pr}]{upg_pr}[/link]")
                 
         comment_data = res["comment_data"]
-        console.print("\n  [bold yellow]Latest Review/Comment:[/bold yellow]")
-        if not comment_data:
-            console.print("    [dim]No review comments found or GitHub authentication not active.[/dim]")
+        if comment_data:
+            history = comment_data.get("history", [])
+            if verbose and history:
+                console.print("\n  [bold yellow]PR Reviews History (last 10 comments):[/bold yellow]")
+                # Print oldest first (chronological order)
+                for c in reversed(history):
+                    prefix = "[bold green][Ent][/bold green]" if c["is_ent"] else ("[bold yellow][Upg][/bold yellow]" if c["is_upg"] else "[bold cyan][Comm][/bold cyan]")
+                    console.print(f"    👤 {prefix} [bold cyan]@{c['user']}[/bold cyan] [dim]({c['relative']}):[/dim]")
+                    wrapped_body = textwrap.indent(textwrap.fill(c["body"], width=80), "      ")
+                    console.print(f"      [italic]{wrapped_body}[/italic]")
+                    console.print(f"    🔗 [underline blue]{c['html_url']}[/underline blue]\n")
+            else:
+                console.print("\n  [bold yellow]Latest Review/Comment:[/bold yellow]")
+                user = comment_data["user"]
+                relative = comment_data["relative"]
+                body = comment_data["body"]
+                link_url = comment_data["html_url"]
+                
+                console.print(f"    👤 [bold cyan]@{user}[/bold cyan] [dim]({relative}):[/dim]")
+                wrapped_body = textwrap.indent(textwrap.fill(body, width=80), "      ")
+                console.print(f"    [italic]{wrapped_body}[/italic]")
+                console.print(f"    🔗 [underline blue]{link_url}[/underline blue]")
         else:
-            user = comment_data["user"]
-            relative = comment_data["relative"]
-            body = comment_data["body"]
-            link_url = comment_data["html_url"]
-            
-            console.print(f"    👤 [bold cyan]@{user}[/bold cyan] [dim]({relative}):[/dim]")
-            wrapped_body = textwrap.indent(textwrap.fill(body, width=80), "      ")
-            console.print(f"[italic]{wrapped_body}[/italic]")
-            console.print(f"    🔗 [underline blue]{link_url}[/underline blue]")
+            console.print("\n  [bold yellow]Latest Review/Comment:[/bold yellow]")
+            console.print("    [dim]No review comments found or GitHub authentication not active.[/dim]")
     print()
 
 def show_subcommand_help(subcommand):
