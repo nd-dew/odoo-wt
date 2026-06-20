@@ -1056,3 +1056,45 @@ def test_cli_single_branch_detailed_status(monkeypatch, tmp_path, capsys):
     assert "mail discuss layout" in captured.out
     assert "Runbot Status" in captured.out
 
+def test_cli_single_base_branch_detailed_status(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "status", "master"])
+    
+    config_path = tmp_path / "odoo-wt-base.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root", "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock return values for live base branch with 1 failing build
+    monkeypatch.setattr("odoo_wt.runbot_client.check_branch_status_and_comments", lambda name, **kwargs: {
+        "batch_url": "https://runbot.odoo.com/runbot/batch/2592876",
+        "ts_str": "2026-06-18 10:00:00",
+        "success": 2,
+        "failed": 1,
+        "warning": 0,
+        "running": 0,
+        "odoo_pr": "https://github.com/odoo/odoo/pull/123",
+        "enterprise_pr": "https://github.com/odoo/enterprise/pull/456",
+        "upgrade_pr": None,
+        "comment_data": {
+            "user": "pmah-odoo",
+            "relative": "2h ago",
+            "body": "This should be completely ignored for base branch",
+            "html_url": "https://github.com/odoo/odoo/pull/123#discussion_r123456"
+        }
+    })
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "Base Branch for" in captured.out
+    assert "Note: Some upstream builds are currently FAILING" in captured.out
+    assert "Pull Requests" not in captured.out
+    assert "Latest Review" not in captured.out
+
