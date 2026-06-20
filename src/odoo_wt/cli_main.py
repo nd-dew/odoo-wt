@@ -250,7 +250,7 @@ def main():
         
         # Symmetrical context-aware resolution of current worktree branch if none specified
         if not target_branch and not explicit_all:
-            cwd = os.getcwd()
+            cwd = Path(os.getcwd()).absolute()
             _, _, worktrees = discover_system_data(
                 config["wt_root"], 
                 config["suffix"],
@@ -258,8 +258,8 @@ def main():
                 known_suffixes=config.get("known_suffixes", [])
             )
             for wt in worktrees:
-                wt_path = str(Path(wt["path"]).expanduser().absolute())
-                if cwd.startswith(wt_path) or Path(cwd).absolute() == Path(wt_path).absolute():
+                wt_path = Path(wt["path"]).expanduser().absolute()
+                if cwd == wt_path or wt_path in cwd.parents:
                     target_branch = wt["name"]
                     break
                     
@@ -1151,10 +1151,20 @@ def print_single_branch_detailed_status(config, branch_name):
         known_versions=config.get("known_versions", []),
         known_suffixes=config.get("known_suffixes", [])
     )
+    
+    exact_match = None
     for wt in worktrees:
-        if branch_name.lower() in wt["name"].lower():
-            branch_name = wt["name"]
+        if wt["name"].lower() == branch_name.lower():
+            exact_match = wt
             break
+            
+    if exact_match:
+        branch_name = exact_match["name"]
+    else:
+        for wt in worktrees:
+            if branch_name.lower() in wt["name"].lower():
+                branch_name = wt["name"]
+                break
             
     is_base = is_base_branch(branch_name)
     title_label = "Base Branch" if is_base else "Detailed Status"
