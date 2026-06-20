@@ -27,9 +27,9 @@ def show_help():
     console.print("  (If no subcommand is passed, launches the full-screen interactive TUI)\n")
     
     console.print("[bold yellow]Subcommands:[/bold yellow]")
-    console.print("  [bold green]status[/bold green] [cyan][all/branch][/cyan]      Show Runbot build status & GitHub PR reviews [dim](Combined)[/dim]")
-    console.print("  [bold green]runbot[/bold green] [cyan][all/branch][/cyan]      Show Runbot build details & failing tests [dim](CI-focused)[/dim]")
-    console.print("  [bold green]reviews[/bold green] [cyan][all/branch][/cyan]     Show linked Pull Requests & latest peer comments [dim](PR-focused)[/dim]")
+    console.print("  [bold green]status[/bold green] [cyan][all/-a/branch][/cyan]    Show Runbot build status & GitHub PR reviews [dim](Combined)[/dim]")
+    console.print("  [bold green]runbot[/bold green] [cyan][all/-a/branch][/cyan]    Show Runbot build details & failing tests [dim](CI-focused)[/dim]")
+    console.print("  [bold green]reviews[/bold green] [cyan][all/-a/branch][/cyan]   Show linked Pull Requests & latest peer comments [dim](PR-focused)[/dim]")
     console.print("  [bold green]list[/bold green]                         Simply list all local worktree branch names")
     console.print("  [bold green]create[/bold green] [cyan]<branch>[/cyan]          Open the TUI pre-filled in the 'Creation' tab")
     console.print("  [bold green]open[/bold green] [cyan]<branch>[/cyan]            Directly change your shell directory into a worktree")
@@ -275,13 +275,14 @@ def main():
                 if cmd == "status" and idx + 1 < len(sys.argv) and sys.argv[idx + 1] in ("runbot", "reviews"):
                     mode = sys.argv[idx + 1]
                     sys.argv.pop(idx + 1)
-                elif idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith("-"):
+                elif idx + 1 < len(sys.argv):
                     val = sys.argv[idx + 1]
-                    if val == "all":
+                    if val in ("all", "-a", "--all"):
                         explicit_all = True
-                    else:
+                        sys.argv.pop(idx + 1)
+                    elif not val.startswith("-"):
                         target_branch = val
-                    sys.argv.pop(idx + 1)
+                        sys.argv.pop(idx + 1)
                 
                 if cmd == "status":
                     sys.argv.pop(idx)
@@ -1354,11 +1355,14 @@ def show_subcommand_help(subcommand):
         console.print("[bold yellow]Usage:[/bold yellow]")
         console.print("  [bold green]odoo-wt status[/bold green]                       Show combined status of the active branch (if inside a worktree)")
         console.print("  [bold green]odoo-wt status[/bold green] [cyan]<branch_name>[/cyan]          Show combined status of a specific branch from anywhere")
-        console.print("  [bold green]odoo-wt status[/bold green] [cyan]all[/cyan]                  Show combined overview table of all local branches\n")
+        console.print("  [bold green]odoo-wt status[/bold green] [cyan][all/-a][/cyan]             Show combined overview table of all local branches\n")
         
         console.print("[bold yellow]Description:[/bold yellow]")
         console.print("  Fetches both the Runbot CI build status (including failed/warned build counts)")
-        console.print("  and the latest GitHub PR comments/reviews in a single, comprehensive diagnostic view.\n")
+        console.print("  and the latest GitHub PR comments/reviews in a single, comprehensive diagnostic view.")
+        console.print("  ")
+        console.print("  By default, if run inside any worktree directory, it displays a detailed single-branch card.")
+        console.print("  To bypass this and force-display the global table of all branches, use the [bold cyan]'all'[/bold cyan] or [bold cyan]'-a'[/bold cyan] parameter.\n")
         
         console.print("[bold yellow]Context-Aware Directory Sensing:[/bold yellow]")
         console.print("  If you run this command inside any subdirectory of an active worktree folder (including 'odoo' or 'enterprise'),")
@@ -1372,7 +1376,7 @@ def show_subcommand_help(subcommand):
         
         console.print("[bold yellow]Examples:[/bold yellow]")
         console.print("  [bold green]odoo-wt status[/bold green]                    [dim]# Show combined card of current worktree branch[/dim]")
-        console.print("  [bold green]odoo-wt status[/bold green] [cyan]all[/cyan]                [dim]# Force display the high-level combined table of all branches[/dim]")
+        console.print("  [bold green]odoo-wt status[/bold green] [cyan]-a[/cyan]                 [dim]# Force display the high-level combined table of all branches[/dim]")
         
     elif subcommand == "runbot":
         console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'runbot'[/cyan]\n")
@@ -1381,11 +1385,14 @@ def show_subcommand_help(subcommand):
         console.print("[bold yellow]Usage:[/bold yellow]")
         console.print("  [bold green]odoo-wt runbot[/bold green]                       Show CI status of the active branch (if inside a worktree)")
         console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]<branch_name>[/cyan]          Show CI status of a specific branch from anywhere")
-        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]all[/cyan]                  Show CI overview table of all local branches\n")
+        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan][all/-a][/cyan]             Show CI overview table of all local branches\n")
         
         console.print("[bold yellow]Description:[/bold yellow]")
         console.print("  A high-performance diagnostic command that focuses exclusively on Runbot CI build counts,")
         console.print("  batch URLs, and failing test lists.")
+        console.print("  ")
+        console.print("  By default, if run inside any worktree directory, it displays a detailed single-branch CI card.")
+        console.print("  To bypass this and force-display the global table of all branches, use the [bold cyan]'all'[/bold cyan] or [bold cyan]'-a'[/bold cyan] parameter.")
         console.print("  ")
         console.print("  [bold green]⚡ Blazing Fast:[/bold green] This command completely [bold cyan]skips any GitHub PR comments lookups and API requests[/bold cyan],")
         console.print("  minimizing network latency and displaying your CI status in a fraction of a second!\n")
@@ -1402,7 +1409,7 @@ def show_subcommand_help(subcommand):
         
         console.print("[bold yellow]Examples:[/bold yellow]")
         console.print("  [bold green]odoo-wt runbot[/bold green]                    [dim]# Show CI card of current worktree branch[/dim]")
-        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]all[/cyan]                [dim]# Force display the high-level CI table of all branches[/dim]")
+        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]-a[/cyan]                 [dim]# Force display the high-level CI table of all branches[/dim]")
         console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]fix-paymob --verbose[/cyan]  [dim]# Show all failing tests of 'fix-paymob' grouped by module[/dim]\n")
         
     elif subcommand == "reviews":
@@ -1412,11 +1419,14 @@ def show_subcommand_help(subcommand):
         console.print("[bold yellow]Usage:[/bold yellow]")
         console.print("  [bold green]odoo-wt reviews[/bold green]                      Show PR reviews of the active branch (if inside a worktree)")
         console.print("  [bold green]odoo-wt reviews[/bold green] [cyan]<branch_name>[/cyan]         Show PR reviews of a specific branch from anywhere")
-        console.print("  [bold green]odoo-wt reviews[/bold green] [cyan]all[/cyan]                  Show PR reviews table of all local branches\n")
+        console.print("  [bold green]odoo-wt reviews[/bold green] [cyan][all/-a][/cyan]            Show PR reviews table of all local branches\n")
         
         console.print("[bold yellow]Description:[/bold yellow]")
         console.print("  A focused PR diagnostic command that displays linked community, enterprise, and upgrade")
         console.print("  Pull Requests on GitHub, alongside the last human review comment/approvals.")
+        console.print("  ")
+        console.print("  By default, if run inside any worktree directory, it displays a detailed single-branch reviews card.")
+        console.print("  To bypass this and force-display the global table of all branches, use the [bold cyan]'all'[/bold cyan] or [bold cyan]'-a'[/bold cyan] parameter.")
         console.print("  ")
         console.print("  This command [bold cyan]skips any Runbot CI build checks[/bold cyan] and focuses exclusively on human peer feedback,")
         console.print("  allowing you to quickly see what adjustments are needed before your PR is approved.\n")
@@ -1432,7 +1442,7 @@ def show_subcommand_help(subcommand):
         
         console.print("[bold yellow]Examples:[/bold yellow]")
         console.print("  [bold green]odoo-wt reviews[/bold green]                   [dim]# Show PR reviews card of current worktree branch[/dim]")
-        console.print("  [bold green]odoo-wt reviews[/bold green] [cyan]all[/cyan]               [dim]# Force display the PR reviews table of all branches[/dim]\n")
+        console.print("  [bold green]odoo-wt reviews[/bold green] [cyan]-a[/cyan]               [dim]# Force display the PR reviews table of all branches[/dim]\n")
         
     elif subcommand in ("create", "open", "code", "delete", "rm"):
         console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'{subcommand}'[/cyan]\n")
