@@ -1394,8 +1394,7 @@ def show_subcommand_help(subcommand):
         console.print("  By default, if run inside any worktree directory, it displays a detailed single-branch CI card.")
         console.print("  To bypass this and force-display the global table of all branches, use the [bold cyan]'all'[/bold cyan] or [bold cyan]'-a'[/bold cyan] parameter.")
         console.print("  ")
-        console.print("  [bold green]⚡ Blazing Fast:[/bold green] This command completely [bold cyan]skips any GitHub PR comments lookups and API requests[/bold cyan],")
-        console.print("  minimizing network latency and displaying your CI status in a fraction of a second!\n")
+        console.print("  This command skips all GitHub PR reviews and comments lookups to maximize performance.\n")
         
         console.print("[bold yellow]Context-Aware Directory Sensing:[/bold yellow]")
         console.print("  If you run this command inside any subdirectory of an active worktree folder (including 'odoo' or 'enterprise'),")
