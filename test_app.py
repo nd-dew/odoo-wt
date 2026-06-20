@@ -1147,7 +1147,6 @@ def test_cli_status_cwd_inside_worktree(monkeypatch, tmp_path, capsys):
 def test_fetch_failing_tests_from_batch(monkeypatch):
     from odoo_wt.runbot_client import fetch_failing_tests_from_batch
     
-    import io
     class MockResponse:
         def __init__(self, content):
             self.content = content
@@ -1155,13 +1154,27 @@ def test_fetch_failing_tests_from_batch(monkeypatch):
             return self
         def __exit__(self, exc_type, exc_val, exc_tb):
             pass
-        def read(self):
+        def read(self, *args):
             return self.content.encode("utf-8")
             
-    monkeypatch.setattr("urllib.request.urlopen", lambda *args, **kwargs: MockResponse(
-        'Some test logs... TestMail.test_mail_sending is failing... '
-        'also TestDiscuss.test_channel_creation was a error. test_options is not a real test.'
-    ))
+    def mock_urlopen(request, *args, **kwargs):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if "batch" in url and "build" not in url:
+            return MockResponse(
+                '<div class="btn-group slot_button_group">\n'
+                '  <span class="btn btn-danger"></span>\n'
+                '  <a href="/runbot/batch/123/build/456">Build</a>\n'
+                '</div>'
+            )
+        elif "build" in url:
+            return MockResponse('href="http://runbot.odoo.com/logs/job_20_test.txt"')
+        else:
+            return MockResponse(
+                'Some test logs... TestMail.test_mail_sending is failing... '
+                'also TestDiscuss.test_channel_creation was a error. test_options is not a real test.'
+            )
+            
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
     
     tests = fetch_failing_tests_from_batch("https://runbot.odoo.com/batch/123")
     assert "TestMail.test_mail_sending" in tests
