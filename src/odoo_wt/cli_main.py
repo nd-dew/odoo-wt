@@ -24,9 +24,9 @@ def show_help():
     
     console.print("[bold yellow]Usage:[/bold yellow]")
     console.print("  [bold green]odoo-wt[/bold green]                       Launch the interactive TUI [dim](Recommended)[/dim]")
-    console.print("  [bold green]odoo-wt status[/bold green]                  Show runbot build status & pull requests overview")
-    console.print("  [bold green]odoo-wt runbot[/bold green]                  Print detailed Runbot CI status table")
-    console.print("  [bold green]odoo-wt reviews[/bold green]                 Print detailed PR Reviews dashboard")
+    console.print("  [bold green]odoo-wt status [cyan][all/branch][/cyan][/bold green] Show runbot status & PR overview [dim](CWD context-aware)[/dim]")
+    console.print("  [bold green]odoo-wt runbot [cyan][all/branch][/cyan][/bold green] Print detailed Runbot CI status table")
+    console.print("  [bold green]odoo-wt reviews [cyan][all/branch][/cyan][/bold green] Print detailed PR Reviews dashboard")
     console.print("  [bold green]odoo-wt list[/bold green]                  Simply list existing worktree names, one per line")
     console.print("  [bold green]odoo-wt <branch>[/bold green]              Smart Switcher/Creator: opens TUI if new, shell if existing")
     
@@ -217,23 +217,53 @@ def main():
         sys.exit(0)
 
     # Command-line Status, Runbot, and Reviews modes
+    target_branch = None
+    explicit_all = False
+    
     if "status" in sys.argv or "runbot" in sys.argv or "reviews" in sys.argv:
         mode = "combined"
-        if "status" in sys.argv:
-            idx = sys.argv.index("status")
-            if idx + 1 < len(sys.argv) and sys.argv[idx + 1] in ("runbot", "reviews"):
-                mode = sys.argv[idx + 1]
-                sys.argv.pop(idx + 1)
-            sys.argv.pop(idx)
-        elif "runbot" in sys.argv:
-            mode = "runbot"
-            sys.argv.remove("runbot")
-        elif "reviews" in sys.argv:
-            mode = "reviews"
-            sys.argv.remove("reviews")
-            
+        # Determine if there's an explicit branch or "all" after the command
+        for cmd in ("status", "runbot", "reviews"):
+            if cmd in sys.argv:
+                idx = sys.argv.index(cmd)
+                if cmd == "status" and idx + 1 < len(sys.argv) and sys.argv[idx + 1] in ("runbot", "reviews"):
+                    mode = sys.argv[idx + 1]
+                    sys.argv.pop(idx + 1)
+                elif idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith("-"):
+                    val = sys.argv[idx + 1]
+                    if val == "all":
+                        explicit_all = True
+                    else:
+                        target_branch = val
+                    sys.argv.pop(idx + 1)
+                
+                if cmd == "status":
+                    sys.argv.pop(idx)
+                else:
+                    sys.argv.remove(cmd)
+                break
+                
         check_dependencies()
-        print_cli_status(config, mode=mode, sort_mode=sort_mode)
+        
+        # Symmetrical context-aware resolution of current worktree branch if none specified
+        if not target_branch and not explicit_all:
+            cwd = os.getcwd()
+            _, _, worktrees = discover_system_data(
+                config["wt_root"], 
+                config["suffix"],
+                known_versions=config.get("known_versions", []),
+                known_suffixes=config.get("known_suffixes", [])
+            )
+            for wt in worktrees:
+                wt_path = str(Path(wt["path"]).expanduser().absolute())
+                if cwd.startswith(wt_path) or Path(cwd).absolute() == Path(wt_path).absolute():
+                    target_branch = wt["name"]
+                    break
+                    
+        if target_branch:
+            print_single_branch_detailed_status(config, target_branch)
+        else:
+            print_cli_status(config, mode=mode, sort_mode=sort_mode)
         sys.exit(0)
 
     # Utility metadata commands
@@ -568,16 +598,24 @@ def main():
 
         if matched_wt:
             from rich.console import Console
-            from .runbot_client import query_branch_status
+            from .runbot_client import check_branch_status_and_comments
             
             console = Console()
             console.print(f"✨ Found worktree '[cyan]{matched_wt['name']}[/cyan]' locally!")
             
-            with console.status("[cyan]Fetching live Runbot status..."):
-                res = query_branch_status(matched_wt["name"])
+            with console.status("[cyan]Fetching live Runbot and GitHub details..."):
+                res = check_branch_status_and_comments(matched_wt["name"])
                 
             if res:
-                batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr = res[:8]
+                batch_url = res["batch_url"]
+                ts_str = res["ts_str"]
+                success = res["success"]
+                failed = res["failed"]
+                warning = res["warning"]
+                running = res["running"]
+                odoo_pr = res["odoo_pr"]
+                enterprise_pr = res["enterprise_pr"]
+                comment_data = res["comment_data"]
                 
                 warn_str = f"[yellow]{warning}w[/yellow]" if warning > 0 else "0w"
                 fail_str = f"[red]{failed}f[/red]" if failed > 0 else "0f"
@@ -609,7 +647,21 @@ def main():
                     status = f"🟢 Passed{time_suffix}"
                     
                 console.print(f"  [bold]Runbot Status:[/bold] {status}")
-                console.print(f"  [bold]Batch URL:[/bold]     {batch_url}")
+                console.print(f"  [bold]Batch URL:[/bold]     [link={batch_url}]{batch_url}[/link]")
+                
+                # Linked pull requests
+                parts = []
+                if odoo_pr: parts.append(f"[link={odoo_pr}]Comm[/link]")
+                if enterprise_pr: parts.append(f"[link={enterprise_pr}]Ent[/link]")
+                if parts:
+                    console.print(f"  [bold]PR Links:[/bold]      {' | '.join(parts)}")
+                    
+                # Latest human PR comment/review
+                if comment_data:
+                    user = comment_data["user"]
+                    relative = comment_data["relative"]
+                    body_clean = comment_data["body_clean"]
+                    console.print(f"  [bold]Last Comment:[/bold]  👤 [bold cyan]@{user}[/bold cyan] [dim]({relative})[/dim]: [italic]\"{body_clean}\"[/italic]")
             else:
                 console.print("  [bold]Runbot Status:[/bold] ⚪ No batch")
 
@@ -1070,6 +1122,95 @@ def print_cli_status(config, mode="combined", sort_mode="recency"):
         "reviews": "most recently active human PR comments first"
     }
     console.print(f"[dim]Sorted by: {sort_labels.get(sort_mode, sort_mode)}[/dim]")
+
+def print_single_branch_detailed_status(config, branch_name):
+    from rich.console import Console
+    from .runbot_client import check_branch_status_and_comments
+    import datetime
+    import textwrap
+    
+    console = Console()
+    console.print(f"📊 [bold cyan]Detailed Status for[/bold cyan] '[cyan]{branch_name}[/cyan]':\n")
+    
+    with console.status("[cyan]Fetching live Runbot and GitHub PR details..."):
+        res = check_branch_status_and_comments(branch_name, skip_comments=False)
+        
+    if not res:
+        console.print("  [bold]Runbot Status:[/bold] ⚪ No batch (not found on Runbot)")
+        print()
+        return
+        
+    success = res["success"]
+    failed = res["failed"]
+    warning = res["warning"]
+    running = res["running"]
+    
+    warn_str = f"[bold yellow]{warning}w[/bold yellow]" if warning > 0 else "0w"
+    fail_str = f"[bold red]{failed}f[/bold red]" if failed > 0 else "0f"
+    run_str = f"[bold cyan]{running}r[/bold cyan]" if running > 0 else "0r"
+    pass_str = f"[bold green]{success}p[/bold green]" if success > 0 else "0p"
+    
+    status_suffix = f"({pass_str}, {warn_str}, {fail_str}, {run_str})"
+    ts_str = res["ts_str"]
+    
+    def relative_time(ts):
+        if not ts: return ""
+        try:
+            dt = datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+            now = datetime.datetime.utcnow()
+            delta = now - dt
+            total_seconds = int(delta.total_seconds())
+            if total_seconds < 0: total_seconds = 0
+            if total_seconds < 60: return "just now"
+            elif total_seconds < 3600: return f"{total_seconds // 60}m ago"
+            elif total_seconds < 86400: return f"{total_seconds // 3600}h ago"
+            else: return f"{total_seconds // 86400}d ago"
+        except Exception: return ""
+        
+    time_suffix = f" {relative_time(ts_str)}" if ts_str else ""
+    
+    if running > 0:
+        status_line = f"⏳ [bold cyan]Running[/bold cyan] {status_suffix}{time_suffix}"
+    elif failed > 0:
+        status_line = f"🔴 [bold red]Failed[/bold red] {status_suffix}{time_suffix}"
+    elif warning > 0:
+        status_line = f"🟡 [bold yellow]Warning[/bold yellow] {status_suffix}{time_suffix}"
+    else:
+        status_line = f"🟢 [bold green]Passed[/bold green] {status_suffix}{time_suffix}"
+        
+    console.print(f"  [bold]Runbot Status:[/bold] {status_line}")
+    console.print(f"  [bold]Batch URL:[/bold]     [link={res['batch_url']}]{res['batch_url']}[/link]")
+    
+    odoo_pr = res["odoo_pr"]
+    ent_pr = res["enterprise_pr"]
+    upg_pr = res["upgrade_pr"]
+    
+    console.print("\n  [bold yellow]Pull Requests:[/bold yellow]")
+    if not odoo_pr and not ent_pr and not upg_pr:
+        console.print("    [dim]No linked pull requests found on Runbot.[/dim]")
+    else:
+        if odoo_pr:
+            console.print(f"    - Community:  [link={odoo_pr}]{odoo_pr}[/link]")
+        if ent_pr:
+            console.print(f"    - Enterprise: [link={ent_pr}]{ent_pr}[/link]")
+        if upg_pr:
+            console.print(f"    - Upgrade:    [link={upg_pr}]{upg_pr}[/link]")
+            
+    comment_data = res["comment_data"]
+    console.print("\n  [bold yellow]Latest Review/Comment:[/bold yellow]")
+    if not comment_data:
+        console.print("    [dim]No review comments found or GitHub authentication not active.[/dim]")
+    else:
+        user = comment_data["user"]
+        relative = comment_data["relative"]
+        body = comment_data["body"]
+        link_url = comment_data["html_url"]
+        
+        console.print(f"    👤 [bold cyan]@{user}[/bold cyan] [dim]({relative}):[/dim]")
+        wrapped_body = textwrap.indent(textwrap.fill(body, width=80), "      ")
+        console.print(f"[italic]{wrapped_body}[/italic]")
+        console.print(f"    🔗 [underline blue]{link_url}[/underline blue]")
+    print()
 
 if __name__ == "__main__":
     main()
