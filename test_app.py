@@ -1098,3 +1098,49 @@ def test_cli_single_base_branch_detailed_status(monkeypatch, tmp_path, capsys):
     assert "Pull Requests" not in captured.out
     assert "Latest Review" not in captured.out
 
+def test_cli_status_cwd_inside_worktree(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "status"])
+    
+    config_path = tmp_path / "odoo-wt-cwd.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root", "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock discover_system_data to return a worktree matching our mocked CWD
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], [
+            {"name": "17.0-fix-pian", "path": "/path/root/17.0-fix-pian", "version": "17.0"}
+        ]
+    ))
+    
+    # Mock current working directory to be inside the worktree path
+    monkeypatch.setattr("os.getcwd", lambda: "/path/root/17.0-fix-pian/odoo")
+    
+    # Mock return values for live runbot details + pr comments
+    monkeypatch.setattr("odoo_wt.runbot_client.check_branch_status_and_comments", lambda name, **kwargs: {
+        "batch_url": "https://runbot.odoo.com/runbot/batch/2592876",
+        "ts_str": "2026-06-18 10:00:00",
+        "success": 2,
+        "failed": 0,
+        "warning": 1,
+        "running": 0,
+        "odoo_pr": "https://github.com/odoo/odoo/pull/123",
+        "enterprise_pr": "https://github.com/odoo/enterprise/pull/456",
+        "upgrade_pr": None,
+        "comment_data": None
+    })
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    # It must have successfully detected CWD is inside 17.0-fix-pian, and printed its detailed card!
+    assert "Detailed Status for" in captured.out
+    assert "17.0-fix-pian" in captured.out
+
