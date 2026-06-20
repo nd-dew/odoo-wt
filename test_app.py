@@ -1183,7 +1183,7 @@ def test_fetch_failing_tests_from_batch(monkeypatch):
 
 def test_cli_single_branch_detailed_status_with_failing_tests(monkeypatch, tmp_path, capsys):
     from odoo_wt import cli_main
-    monkeypatch.setattr("sys.argv", ["odoo-wt", "status", "17.0-fix-pian"])
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "runbot", "17.0-fix-pian"])
     
     config_path = tmp_path / "odoo-wt-fail.json"
     config_path.write_text("{}")
