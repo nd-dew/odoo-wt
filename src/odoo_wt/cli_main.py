@@ -234,6 +234,10 @@ def main():
         # Determine if there's an explicit branch or "all" after the command
         for cmd in ("status", "runbot", "reviews"):
             if cmd in sys.argv:
+                if cmd == "status":
+                    mode = "combined"
+                else:
+                    mode = cmd
                 idx = sys.argv.index(cmd)
                 if cmd == "status" and idx + 1 < len(sys.argv) and sys.argv[idx + 1] in ("runbot", "reviews"):
                     mode = sys.argv[idx + 1]
@@ -270,7 +274,7 @@ def main():
                     break
                     
         if target_branch:
-            print_single_branch_detailed_status(config, target_branch, verbose=verbose)
+            print_single_branch_detailed_status(config, target_branch, verbose=verbose, mode=mode)
         else:
             print_cli_status(config, mode=mode, sort_mode=sort_mode, verbose=verbose)
         sys.exit(0)
@@ -1135,7 +1139,7 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
     }
     console.print(f"[dim]Sorted by: {sort_labels.get(sort_mode, sort_mode)}[/dim]")
 
-def print_single_branch_detailed_status(config, branch_name, verbose=False):
+def print_single_branch_detailed_status(config, branch_name, verbose=False, mode="combined"):
     from rich.console import Console
     from .runbot_client import check_branch_status_and_comments
     from .system_discovery import is_base_branch
@@ -1168,10 +1172,16 @@ def print_single_branch_detailed_status(config, branch_name, verbose=False):
             
     is_base = is_base_branch(branch_name)
     title_label = "Base Branch" if is_base else "Detailed Status"
+    if mode == "runbot":
+        title_label = "Runbot CI Status"
+    elif mode == "reviews":
+        title_label = "PR Reviews Status"
+        
     console.print(f"📊 [bold cyan]{title_label} for[/bold cyan] '[cyan]{branch_name}[/cyan]':\n")
     
+    skip_comments = is_base or mode == "runbot"
     with console.status("[cyan]Fetching live Runbot details..."):
-        res = check_branch_status_and_comments(branch_name, skip_comments=is_base)
+        res = check_branch_status_and_comments(branch_name, skip_comments=skip_comments)
         
     if not res:
         console.print("  [bold]Runbot Status:[/bold] ⚪ No batch (not found on Runbot)")
@@ -1223,48 +1233,49 @@ def print_single_branch_detailed_status(config, branch_name, verbose=False):
     else:
         status_line = f"🟢 [bold green]Passed[/bold green] {status_suffix}{time_suffix}"
         
-    console.print(f"  [bold]Runbot Status:[/bold] {status_line}")
-    console.print(f"  [bold]Batch URL:[/bold]     [link={res['batch_url']}]{res['batch_url']}[/link]")
+    if mode != "reviews":
+        console.print(f"  [bold]Runbot Status:[/bold] {status_line}")
+        console.print(f"  [bold]Batch URL:[/bold]     [link={res['batch_url']}]{res['batch_url']}[/link]")
+        
+        # Failing tests summary if any
+        failing_tests = res.get("failing_tests", [])
+        if failing_tests:
+            if verbose:
+                # Group by module/addon
+                grouped = {}
+                for t in failing_tests:
+                    addon = "core/base"
+                    if "addons." in t:
+                        parts = t.split("addons.")[1].split(".")
+                        if parts: addon = parts[0]
+                    elif "addons/" in t:
+                        parts = t.split("addons/")[1].split("/")
+                        if parts: addon = parts[0]
+                    elif "." in t:
+                        parts = t.split(".")
+                        if parts[0] not in ("odoo", "src"):
+                            addon = parts[0]
+                            
+                    if addon not in grouped:
+                        grouped[addon] = []
+                    grouped[addon].append(t)
+                    
+                console.print("\n  [bold red]❌ Failing Tests by Module:[/bold red]")
+                for addon, tests in sorted(grouped.items()):
+                    console.print(f"    [bold cyan]{addon}[/bold cyan]:")
+                    for t in tests:
+                        # Print cleanly with no hyphens/bullets, indented with exactly 6 spaces for easy double-click copying!
+                        console.print(f"      [red]{t}[/red]")
+            else:
+                # Symmetrical non-verbose Top 5 failure summary
+                console.print("\n  [bold red]❌ Failing Tests (top 5):[/bold red]")
+                for t in failing_tests[:5]:
+                    # Print cleanly with no hyphens/bullets, indented with exactly 4 spaces for easy double-click copying!
+                    console.print(f"    [red]{t}[/red]")
+                if len(failing_tests) > 5:
+                    console.print(f"    - [dim]... and {len(failing_tests) - 5} more (Check the Batch URL or run with --verbose)[/dim]")
     
-    # Failing tests summary if any
-    failing_tests = res.get("failing_tests", [])
-    if failing_tests:
-        if verbose:
-            # Group by module/addon
-            grouped = {}
-            for t in failing_tests:
-                addon = "core/base"
-                if "addons." in t:
-                    parts = t.split("addons.")[1].split(".")
-                    if parts: addon = parts[0]
-                elif "addons/" in t:
-                    parts = t.split("addons/")[1].split("/")
-                    if parts: addon = parts[0]
-                elif "." in t:
-                    parts = t.split(".")
-                    if parts[0] not in ("odoo", "src"):
-                        addon = parts[0]
-                        
-                if addon not in grouped:
-                    grouped[addon] = []
-                grouped[addon].append(t)
-                
-            console.print("\n  [bold red]❌ Failing Tests by Module:[/bold red]")
-            for addon, tests in sorted(grouped.items()):
-                console.print(f"    [bold cyan]{addon}[/bold cyan]:")
-                for t in tests:
-                    # Print cleanly with no hyphens/bullets, indented with exactly 6 spaces for easy double-click copying!
-                    console.print(f"      [red]{t}[/red]")
-        else:
-            # Symmetrical non-verbose Top 5 failure summary
-            console.print("\n  [bold red]❌ Failing Tests (top 5):[/bold red]")
-            for t in failing_tests[:5]:
-                # Print cleanly with no hyphens/bullets, indented with exactly 4 spaces for easy double-click copying!
-                console.print(f"    [red]{t}[/red]")
-            if len(failing_tests) > 5:
-                console.print(f"    - [dim]... and {len(failing_tests) - 5} more (Check the Batch URL or run with --verbose)[/dim]")
-    
-    if not is_base:
+    if mode != "runbot" and not is_base:
         odoo_pr = res["odoo_pr"]
         ent_pr = res["enterprise_pr"]
         upg_pr = res["upgrade_pr"]
