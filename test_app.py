@@ -1287,6 +1287,6 @@ def test_cli_subcommand_help(monkeypatch, capsys):
     assert excinfo.value.code == 0
     captured = capsys.readouterr()
     assert "Subcommand Help: 'status'" in captured.out
-    assert "Diagnostic Modes:" in captured.out
+    assert "Description:" in captured.out
     assert "Context-Aware" in captured.out
 
