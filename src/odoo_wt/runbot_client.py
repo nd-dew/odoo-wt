@@ -314,31 +314,78 @@ def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optiona
 
 def fetch_failing_tests_from_batch(batch_url: str) -> list:
     """
-    Downloads the Runbot batch page and extracts the names of any failing unit tests.
+    Downloads the Runbot batch page, identifies failed builds, scrapes their detailed build pages,
+    and extracts failing unit tests or static check errors from the logs.
     """
     if not batch_url:
         return []
         
-    req = urllib.request.Request(
+    req_batch = urllib.request.Request(
         batch_url, 
         headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     )
     try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            html = response.read().decode('utf-8')
+        with urllib.request.urlopen(req_batch, timeout=5) as response:
+            html_batch = response.read().decode('utf-8')
             
-        tests = []
-        matches_class = re.findall(r'\b(Test[A-Za-z0-9_]+\.test_[A-Za-z0-9_]+)\b', html)
-        for m in matches_class:
-            if m not in tests:
-                tests.append(m)
-                
-        matches_raw = re.findall(r'\b(test_[A-Za-z0-9_]{6,})\b', html)
-        for m in matches_raw:
-            if m not in tests and not any(m in existing for existing in tests):
-                if not any(fw in m.lower() for fw in ("test_option", "test_config", "test_success", "test_param")):
-                    tests.append(m)
+        # 1. Parse failed build links from the batch slots
+        failed_build_links = []
+        blocks = re.findall(r'<div class="btn-group[^"]*slot_button_group">.*?</div>', html_batch, re.DOTALL)
+        for b in blocks:
+            if "btn-danger" in b or "btn-warning" in b:
+                m = re.search(r'href="(/runbot/batch/\d+/build/\d+|/runbot/build/\d+)"', b)
+                if m:
+                    failed_build_links.append("https://runbot.odoo.com" + m.group(1))
                     
+        # Limit to checking at most 2 failed builds to keep execution extremely fast and safe
+        tests = []
+        for build_url in failed_build_links[:2]:
+            try:
+                req_build = urllib.request.Request(
+                    build_url,
+                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                )
+                with urllib.request.urlopen(req_build, timeout=5) as resp_build:
+                    html_build = resp_build.read().decode('utf-8')
+                    
+                # Find all .txt log links on the build page
+                log_links = re.findall(r'href="(http[s]?://[^"]+/logs/[^"]+\.txt)"', html_build)
+                
+                # Check at most 3 log files per build to avoid network overhead
+                for log_url in log_links[:3]:
+                    try:
+                        req_log = urllib.request.Request(
+                            log_url,
+                            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                        )
+                        # Fetch first 100KB of the log file
+                        with urllib.request.urlopen(req_log, timeout=5) as resp_log:
+                            log_text = resp_log.read(100000).decode('utf-8', errors='ignore')
+                            
+                        # A. Search for full TestClass.test_method formats (highest signal!)
+                        matches_class = re.findall(r'\b(Test[A-Za-z0-9_]+\.test_[A-Za-z0-9_]+)\b', log_text)
+                        for m in matches_class:
+                            if m not in tests:
+                                tests.append(m)
+                                
+                        # B. Search for standalone test_xxxx names
+                        matches_raw = re.findall(r'\b(test_[A-Za-z0-9_]{6,})\b', log_text)
+                        for m in matches_raw:
+                            if m not in tests and not any(m in existing for existing in tests):
+                                if not any(fw in m.lower() for fw in ("test_option", "test_config", "test_success", "test_param")):
+                                    tests.append(m)
+                                    
+                        # C. If it is a static check / linter error, parse the log file name itself!
+                        if "check_" in log_url or "lint" in log_url:
+                            log_name = log_url.split("/")[-1].replace(".txt", "")
+                            if not any(t in log_text for t in tests):
+                                if log_name not in tests:
+                                    tests.append(log_name)
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+                
         return tests
     except Exception:
         return []
