@@ -1005,15 +1005,19 @@ class OdooWtApp(App):
             comment_w = max(20, W - branch_w - runbot_w - link_w - 6)
             
             if "col-branch" in table.columns:
+                table.columns["col-branch"].auto_width = False
                 table.columns["col-branch"].width = branch_w
             if "col-runbot" in table.columns:
+                table.columns["col-runbot"].auto_width = False
                 table.columns["col-runbot"].width = runbot_w
             if "col-link" in table.columns:
+                table.columns["col-link"].auto_width = False
                 table.columns["col-link"].width = link_w
             if "col-comment" in table.columns:
+                table.columns["col-comment"].auto_width = False
                 table.columns["col-comment"].width = comment_w
                 
-            table.refresh()
+            table.refresh(layout=True)
         except Exception:
             pass
 
@@ -1118,6 +1122,7 @@ class OdooWtApp(App):
         try:
             table = self.query_one("#wt-table", DataTable)
             table.update_cell(row_key, column_key, value)
+            self.adjust_column_widths()
             config_mgr.append_log("UI Cell Updated", {"row": row_key, "col": column_key, "value": value})
         except Exception as e:
             config_mgr.append_log("UI Cell Update Error", {"error": str(e)})
