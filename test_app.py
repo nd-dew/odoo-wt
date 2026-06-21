@@ -865,8 +865,8 @@ def test_get_latest_pr_comment(monkeypatch):
     assert latest["user"] == "xavierbol"
     assert latest["html_url"] == "link3"
     assert latest["is_ent"] is True
-    # Truncate at exactly 50 chars + "..."
-    assert latest["body_clean"] == "This is an extremely long code review comment writ..."
+    # Full untruncated body
+    assert latest["body_clean"] == "This is an extremely long code review comment written by xavierbol to test the 50-char ellipses truncation guard inside odoo-wt!"
 
 def test_tui_base_branch_minimal_status(monkeypatch):
     from odoo_wt.main_tui import OdooWtApp
