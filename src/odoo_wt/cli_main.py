@@ -1062,8 +1062,8 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
                 prefix_plain = "[Ent]" if is_ent else ("[Upg]" if is_upg else "[Comm]")
                 prefix = "[bold green][Ent][/bold green]" if is_ent else ("[bold yellow][Upg][/bold yellow]" if is_upg else "[bold cyan][Comm][/bold cyan]")
                 
-                # Non-comment column overhead (Branch + Pull Requests + padding) = 45
-                comment_col_max = tbl_width - 45
+                # Symmetrical dynamic column overhead to prevent Branch Name from ever being squeezed/collapsed
+                comment_col_max = tbl_width - len(name) - 26
                 meta_len = len(prefix_plain) + len(user) + len(relative) + 8
                 allowed_body_len = comment_col_max - meta_len
                 
@@ -1144,9 +1144,8 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
                 link_url = comment_data["html_url"]
                 body_clean = comment_data.get("body_clean", "")
                 
-                # Symmetrical adaptive layout truncation
-                # Non-comment column overhead (Branch + Runbot + Links + padding) = 54
-                comment_col_max = tbl_width - 54
+                # Symmetrical dynamic column overhead to prevent Branch Name from ever being squeezed/collapsed
+                comment_col_max = tbl_width - len(name) - 39
                 meta_len = len(user) + len(relative) + 6
                 allowed_body_len = comment_col_max - meta_len
                 
