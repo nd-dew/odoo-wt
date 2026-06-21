@@ -996,11 +996,11 @@ class OdooWtApp(App):
                 
             # Symmetrical dynamic grid calculation:
             # - Runbot Status takes 14 cells.
-            # - Link takes 18 cells.
+            # - Link takes 15 cells.
             # - Branch Name gets up to 35% of W, minimum 25, maximum 45.
             # - Last Comment gets the absolute remaining width to prevent truncation and overflow!
             runbot_w = 14
-            link_w = 18
+            link_w = 15
             branch_w = max(25, min(45, int(W * 0.35)))
             comment_w = max(20, W - branch_w - runbot_w - link_w - 6)
             
