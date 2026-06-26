@@ -1045,7 +1045,7 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
         sorted_wts = sorted(worktrees, key=recency_sort_key, reverse=True)
     
     # Calculate target column widths dynamically based on config and terminal width
-    max_w = config.get("status_max_width", 150)
+    max_w = config.get("status_max_width", 200)
     try:
         terminal_width = console.width
         tbl_width = min(max_w, terminal_width)
@@ -1151,7 +1151,7 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
                 allowed_body_len = comment_col_max - meta_len
                 
                 if allowed_body_len >= 10:
-                    max_len = min(allowed_body_len, 90)
+                    max_len = min(allowed_body_len, 120)
                     if len(body_clean) > max_len:
                         body_clean = body_clean[:max_len].strip() + "..."
                 else:
@@ -1233,7 +1233,7 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
                 allowed_body_len = comment_col_max - meta_len
                 
                 if allowed_body_len >= 10:
-                    max_len = min(allowed_body_len, 50)
+                    max_len = min(allowed_body_len, 120)
                     if len(body_clean) > max_len:
                         body_clean = body_clean[:max_len].strip() + "..."
                 else:
