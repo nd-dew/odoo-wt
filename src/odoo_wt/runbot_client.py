@@ -90,6 +90,10 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             warning = block.count("btn-warning")
             running = block.count("fa-spinner")
             
+            # If the batch exists but has no completed or spinning builds yet, it is preparing/pending
+            if success == 0 and failed == 0 and warning == 0 and running == 0:
+                running = 1
+            
             # Parse linked Pull Requests from the entire HTML
             odoo_pr = None
             enterprise_pr = None
@@ -118,6 +122,10 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             failed = block.count("btn-danger")
             warning = block.count("btn-warning")
             running = block.count("fa-spinner")
+            
+            # If the batch exists but has no completed or spinning builds yet, it is preparing/pending
+            if success == 0 and failed == 0 and warning == 0 and running == 0:
+                running = 1
             
             # Parse linked Pull Requests from the entire HTML
             odoo_pr = None
