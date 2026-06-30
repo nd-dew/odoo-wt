@@ -94,11 +94,11 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             if success == 0 and failed == 0 and warning == 0 and running == 0:
                 running = 1
             
-            # Parse linked Pull Requests from the entire HTML
+            # Parse linked Pull Requests from the matched block/tile only
             odoo_pr = None
             enterprise_pr = None
             upgrade_pr = None
-            pr_links = re.findall(r'href="(https://github.com/odoo(?:-dev)?/([^/]+)/pull/\d+)"', html)
+            pr_links = re.findall(r'href="(https://github.com/odoo(?:-dev)?/([^/]+)/pull/\d+)"', block)
             for url, repo in pr_links:
                 if repo == "odoo" and not odoo_pr:
                     odoo_pr = url
@@ -127,11 +127,11 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             if success == 0 and failed == 0 and warning == 0 and running == 0:
                 running = 1
             
-            # Parse linked Pull Requests from the entire HTML
+            # Parse linked Pull Requests from the matched block/tile only
             odoo_pr = None
             enterprise_pr = None
             upgrade_pr = None
-            pr_links = re.findall(r'href="(https://github.com/odoo(?:-dev)?/([^/]+)/pull/\d+)"', html)
+            pr_links = re.findall(r'href="(https://github.com/odoo(?:-dev)?/([^/]+)/pull/\d+)"', block)
             for url, repo in pr_links:
                 if repo == "odoo" and not odoo_pr:
                     odoo_pr = url
