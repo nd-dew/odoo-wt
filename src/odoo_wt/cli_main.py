@@ -520,10 +520,26 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
             if ans in ("y", "yes"):
                 print(f"Deleting worktree '{delete_branch}'...")
                 target_path = match["path"]
-                subprocess.run(["git", "worktree", "remove", "--force", "odoo"], cwd=target_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                
+                # Resolve base directories dynamically
+                env_root = Path(config.get("env_root", "~/repos")).expanduser().absolute()
+                base_odoo = env_root / config.get("community_dir", "odoo")
+                base_ent = env_root / config.get("enterprise_dir", "enterprise")
+                base_upg = env_root / config.get("upgrade_dir", "upgrade")
+                
+                # Symmetrically remove community, enterprise, and upgrade worktrees from git metadata
+                if (Path(target_path) / "odoo").exists():
+                    subprocess.run(["git", "worktree", "remove", "-f", str(Path(target_path) / "odoo")], cwd=base_odoo, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if (Path(target_path) / "enterprise").exists():
-                    subprocess.run(["git", "worktree", "remove", "--force", "enterprise"], cwd=target_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["git", "worktree", "prune"], cwd=os.path.expanduser(config["wt_root"]), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run(["git", "worktree", "remove", "-f", str(Path(target_path) / "enterprise")], cwd=base_ent, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if (Path(target_path) / "upgrade").exists():
+                    subprocess.run(["git", "worktree", "remove", "-f", str(Path(target_path) / "upgrade")], cwd=base_upg, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    
+                # Clean up and prune orphaned git references
+                for repo in (base_odoo, base_ent, base_upg):
+                    if repo.exists():
+                        subprocess.run(["git", "worktree", "prune"], cwd=repo, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        
                 try:
                     shutil.rmtree(target_path)
                 except Exception:
