@@ -81,9 +81,13 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             ts_str = match.group(2)
             batch_url = f"https://runbot.odoo.com/runbot/batch/{batch_id}"
             
-            # Slice the HTML block strictly to just this batch tile to count its classes safely
+            # Symmetrically search backward to capture the entire bundle_row including its column 1 GitHub dropdown links!
             tile_start = html.find(f'href="/runbot/batch/{batch_id}"')
-            block = html[tile_start:tile_start+4000] if tile_start != -1 else html
+            if tile_start != -1:
+                row_start = html.rfind('<div class="row bundle_row">', 0, tile_start)
+                block = html[row_start:tile_start+4000] if row_start != -1 else html[tile_start:tile_start+4000]
+            else:
+                block = html
             
             success = block.count("btn-success")
             failed = block.count("btn-danger")
@@ -115,8 +119,13 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             batch_id = match_id.group(1)
             batch_url = f"https://runbot.odoo.com/runbot/batch/{batch_id}"
             
+            # Symmetrically search backward to capture the entire bundle_row including its column 1 GitHub dropdown links!
             tile_start = html.find(f'href="/runbot/batch/{batch_id}"')
-            block = html[tile_start:tile_start+4000] if tile_start != -1 else html
+            if tile_start != -1:
+                row_start = html.rfind('<div class="row bundle_row">', 0, tile_start)
+                block = html[row_start:tile_start+4000] if row_start != -1 else html[tile_start:tile_start+4000]
+            else:
+                block = html
             
             success = block.count("btn-success")
             failed = block.count("btn-danger")
