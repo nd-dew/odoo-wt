@@ -228,6 +228,73 @@ def main():
     else:
         config = config_mgr.load()
 
+    # Tab autocomplete generation command for Bash and Zsh
+    if "autocomplete" in sys.argv:
+        shell = "instructions"
+        if "bash" in sys.argv:
+            shell = "bash"
+        elif "zsh" in sys.argv:
+            shell = "zsh"
+            
+        if shell == "bash":
+            print("""_odoo_wt_autocomplete() {
+    local cur prev opts
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    
+    if [[ ${COMP_CWORD} -eq 1 ]]; then
+        opts="status runbot reviews list create open code delete rm help autocomplete"
+        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+        return 0
+    fi
+    
+    if [[ ${COMP_CWORD} -eq 2 ]]; then
+        case "${prev}" in
+            status|runbot|reviews|open|code|delete|rm)
+                local branches=$(odoo-wt list 2>/dev/null)
+                COMPREPLY=( $(compgen -W "${branches}" -- ${cur}) )
+                return 0
+                ;;
+        esac
+    fi
+}
+complete -F _odoo_wt_autocomplete odoo-wt""")
+            sys.exit(0)
+            
+        elif shell == "zsh":
+            print("""_odoo_wt_zsh_autocomplete() {
+    local -a subcommands
+    subcommands=(status runbot reviews list create open code delete rm help autocomplete)
+    
+    if (( CURRENT == 2 )); then
+        _describe -t subcommands 'subcommands' subcommands
+    elif (( CURRENT == 3 )); then
+        case "$words[2]" in
+            status|runbot|reviews|open|code|delete|rm)
+                local -a branches
+                branches=(${(f)"$(odoo-wt list 2>/dev/null)"})
+                _describe -t branches 'branch names' branches
+                ;;
+        esac
+    fi
+}
+compdef _odoo_wt_zsh_autocomplete odoo-wt""")
+            sys.exit(0)
+            
+        else:
+            print("# odoo-wt Autocomplete Shell Integration")
+            print("# To enable, run this command or add it to your shell configuration file:")
+            print("#")
+            print("# For Bash:")
+            print("#   echo 'source <(odoo-wt autocomplete bash)' >> ~/.bashrc")
+            print("#   source ~/.bashrc")
+            print("#")
+            print("# For Zsh:")
+            print("#   echo 'source <(odoo-wt autocomplete zsh)' >> ~/.zshrc")
+            print("#   source ~/.zshrc")
+            sys.exit(0)
+
     # Simple list command (one branch name per line, no formatting, no titles, sorted by recency)
     if "list" in sys.argv:
         check_dependencies()
