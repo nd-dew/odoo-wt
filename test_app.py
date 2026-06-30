@@ -1435,3 +1435,38 @@ def test_cli_autocomplete(monkeypatch, tmp_path, capsys):
     assert "_odoo_wt_zsh_autocomplete()" in captured_zsh.out
     assert "compdef _odoo_wt_zsh_autocomplete odoo-wt" in captured_zsh.out
 
+def test_fetch_repo_comments_with_inline_reviews(monkeypatch):
+    from odoo_wt.runbot_client import fetch_repo_comments
+    
+    class MockResponse:
+        def __init__(self, stdout):
+            self.stdout = stdout
+            self.stderr = ""
+            
+    def mock_run(cmd, **kwargs):
+        if "view" in cmd:
+            # Return empty reviews/comments list to isolate inline parsing
+            return MockResponse('{"comments": [], "reviews": []}')
+        elif "api" in cmd:
+            # Return mocked inline comments list
+            return MockResponse(
+                '[\n'
+                '  {\n'
+                '    "user": {"login": "Brieuc-brd"},\n'
+                '    "created_at": "2026-06-22T10:00:00Z",\n'
+                '    "html_url": "https://github.com/comment/123",\n'
+                '    "body": "I don\'t think this is necessary."\n'
+                '  }\n'
+                ']'
+            )
+        return MockResponse("")
+        
+    monkeypatch.setattr("subprocess.run", mock_run)
+    
+    comments = fetch_repo_comments("odoo/enterprise", "121346")
+    assert len(comments) == 1
+    c = comments[0]
+    assert c["user"] == "Brieuc-brd"
+    assert c["body"] == "I don't think this is necessary."
+    assert c["html_url"] == "https://github.com/comment/123"
+
