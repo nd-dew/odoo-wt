@@ -88,7 +88,7 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             success = block.count("btn-success")
             failed = block.count("btn-danger")
             warning = block.count("btn-warning")
-            running = block.count("fa-spinner") + block.count("btn-info")
+            running = block.count("fa-spinner") + block.count("fa-spin") + block.count("fa-circle-o-notch")
             
             # If the batch exists but has no completed or spinning builds yet, it is preparing/pending
             if success == 0 and failed == 0 and warning == 0 and running == 0:
@@ -121,7 +121,7 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             success = block.count("btn-success")
             failed = block.count("btn-danger")
             warning = block.count("btn-warning")
-            running = block.count("fa-spinner") + block.count("btn-info")
+            running = block.count("fa-spinner") + block.count("fa-spin") + block.count("fa-circle-o-notch")
             
             # If the batch exists but has no completed or spinning builds yet, it is preparing/pending
             if success == 0 and failed == 0 and warning == 0 and running == 0:
