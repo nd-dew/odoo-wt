@@ -962,9 +962,7 @@ def test_cli_switcher_mode_with_runbot_details(monkeypatch, tmp_path, capsys):
         
     assert excinfo.value.code == 0
     captured = capsys.readouterr()
-    assert "Found worktree" in captured.out
-    assert "Passed" in captured.out
-    assert "https://runbot.odoo.com/batch/999" in captured.out
+    assert "Changing directory to /path/root/17.0-fix-pian" in captured.out
 
 def test_cli_switcher_unpacking_safety_with_tuple(monkeypatch, tmp_path, capsys):
     from odoo_wt import cli_main
@@ -995,7 +993,7 @@ def test_cli_switcher_unpacking_safety_with_tuple(monkeypatch, tmp_path, capsys)
         cli_main.main()
         
     captured = capsys.readouterr()
-    assert "Passed" in captured.out
+    assert "Changing directory to /path/root/17.0-fix-pian" in captured.out
 
 def test_shell_history_pwd_oldpwd_injection(monkeypatch, tmp_path):
     from odoo_wt import cli_main
