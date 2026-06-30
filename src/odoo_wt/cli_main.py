@@ -168,13 +168,34 @@ def main():
     except FileNotFoundError:
         original_cwd = os.path.expanduser("~")
     
-    # --verbose flag
-    verbose = False
-    if "--verbose" in sys.argv or "-v" in sys.argv:
-        verbose = True
-        for marker in ("--verbose", "-v"):
-            if marker in sys.argv:
-                sys.argv.remove(marker)
+    # Symmetrically parse verbose_level by counting --verbose and v occurrences
+    verbose_level = 0
+    to_remove = []
+    for arg in sys.argv[1:]:
+        if arg == "--verbose":
+            verbose_level += 1
+            to_remove.append(arg)
+        elif arg.startswith("-") and not arg.startswith("--"):
+            v_count = arg.count("v")
+            if v_count > 0:
+                verbose_level += v_count
+                clean_arg = "-" + "".join(char for char in arg[1:] if char != "v")
+                to_remove.append((arg, clean_arg))
+                
+    for item in to_remove:
+        if isinstance(item, tuple):
+            old, new = item
+            if old in sys.argv:
+                idx = sys.argv.index(old)
+                if new == "-":
+                    sys.argv.pop(idx)
+                else:
+                    sys.argv[idx] = new
+        else:
+            if item in sys.argv:
+                sys.argv.remove(item)
+                
+    verbose = (verbose_level > 0)
     
     # Check for subcommand-specific help first!
     if "--help" in sys.argv or "-h" in sys.argv:
@@ -377,9 +398,9 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
                     break
                     
         if target_branch:
-            print_single_branch_detailed_status(config, target_branch, verbose=verbose, mode=mode)
+            print_single_branch_detailed_status(config, target_branch, verbose_level=verbose_level, mode=mode)
         else:
-            print_cli_status(config, mode=mode, sort_mode=sort_mode, verbose=verbose)
+            print_cli_status(config, mode=mode, sort_mode=sort_mode, verbose_level=verbose_level)
         sys.exit(0)
 
     # Utility metadata commands
@@ -730,7 +751,7 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
             console.print(f"✨ Found worktree '[cyan]{matched_wt['name']}[/cyan]' locally!")
             
             with console.status("[cyan]Fetching live Runbot and GitHub details..."):
-                res = check_branch_status_and_comments(matched_wt["name"])
+                res = check_branch_status_and_comments(matched_wt["name"], verbose_level=verbose_level)
                 
             if res:
                 batch_url = res["batch_url"]
@@ -899,7 +920,7 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
                 print("❌ VS Code ('code' command) not found in PATH.")
                 print(f"Directory is ready at: {target}")
 
-def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False):
+def print_cli_status(config, mode="combined", sort_mode="recency", verbose_level=0):
     from rich.console import Console
     from rich.table import Table
     from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -907,6 +928,7 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
     from .runbot_client import check_branch_status_and_comments
     import datetime
     
+    verbose = (verbose_level > 0)
     console = Console()
     
     # 1. Discover system worktrees
@@ -966,7 +988,7 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
             
             with ThreadPoolExecutor(max_workers=6) as executor:
                 future_to_wt = {
-                    executor.submit(check_branch_status_and_comments, wt["name"], mode == "runbot"): wt 
+                    executor.submit(check_branch_status_and_comments, wt["name"], mode == "runbot", verbose_level): wt 
                     for wt in to_check
                 }
                 
@@ -1271,13 +1293,14 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose=False
     }
     console.print(f"[dim]Sorted by: {sort_labels.get(sort_mode, sort_mode)}[/dim]")
 
-def print_single_branch_detailed_status(config, branch_name, verbose=False, mode="combined"):
+def print_single_branch_detailed_status(config, branch_name, verbose_level=0, mode="combined"):
     from rich.console import Console
     from .runbot_client import check_branch_status_and_comments
     from .system_discovery import is_base_branch
     import datetime
     import textwrap
     
+    verbose = (verbose_level > 0)
     console = Console()
     
     # Symmetrically resolve full branch name from worktrees list if possible
@@ -1313,7 +1336,7 @@ def print_single_branch_detailed_status(config, branch_name, verbose=False, mode
     
     skip_comments = is_base or mode == "runbot"
     with console.status("[cyan]Fetching live Runbot details..."):
-        res = check_branch_status_and_comments(branch_name, skip_comments=skip_comments)
+        res = check_branch_status_and_comments(branch_name, skip_comments=skip_comments, verbose_level=verbose_level)
         
     if not res:
         console.print("  [bold]Runbot Status:[/bold] ⚪ No batch (not found on Runbot)")
