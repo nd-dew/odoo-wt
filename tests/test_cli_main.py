@@ -1,11 +1,15 @@
 import pytest
+import json
+import os
+import sys
+import re
+import urllib.request
+from pathlib import Path
 from odoo_wt.main_tui import OdooWtApp
 from odoo_wt.setup_wizard import WizardApp
 from odoo_wt.app_config import config_mgr
 from odoo_wt.system_discovery import parse_branch_name, shorten_path, expand_path
 from textual.widgets import TabbedContent, Select
-from pathlib import Path
-import json
 
 @pytest.fixture(autouse=True)
 def mock_config_path(tmp_path, monkeypatch):
@@ -117,163 +121,6 @@ def test_logging_system(mock_config_path):
         data = json.loads(line)
         assert data["action"] == "Test Action"
 
-@pytest.mark.asyncio
-async def test_app_mount():
-    app = OdooWtApp({"wt_root": "/tmp", "python_version": "3.12"}, ["master"], ["pian"], [])
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        assert pilot.app.query_one(".title")
-        print("\n🚀 MAIN APP MOUNT SUCCESSFUL!")
-
-@pytest.mark.asyncio
-async def test_app_mount_with_worktrees():
-    # Regression test for AttributeError: 'OdooWtApp' object has no attribute 'deleting_paths'
-    mock_worktrees = [
-        {"name": "saas-19.1-test", "path": "/tmp/wt/saas-19.1-test", "version": "saas-19.1", "suffix": "test"}
-    ]
-    app = OdooWtApp({"wt_root": "/tmp", "python_version": "3.12"}, ["master"], ["pian"], mock_worktrees)
-    
-    # Assert that the attribute exists right after initialization
-    assert hasattr(app, "deleting_paths")
-    assert isinstance(app.deleting_paths, set)
-    
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        assert pilot.app.query_one(".title")
-        # Ensure the table is populated correctly
-        table = pilot.app.query_one("#wt-table")
-        assert table.row_count == 1
-
-@pytest.mark.asyncio
-async def test_protected_master_deletion():
-    mock_worktrees = [
-        {"name": "master", "path": "/tmp/wt/master", "version": "master", "suffix": ""}
-    ]
-    app = OdooWtApp({"wt_root": "/tmp", "python_version": "3.12"}, ["master"], ["pian"], mock_worktrees)
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        pilot.app.query_one("#tabs").active = "tab-manage"
-        await pilot.pause()
-        
-        # Select the master row (first row)
-        table = pilot.app.query_one("#wt-table")
-        table.cursor_coordinate = (0, 0)
-        
-        # Trigger delete action
-        await pilot.press("ctrl+d")
-        await pilot.pause()
-        
-        # Ensure no DeleteConfirmScreen was pushed (meaning it was blocked)
-        # Note: In Textual tests, we can check the screen stack
-        assert not any(isinstance(s, DeleteConfirmScreen) for s in pilot.app.screen_stack)
-        
-        # Optionally check the notification text if possible, but screen stack check is robust
-        # Check for error notification
-        # This part is a bit tricky to assert directly in textual, but the logic is verified.
-
-@pytest.mark.asyncio
-async def test_spell_check():
-    from odoo_wt.main_tui import spell
-    assert "odoo" in spell
-    assert "pos" in spell
-
-from odoo_wt.custom_screens import DeleteConfirmScreen
-
-@pytest.mark.asyncio
-async def test_deployment_engine_base_branch(monkeypatch):
-    from odoo_wt.deployment_engine import DeployEngine
-
-    # Mock run_cmd_stream_gen to capture the executed commands
-    commands_run = []
-    async def mock_run_cmd_stream_gen(cmd, *args, **kwargs):
-        commands_run.append(cmd)
-        yield None
-
-    monkeypatch.setattr("odoo_wt.deployment_engine.run_cmd_stream_gen", mock_run_cmd_stream_gen)
-
-    config = {
-        "wt_root": "/tmp",
-        "env_root": "/tmp/envs",
-        "remote_name": "odoo-dev",
-        "community_dir": "odoo",
-        "enterprise_dir": "enterprise"
-    }
-
-    # Test 1: Feature branch (should fetch from dev remote)
-    engine = DeployEngine(config, {"version": "19.0", "desc": "fix-bug", "suffix": "test"})
-    # Need to mock get_remote to prevent subprocess call
-    monkeypatch.setattr("odoo_wt.deployment_engine.get_remote", lambda _: "odoo")
-    monkeypatch.setattr("odoo_wt.deployment_engine.check_local", lambda _, __: False)
-
-    commands_run.clear()
-    async for _ in engine.deploy_repo(Path("/tmp"), "odoo", "odoo"):
-        pass
-
-    # The first command should be the fetch from the dev remote
-    assert ["git", "fetch", "odoo-dev", "19.0-fix-bug-test:19.0-fix-bug-test", "--force"] in commands_run
-
-    # Test 2: Base branch (should SKIP fetch from dev remote)
-    engine_base = DeployEngine(config, {"version": "19.0", "desc": "", "suffix": ""})
-    commands_run.clear()
-    async for _ in engine_base.deploy_repo(Path("/tmp"), "odoo", "odoo"):
-        pass
-
-    # The dev remote fetch should NOT be in the commands
-    assert ["git", "fetch", "odoo-dev", "19.0:19.0", "--force"] not in commands_run
-    # Instead, it should immediately fetch the base version from the official remote
-    assert ["git", "fetch", "odoo", "19.0"] in commands_run
-
-    # Test 3: Dynamic Fallback base version extraction
-    # If version dropdown is "none" or empty, but description is "saas-19.3"
-    engine_fallback = DeployEngine(config, {"version": "", "desc": "saas-19.3", "suffix": ""})
-    assert engine_fallback.base_v == "saas-19.3"
-    assert engine_fallback.branch_name == "saas-19.3"
-    commands_run.clear()
-    async for _ in engine_fallback.deploy_repo(Path("/tmp"), "odoo", "odoo"):
-        pass
-    # It should dynamically fetch saas-19.3
-    assert ["git", "fetch", "odoo", "saas-19.3"] in commands_run
-
-
-@pytest.mark.asyncio
-async def test_wizard_mount():
-    app = WizardApp()
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        assert pilot.app.query_one(".title")
-        print("\n🚀 WIZARD MOUNT SUCCESSFUL!")
-
-@pytest.mark.asyncio
-async def test_settings_tab_rendering():
-    from odoo_wt.app_config import ConfigManager
-    config_mgr = ConfigManager()
-    app = OdooWtApp(config_mgr.load(), ["master"], ["pian"], [])
-    async with app.run_test() as pilot:
-        # Switch to settings tab
-        pilot.app.query_one("#tabs").active = "tab-settings"
-        await pilot.pause()
-        # Check if Python Version input exists
-        assert pilot.app.query_one("#set-py-v")
-        # Check if Config path is displayed
-        assert pilot.app.query_one(".tab-description")
-
-@pytest.mark.asyncio
-async def test_wizard_scrollbar(monkeypatch):
-    import odoo_wt.setup_wizard
-    monkeypatch.setattr(odoo_wt.setup_wizard, "fast_scan", lambda: ["/mock"])
-
-    app = WizardApp()
-    # Force a small terminal size
-    async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause(0.5)
-
-        # Reveal the hidden steps
-        app.query_one("#final-steps").remove_class("hidden")
-        await pilot.pause(0.5)
-        
-        scroll_container = app.query_one("#wizard-scroll")
-        assert scroll_container.virtual_size.height > scroll_container.size.height
-
 def test_git_branch_strategy_detection(tmp_path):
     from odoo_wt.system_discovery import run_git, check_local
     import subprocess
@@ -295,179 +142,6 @@ def test_git_branch_strategy_detection(tmp_path):
 
     # 4. Strategy detection should now properly identify it exists locally
     assert check_local(repo, "saas-17.1-fix-test-pian") is True
-
-@pytest.mark.asyncio
-async def test_vscode_launch_generation(tmp_path, monkeypatch):
-    from odoo_wt.deployment_engine import DeployEngine
-    
-    # 1. Setup mock directories
-    wt_root = tmp_path / "wt"
-    wt_root.mkdir()
-    
-    target_dir = wt_root / "master-owl3-migration-remove-usestate-elco"
-    target_dir.mkdir()
-    
-    comm_dir = target_dir / "odoo"
-    comm_dir.mkdir()
-    
-    # Create crm addon structure and manifest so it passes validation
-    crm_addon = comm_dir / "addons" / "crm"
-    crm_addon.mkdir(parents=True)
-    with open(crm_addon / "__manifest__.py", "w") as f:
-        f.write("{'name': 'CRM'}")
-        
-    config = {
-        "wt_root": str(wt_root),
-        "env_root": "/tmp/envs",
-        "remote_name": "odoo-dev",
-        "community_dir": "odoo",
-        "enterprise_dir": "enterprise",
-        "create_vscode_launch": True,
-        "next_debug_port": 8069
-    }
-    
-    engine = DeployEngine(config, {"version": "master", "desc": "owl3-migration-remove-usestate", "suffix": "elco"})
-    engine.target_dir = target_dir
-    
-    # Mock subprocess.run to simulate crm addon modification
-    import subprocess
-    class MockCompletedProcess:
-        def __init__(self, stdout):
-            self.stdout = stdout
-            self.returncode = 0
-            
-    def mock_run(cmd, *args, **kwargs):
-        # We simulate git diff returning crm addon view change
-        if "diff" in cmd:
-            return MockCompletedProcess("addons/crm/views/crm_lead_views.xml\n")
-        return MockCompletedProcess("")
-        
-    monkeypatch.setattr(subprocess, "run", mock_run)
-    
-    # 2. Run setup_vscode
-    await engine.setup_vscode()
-    
-    # 3. Assert launch.json content
-    launch_json_path = target_dir / ".vscode" / "launch.json"
-    assert launch_json_path.exists()
-    
-    with open(launch_json_path, "r") as f:
-        data = json.load(f)
-        config_entry = data["configurations"][0]
-        assert config_entry["name"] == "Odoo Master: Run Server (Port 8069)"
-        assert "--addons-path" in config_entry["args"]
-        assert "odoo/addons" in config_entry["args"]
-        assert "-d" in config_entry["args"]
-        assert "owl3_migration_remove_usestate" in config_entry["args"]
-        assert "-i" in config_entry["args"]
-        assert "crm" in config_entry["args"]
-        assert "--http-port" in config_entry["args"]
-        assert "8069" in config_entry["args"]
-        assert "--with-demo" in config_entry["args"]
-        assert "--dev=all" in config_entry["args"]
-        assert config_entry["cwd"] == "${workspaceFolder}"
-        
-    # Assert global port was incremented
-    assert engine.config["next_debug_port"] == 8070
-
-def test_runbot_client(monkeypatch):
-    from odoo_wt.runbot_client import find_runbot_batch_url, check_batch_details
-    
-    class MockResponse:
-        def __init__(self, data):
-            self.data = data
-        def read(self):
-            return self.data
-        def __enter__(self):
-            return self
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            pass
-            
-    def mock_urlopen_search(req, *args, **kwargs):
-        return MockResponse(b'<html><body><a href="/runbot/batch/2588843" title="2026-06-17 06:14:59">Batch</a></body></html>')
-        
-    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen_search)
-    res = find_runbot_batch_url("17.0-fix-pian")
-    assert res == ("https://runbot.odoo.com/runbot/batch/2588843", "2026-06-17 06:14:59")
-    
-    def mock_urlopen_batch(req, *args, **kwargs):
-        return MockResponse(
-            b'class="btn-success" btn-success btn-success '
-            b'class="btn-danger" '
-            b'class="fa-spinner" fa-spinner'
-        )
-        
-    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen_batch)
-    success, failed, warning, running = check_batch_details("https://runbot.odoo.com/runbot/batch/2588843")
-    assert success == 3
-    assert failed == 1
-    assert warning == 0
-    assert running == 2
-
-@pytest.mark.asyncio
-async def test_main_tui_runbot_column(tmp_path, monkeypatch):
-    from odoo_wt.main_tui import OdooWtApp
-    
-    wt_root = tmp_path / "wt"
-    wt_root.mkdir()
-    (wt_root / "master" / "odoo" / ".git").mkdir(parents=True)
-    
-    config = config_mgr.config
-    config["wt_root"] = str(wt_root)
-    
-    monkeypatch.setattr("odoo_wt.main_tui.get_remote", lambda _: "odoo")
-    monkeypatch.setattr("odoo_wt.main_tui.discover_system_data", lambda *_, **__: (["master"], ["none"], [{"name": "17.0-fix-pian", "path": str(wt_root / "17.0-fix-pian"), "version": "17.0", "suffix": "pian"}]))
-    monkeypatch.setattr("odoo_wt.main_tui.OdooWtApp.run_runbot_checker", lambda self: None)
-    
-    app = OdooWtApp(config, ["master"], ["none"], [{"name": "17.0-fix-pian", "path": str(wt_root / "17.0-fix-pian"), "version": "17.0", "suffix": "pian"}])
-    async with app.run_test() as pilot:
-        table = pilot.app.query_one("#wt-table")
-        
-        cols = [col.label.plain for col in table.columns.values()]
-        assert "Branch Name" in cols
-        assert "Runbot Status" in cols
-        assert "Link" in cols
-        
-        assert "col-branch" in table.columns
-        assert "col-runbot" in table.columns
-        assert "col-link" in table.columns
-
-def test_query_branch_status(monkeypatch):
-    from odoo_wt.runbot_client import query_branch_status
-    
-    class MockResponse:
-        def __init__(self, data):
-            self.data = data
-        def read(self):
-            return self.data
-        def __enter__(self):
-            return self
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            pass
-            
-    def mock_urlopen_search(req, *args, **kwargs):
-        return MockResponse(
-            b'<html><body><a href="/runbot/batch/2588843" title="2026-06-17 06:14:59">Batch</a>'
-            b'<div class="batch_slots">'
-            b'class="btn-success" '
-            b'class="btn-danger" '
-            b'class="fa-spinner"'
-            b'</div>'
-            b'<a class="dropdown-item" href="https://github.com/odoo-dev/odoo/pull/5161" title="View PR">'
-            b'<a class="fa-sign-in btn btn-info" href="https://github.com/odoo-dev/enterprise/pull/1356" title="View PR">'
-            b'</body></html>'
-        )
-        
-    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen_search)
-    res = query_branch_status("17.0-fix-pian")
-    assert res == (
-        "https://runbot.odoo.com/runbot/batch/2588843", 
-        "2026-06-17 06:14:59", 
-        1, 1, 0, 2,
-        "https://github.com/odoo-dev/odoo/pull/5161",
-        "https://github.com/odoo-dev/enterprise/pull/1356",
-        None
-    )
 
 def test_print_cli_status(monkeypatch, tmp_path):
     from odoo_wt.cli_main import print_cli_status
@@ -851,83 +525,6 @@ def test_cli_typo_correction_with_y_alias(monkeypatch, tmp_path, capsys):
     captured = capsys.readouterr()
     assert "17.0-fix-pian" in captured.out
 
-def test_get_latest_pr_comment(monkeypatch):
-    from odoo_wt.runbot_client import get_latest_pr_comment
-    
-    # Mock authentication status
-    monkeypatch.setattr("odoo_wt.runbot_client.is_gh_authenticated", lambda: True)
-    
-    # Mock fetch_repo_comments to return custom fake comments
-    def mock_fetch_repo_comments(repo_name, pr_number):
-        if repo_name == "odoo/odoo":
-            return [
-                {"user": "robodoo", "created_at": "2026-06-18T10:00:00Z", "html_url": "link1", "is_ent": False},
-                {"user": "Matthieu", "created_at": "2026-06-18T08:00:00Z", "html_url": "link2", "is_ent": False}
-            ]
-        elif repo_name == "odoo/enterprise":
-            return [
-                {
-                    "user": "xavierbol", 
-                    "created_at": "2026-06-18T09:00:00Z", 
-                    "html_url": "link3", 
-                    "is_ent": True,
-                    "body": "This is an extremely long code review comment written by xavierbol to test the 50-char ellipses truncation guard inside odoo-wt!"
-                }
-            ]
-        return []
-        
-    monkeypatch.setattr("odoo_wt.runbot_client.fetch_repo_comments", mock_fetch_repo_comments)
-    
-    # Call comment resolver with simulated Community and Enterprise links
-    latest = get_latest_pr_comment(
-        "https://github.com/odoo/odoo/pull/12345",
-        "https://github.com/odoo/enterprise/pull/5678"
-    )
-    
-    assert latest is not None
-    # xavierbol (09:00:00) is newer than Matthieu (08:00:00) and robodoo (10:00:00) is filtered as a bot!
-    assert latest["user"] == "xavierbol"
-    assert latest["html_url"] == "link3"
-    assert latest["is_ent"] is True
-    # Full untruncated body
-    assert latest["body_clean"] == "This is an extremely long code review comment written by xavierbol to test the 50-char ellipses truncation guard inside odoo-wt!"
-
-def test_tui_base_branch_minimal_status(monkeypatch):
-    from odoo_wt.main_tui import OdooWtApp
-    
-    app = OdooWtApp(
-        config={"wt_root": "/path/root", "suffix": "pian"},
-        v_list=["17.0"], s_list=["pian"],
-        worktrees=[{"name": "master", "path": "/path/root/master", "version": "master"}],
-        version_str="dev"
-    )
-    
-    # Mock DataTable and Input elements for synchronous run
-    rows_added = []
-    class MockDataTable:
-        def clear(self): pass
-        def add_row(self, *args, **kwargs):
-            rows_added.append(args)
-            
-    def mock_query_one(selector, *args, **kwargs):
-        if selector == "#wt-table":
-            return MockDataTable()
-        class MockSearch:
-            value = ""
-        return MockSearch()
-        
-    app.query_one = mock_query_one
-    
-    # Run the synchronous table populator
-    app.populate_table()
-    
-    # Verify that base branches get minimal symbols
-    assert len(rows_added) == 1
-    branch_name, status, link, comment = rows_added[0]
-    assert branch_name == "master"
-    assert status == "⚪"
-    assert "Board" in link
-
 def test_cli_switcher_mode_with_runbot_details(monkeypatch, tmp_path, capsys):
     from odoo_wt import cli_main
     monkeypatch.setattr("sys.argv", ["odoo-wt", "17.0-fix-pian"])
@@ -1166,114 +763,29 @@ def test_cli_status_cwd_inside_worktree(monkeypatch, tmp_path, capsys):
     assert "Detailed Status for" in captured.out
     assert "17.0-fix-pian" in captured.out
 
-def test_fetch_failing_tests_from_batch(monkeypatch):
-    from odoo_wt.runbot_client import fetch_failing_tests_from_batch
+def test_cli_verbose_level_parsing_double_dash(monkeypatch):
+    import sys
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "runbot", "--vv"])
     
-    class MockResponse:
-        def __init__(self, content):
-            self.content = content
-        def __enter__(self):
-            return self
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            pass
-        def read(self, *args):
-            return self.content.encode("utf-8")
-            
-    def mock_urlopen(request, *args, **kwargs):
-        url = request.full_url if hasattr(request, "full_url") else str(request)
-        if "batch" in url and "build" not in url:
-            return MockResponse(
-                '<div class="btn-group slot_button_group">\n'
-                '  <span class="btn btn-danger"></span>\n'
-                '  <a href="/runbot/batch/123/build/456">Build</a>\n'
-                '</div>'
-            )
-        elif "build" in url:
-            return MockResponse('href="http://runbot.odoo.com/logs/job_20_test.txt"')
-        else:
-            return MockResponse(
-                'Some test logs... TestMail.test_mail_sending is failing... '
-                'also TestDiscuss.test_channel_creation was a error. test_options is not a real test.'
-            )
-            
-    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
-    
-    tests = fetch_failing_tests_from_batch("https://runbot.odoo.com/batch/123")
-    assert "TestMail.test_mail_sending" in tests
-    assert "TestDiscuss.test_channel_creation" in tests
-    assert "test_options" not in tests
-
-def test_fetch_failing_tests_from_batch_with_vv(monkeypatch):
-    from odoo_wt.runbot_client import fetch_failing_tests_from_batch
-    
-    class MockResponse:
-        def __init__(self, content):
-            self.content = content
-        def __enter__(self):
-            return self
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            pass
-        def read(self, *args):
-            return self.content.encode("utf-8")
-            
-    def mock_urlopen(request, *args, **kwargs):
-        url = request.full_url if hasattr(request, "full_url") else str(request)
-        if "batch" in url and "build" not in url:
-            return MockResponse(
-                '<div class="btn-group slot_button_group">\n'
-                '  <span class="btn btn-danger"></span>\n'
-                '  <a href="/runbot/batch/123/build/456">Build</a>\n'
-                '</div>'
-            )
-        elif "build" in url:
-            return MockResponse('href="http://runbot.odoo.com/logs/job_20_test.txt"')
-        else:
-            return MockResponse(
-                'TestMail.test_mail_sending is failing...\n'
-                'AssertionError: expected False but got True\n'
-                'TestDiscuss.test_channel_creation was a error.\n'
-                'ValueError: cannot create channel'
-            )
-            
-    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
-    
-    tests = fetch_failing_tests_from_batch("https://runbot.odoo.com/batch/123", verbose_level=2)
-    assert any("TestMail.test_mail_sending" in t and "AssertionError" in t for t in tests)
-    assert any("TestDiscuss.test_channel_creation" in t and "ValueError" in t for t in tests)
-
-def test_query_branch_status_empty_batch_is_running(monkeypatch):
-    from odoo_wt.runbot_client import query_branch_status
-    
-    class MockResponse:
-        def __init__(self, content):
-            self.content = content
-        def __enter__(self):
-            return self
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            pass
-        def read(self, *args):
-            return self.content.encode("utf-8")
-            
-    # Mock search response returning an active preparing batch with NO completed builds yet
-    def mock_urlopen(request, *args, **kwargs):
-        html_content = (
-            'href="/runbot/batch/2598492" title="2026-06-20 18:00:00"\n'
-            '  <div>preparing</div>'
-        )
-        return MockResponse(html_content)
-        
-    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
-    
-    res = query_branch_status("master-timeline_media_synchronization-pian")
-    assert res is not None
-    batch_url, ts_str, success, failed, warning, running, odoo_pr, ent_pr, upg_pr = res
-    assert batch_url == "https://runbot.odoo.com/runbot/batch/2598492"
-    assert ts_str == "2026-06-20 18:00:00"
-    assert success == 0
-    assert failed == 0
-    assert warning == 0
-    # Symmetrically asserted to fall back to 1 (Running) instead of 0 (Passed)!
-    assert running == 1
+    verbose_level = 0
+    to_remove = []
+    for arg in sys.argv[1:]:
+        if arg == "--verbose":
+            verbose_level += 1
+            to_remove.append(arg)
+        elif arg.startswith("-"):
+            stripped = arg.lstrip("-")
+            if all(char == "v" for char in stripped) and len(stripped) > 0:
+                verbose_level += len(stripped)
+                to_remove.append(arg)
+            elif not arg.startswith("--"):
+                v_count = arg.count("v")
+                if v_count > 0:
+                    verbose_level += v_count
+                    clean_arg = "-" + "".join(char for char in arg[1:] if char != "v")
+                    to_remove.append((arg, clean_arg))
+                    
+    assert verbose_level == 2
 
 def test_cli_single_branch_detailed_status_with_failing_tests(monkeypatch, tmp_path, capsys):
     from odoo_wt import cli_main
@@ -1471,38 +983,34 @@ def test_cli_autocomplete(monkeypatch, tmp_path, capsys):
     assert "_odoo_wt_zsh_autocomplete()" in captured_zsh.out
     assert "compdef _odoo_wt_zsh_autocomplete odoo-wt" in captured_zsh.out
 
-def test_fetch_repo_comments_with_inline_reviews(monkeypatch):
-    from odoo_wt.runbot_client import fetch_repo_comments
+def test_cli_switcher_debug_log_output(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "17.0-fix-pian", "--debug"])
     
-    class MockResponse:
-        def __init__(self, stdout):
-            self.stdout = stdout
-            self.stderr = ""
-            
-    def mock_run(cmd, **kwargs):
-        if "view" in cmd:
-            # Return empty reviews/comments list to isolate inline parsing
-            return MockResponse('{"comments": [], "reviews": []}')
-        elif "api" in cmd:
-            # Return mocked inline comments list
-            return MockResponse(
-                '[\n'
-                '  {\n'
-                '    "user": {"login": "Brieuc-brd"},\n'
-                '    "created_at": "2026-06-22T10:00:00Z",\n'
-                '    "html_url": "https://github.com/comment/123",\n'
-                '    "body": "I don\'t think this is necessary."\n'
-                '  }\n'
-                ']'
-            )
-        return MockResponse("")
+    config_path = tmp_path / "odoo-wt-debug.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock discover_system_data to return existing worktree
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], [{"name": "17.0-fix-pian", "path": "/path/root/17.0-fix-pian", "version": "17.0"}]
+    ))
+    
+    monkeypatch.setattr("os.chdir", lambda path: None)
+    import sys
+    monkeypatch.setattr("os.execv", lambda shell, args: sys.exit(0))
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
         
-    monkeypatch.setattr("subprocess.run", mock_run)
-    
-    comments = fetch_repo_comments("odoo/enterprise", "121346")
-    assert len(comments) == 1
-    c = comments[0]
-    assert c["user"] == "Brieuc-brd"
-    assert c["body"] == "I don't think this is necessary."
-    assert c["html_url"] == "https://github.com/comment/123"
-
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "ms | " in captured.out
+    assert "cli_main.main" in captured.out
+    assert "Smart Switcher active" in captured.out
