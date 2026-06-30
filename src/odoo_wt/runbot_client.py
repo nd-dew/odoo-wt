@@ -1,5 +1,6 @@
 import urllib.request
 import re
+import json
 from typing import Optional, Tuple
 
 def find_runbot_batch_url(branch_name: str) -> Optional[Tuple[str, str]]:
@@ -488,11 +489,15 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                 with urllib.request.urlopen(req_build, timeout=5) as resp_build:
                     html_build = resp_build.read().decode('utf-8')
                     
-                # Find all .txt log links on the build page
+                # Find all .txt log links on the build page and de-duplicate them
                 log_links = re.findall(r'href="(http[s]?://[^"]+/logs/[^"]+\.txt)"', html_build)
+                unique_log_links = []
+                for link in log_links:
+                    if link not in unique_log_links:
+                        unique_log_links.append(link)
                 
                 # Check at most 3 log files per build to avoid network overhead
-                for log_url in log_links[:3]:
+                for log_url in unique_log_links[:3]:
                     try:
                         req_log = urllib.request.Request(
                             log_url,
@@ -534,7 +539,34 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                                 if log_name not in tests:
                                     display_name = log_name
                                     if verbose_level >= 2:
-                                        err_msg = extract_error_message(log_text, log_name) or extract_error_message(log_text, "failed")
+                                        err_msg = ""
+                                        if "ruff" in log_url.lower():
+                                            # Symmetrically fetch the actual Ruff JSON report for high-fidelity errors!
+                                            try:
+                                                json_url = log_url.replace(".txt", "-ruff-output.json")
+                                                req_json = urllib.request.Request(
+                                                    json_url,
+                                                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                                                )
+                                                with urllib.request.urlopen(req_json, timeout=5) as resp_json:
+                                                    raw_json = json.loads(resp_json.read().decode('utf-8'))
+                                                    if isinstance(raw_json, list) and raw_json:
+                                                        err_parts = []
+                                                        for item in raw_json[:2]:  # Show first 2 violations
+                                                            code = item.get("code", "")
+                                                            msg = item.get("message", "")
+                                                            filename = item.get("filename", "")
+                                                            rel_path = filename.replace("/data/build/", "")
+                                                            row = item.get("location", {}).get("row", 0)
+                                                            col = item.get("location", {}).get("column", 0)
+                                                            err_parts.append(f"{rel_path}:{row}:{col}  ➔  [{code}] {msg}")
+                                                        err_msg = " | ".join(err_parts)
+                                            except Exception:
+                                                pass
+                                                
+                                        if not err_msg:
+                                            err_msg = extract_error_message(log_text, log_name) or extract_error_message(log_text, "failed")
+                                            
                                         if err_msg:
                                             display_name = f"{log_name}  ➔  {err_msg}"
                                     if display_name not in tests:

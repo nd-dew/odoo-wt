@@ -1506,3 +1506,35 @@ def test_fetch_repo_comments_with_inline_reviews(monkeypatch):
     assert c["body"] == "I don't think this is necessary."
     assert c["html_url"] == "https://github.com/comment/123"
 
+def test_cli_switcher_debug_log_output(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "17.0-fix-pian", "--debug"])
+    
+    config_path = tmp_path / "odoo-wt-debug.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock discover_system_data to return existing worktree
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["17.0"], ["pian"], [{"name": "17.0-fix-pian", "path": "/path/root/17.0-fix-pian", "version": "17.0"}]
+    ))
+    
+    monkeypatch.setattr("os.chdir", lambda path: None)
+    import sys
+    monkeypatch.setattr("os.execv", lambda shell, args: sys.exit(0))
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "ms | " in captured.out
+    assert "cli_main.main" in captured.out
+    assert "Smart Switcher active" in captured.out
+

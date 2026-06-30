@@ -10,7 +10,7 @@ try:
 except PackageNotFoundError:
     VERSION = "dev"
 
-from .app_config import config_mgr
+from .app_config import config_mgr, debug_log
 from .system_discovery import discover_system_data, decompose_branch, is_base_branch
 from .setup_wizard import WizardApp
 from .main_tui import OdooWtApp
@@ -745,16 +745,19 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
             matched_wt = None
 
         if matched_wt:
+            debug_log(f"Smart Switcher active. Match found: '{matched_wt['name']}' at path '{matched_wt['path']}'")
             from rich.console import Console
             console = Console()
             console.print(f"🚀 Changing directory to [cyan]{matched_wt['path']}[/cyan]...\n")
             
             # Touch worktree recency
+            debug_log("Updating worktree recency in configuration...")
             if "worktree_recency" not in config: config["worktree_recency"] = {}
             import datetime
             config["worktree_recency"][matched_wt["path"]] = datetime.datetime.utcnow().isoformat()
             config_mgr.save(config)
             
+            debug_log(f"Preparing to spawn sub-shell inside target path (shell: {os.environ.get('SHELL', '/bin/bash')})...")
             os.environ["OLDPWD"] = original_cwd
             os.chdir(matched_wt["path"])
             os.environ["PWD"] = matched_wt["path"]

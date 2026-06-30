@@ -1,6 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
+from .app_config import debug_log
 
 def shorten_path(path_str):
     home = str(Path.home())
@@ -119,6 +120,7 @@ def decompose_branch(full_name, known_versions=None, known_suffixes=None):
     return remote, version, full_name, suffix
 
 def discover_system_data(wt_root, default_suffix, known_versions=None, known_suffixes=None):
+    debug_log(f"Scanning wt_root container for active worktrees (wt_root: {wt_root})")
     versions = set(known_versions) if known_versions else set()
     suffixes = set(known_suffixes) if known_suffixes else set([default_suffix, "test", "none"])
     
@@ -156,6 +158,7 @@ def discover_system_data(wt_root, default_suffix, known_versions=None, known_suf
     s_list.insert(0, default_suffix)
     s_list.append("none")
     s_list.append("custom...")
+    debug_log(f"Finished worktree scan. Discovered {len(worktrees)} items, {len(v_list)} versions, {len(s_list)} suffixes")
     return v_list, s_list, worktrees
 
 def run_git(args, cwd=None, capture=False):
