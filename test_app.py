@@ -1205,6 +1205,40 @@ def test_fetch_failing_tests_from_batch(monkeypatch):
     assert "TestDiscuss.test_channel_creation" in tests
     assert "test_options" not in tests
 
+def test_query_branch_status_empty_batch_is_running(monkeypatch):
+    from odoo_wt.runbot_client import query_branch_status
+    
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def read(self, *args):
+            return self.content.encode("utf-8")
+            
+    # Mock search response returning an active preparing batch with NO completed builds yet
+    def mock_urlopen(request, *args, **kwargs):
+        html_content = (
+            'href="/runbot/batch/2598492" title="2026-06-20 18:00:00"\n'
+            '  <div>preparing</div>'
+        )
+        return MockResponse(html_content)
+        
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+    
+    res = query_branch_status("master-timeline_media_synchronization-pian")
+    assert res is not None
+    batch_url, ts_str, success, failed, warning, running, odoo_pr, ent_pr, upg_pr = res
+    assert batch_url == "https://runbot.odoo.com/runbot/batch/2598492"
+    assert ts_str == "2026-06-20 18:00:00"
+    assert success == 0
+    assert failed == 0
+    assert warning == 0
+    # Symmetrically asserted to fall back to 1 (Running) instead of 0 (Passed)!
+    assert running == 1
+
 def test_cli_single_branch_detailed_status_with_failing_tests(monkeypatch, tmp_path, capsys):
     from odoo_wt import cli_main
     monkeypatch.setattr("sys.argv", ["odoo-wt", "runbot", "17.0-fix-pian"])
