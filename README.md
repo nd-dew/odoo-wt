@@ -132,7 +132,7 @@ uv tool install . --force
 - [x] the runbot/PR checks should work in cli, what would be super cool (Completed: integrated parallel concurrent polling into 'odoo-wt status').
 - [ ] the top space on the app could be tighter, we dont need such big header
 - [ ] we could inform users that to select text they need to hold Shift
-
+- [ ] would be cool to have like an `odoo-wt links` option that way I could very quickly get links to like runbts PRs, or maybe tickets in the future
 
 ## Development
 
