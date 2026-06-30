@@ -1349,3 +1349,31 @@ def test_cli_single_branch_reviews_history_with_verbose(monkeypatch, tmp_path, c
     assert "xavierbol" in captured.out
     assert "Comment 1" in captured.out
 
+def test_cli_autocomplete(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "autocomplete", "bash"])
+    
+    config_path = tmp_path / "odoo-wt-history.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root", "suffix": "pian"
+    })
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "_odoo_wt_autocomplete()" in captured.out
+    assert "status|runbot|reviews|open|code|delete|rm" in captured.out
+
+    # Test Zsh output
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "autocomplete", "zsh"])
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+    assert excinfo.value.code == 0
+    captured_zsh = capsys.readouterr()
+    assert "_odoo_wt_zsh_autocomplete()" in captured_zsh.out
+    assert "compdef _odoo_wt_zsh_autocomplete odoo-wt" in captured_zsh.out
+
