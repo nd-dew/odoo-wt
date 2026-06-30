@@ -262,25 +262,40 @@ class DeployEngine:
             "--dev=all"
         ])
 
-        config_data = {
-            "version": "0.2.0",
-            "configurations": [
-                {
-                    "name": f"Odoo {self.base_v.capitalize()}: Run Server (Port {port})",
-                    "type": "debugpy",
-                    "request": "launch",
-                    "program": f"${{workspaceFolder}}/{self.comm_dir}/odoo-bin",
-                    "python": "${workspaceFolder}/.venv/bin/python",
-                    "args": args,
-                    "console": "integratedTerminal",
-                    "cwd": "${workspaceFolder}",
-                    "justMyCode": False
-                }
-            ]
-        }
+        # Symmetrically format the args list to place options and their values on the same line for readability
+        paired_args = []
+        i = 0
+        while i < len(args):
+            if i + 1 < len(args) and args[i] in ("--addons-path", "-d", "-i", "--http-port"):
+                paired_args.append(f'                "{args[i]}", "{args[i+1]}"')
+                i += 2
+            else:
+                paired_args.append(f'                "{args[i]}"')
+                i += 1
+                
+        args_block_str = ",\n".join(paired_args)
+        
+        launch_json_content = f"""{{
+    "version": "0.2.0",
+    "configurations": [
+        {{
+            "name": "Odoo {self.base_v.capitalize()}: Run Server (Port {port})",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${{workspaceFolder}}/{self.comm_dir}/odoo-bin",
+            "python": "${{workspaceFolder}}/.venv/bin/python",
+            "args": [
+{args_block_str}
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${{workspaceFolder}}",
+            "justMyCode": false
+        }}
+    ]
+}}"""
 
         with open(vscode_dir / "launch.json", "w") as f:
-            json.dump(config_data, f, indent=4)
+            f.write(launch_json_content)
 
         # Prepare and write the executable 'run' helper script using uv run
         run_script_path = self.target_dir / "run"
