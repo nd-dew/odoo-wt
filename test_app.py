@@ -463,7 +463,7 @@ def test_query_branch_status(monkeypatch):
     assert res == (
         "https://runbot.odoo.com/runbot/batch/2588843", 
         "2026-06-17 06:14:59", 
-        1, 1, 0, 1,
+        1, 1, 0, 2,
         "https://github.com/odoo-dev/odoo/pull/5161",
         "https://github.com/odoo-dev/enterprise/pull/1356",
         None
