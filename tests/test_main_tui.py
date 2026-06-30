@@ -1,0 +1,199 @@
+import pytest
+import json
+import os
+import sys
+import re
+import urllib.request
+from pathlib import Path
+from odoo_wt.main_tui import OdooWtApp
+from odoo_wt.setup_wizard import WizardApp
+from odoo_wt.app_config import config_mgr
+from odoo_wt.system_discovery import parse_branch_name, shorten_path, expand_path
+from textual.widgets import TabbedContent, Select
+from odoo_wt.custom_screens import DeleteConfirmScreen
+
+@pytest.fixture(autouse=True)
+def mock_config_path(tmp_path, monkeypatch):
+    config_dir = tmp_path / ".config"
+    config_dir.mkdir()
+    config_file = config_dir / "odoo-wt.json"
+    log_file = config_dir / "odoo-wt-logs.jsonl"
+    
+    import odoo_wt.app_config as ac
+    monkeypatch.setattr(ac, "DEFAULT_CONFIG_FILE", config_file)
+    monkeypatch.setattr(ac, "DEFAULT_LOG_FILE", log_file)
+    monkeypatch.setattr(config_mgr, "config_file", config_file)
+    monkeypatch.setattr(config_mgr, "log_file", log_file)
+    
+    # SAFETY SHIELD: Disable all disk writes during tests
+    monkeypatch.setattr(config_mgr, "is_test_mode", True)
+    
+    # Pre-populate with valid defaults to avoid validation errors
+    config_mgr.config = config_mgr._get_defaults()
+    config_mgr.config["config_path"] = str(config_file)
+    config_mgr.config["log_path"] = str(log_file)
+
+    return config_file
+
+@pytest.mark.asyncio
+async def test_app_mount():
+    app = OdooWtApp({"wt_root": "/tmp", "python_version": "3.12"}, ["master"], ["pian"], [])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.query_one(".title")
+        print("\n🚀 MAIN APP MOUNT SUCCESSFUL!")
+
+@pytest.mark.asyncio
+async def test_app_mount_with_worktrees():
+    # Regression test for AttributeError: 'OdooWtApp' object has no attribute 'deleting_paths'
+    mock_worktrees = [
+        {"name": "saas-19.1-test", "path": "/tmp/wt/saas-19.1-test", "version": "saas-19.1", "suffix": "test"}
+    ]
+    app = OdooWtApp({"wt_root": "/tmp", "python_version": "3.12"}, ["master"], ["pian"], mock_worktrees)
+    
+    # Assert that the attribute exists right after initialization
+    assert hasattr(app, "deleting_paths")
+    assert isinstance(app.deleting_paths, set)
+    
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.query_one(".title")
+        # Ensure the table is populated correctly
+        table = pilot.app.query_one("#wt-table")
+        assert table.row_count == 1
+
+@pytest.mark.asyncio
+async def test_protected_master_deletion():
+    mock_worktrees = [
+        {"name": "master", "path": "/tmp/wt/master", "version": "master", "suffix": ""}
+    ]
+    app = OdooWtApp({"wt_root": "/tmp", "python_version": "3.12"}, ["master"], ["pian"], mock_worktrees)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        pilot.app.query_one("#tabs").active = "tab-manage"
+        await pilot.pause()
+        
+        # Select the master row (first row)
+        table = pilot.app.query_one("#wt-table")
+        table.cursor_coordinate = (0, 0)
+        
+        # Trigger delete action
+        await pilot.press("ctrl+d")
+        await pilot.pause()
+        
+        # Ensure no DeleteConfirmScreen was pushed (meaning it was blocked)
+        # Note: In Textual tests, we can check the screen stack
+        assert not any(isinstance(s, DeleteConfirmScreen) for s in pilot.app.screen_stack)
+        
+        # Optionally check the notification text if possible, but screen stack check is robust
+        # Check for error notification
+        # This part is a bit tricky to assert directly in textual, but the logic is verified.
+
+@pytest.mark.asyncio
+async def test_spell_check():
+    from odoo_wt.main_tui import spell
+    assert "odoo" in spell
+    assert "pos" in spell
+
+@pytest.mark.asyncio
+async def test_wizard_mount():
+    app = WizardApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.query_one(".title")
+        print("\n🚀 WIZARD MOUNT SUCCESSFUL!")
+
+@pytest.mark.asyncio
+async def test_settings_tab_rendering():
+    from odoo_wt.app_config import ConfigManager
+    config_mgr = ConfigManager()
+    app = OdooWtApp(config_mgr.load(), ["master"], ["pian"], [])
+    async with app.run_test() as pilot:
+        # Switch to settings tab
+        pilot.app.query_one("#tabs").active = "tab-settings"
+        await pilot.pause()
+        # Check if Python Version input exists
+        assert pilot.app.query_one("#set-py-v")
+        # Check if Config path is displayed
+        assert pilot.app.query_one(".tab-description")
+
+@pytest.mark.asyncio
+async def test_wizard_scrollbar(monkeypatch):
+    import odoo_wt.setup_wizard
+    monkeypatch.setattr(odoo_wt.setup_wizard, "fast_scan", lambda: ["/mock"])
+
+    app = WizardApp()
+    # Force a small terminal size
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause(0.5)
+
+        # Reveal the hidden steps
+        app.query_one("#final-steps").remove_class("hidden")
+        await pilot.pause(0.5)
+        
+        scroll_container = app.query_one("#wizard-scroll")
+        assert scroll_container.virtual_size.height > scroll_container.size.height
+
+@pytest.mark.asyncio
+async def test_main_tui_runbot_column(tmp_path, monkeypatch):
+    from odoo_wt.main_tui import OdooWtApp
+    
+    wt_root = tmp_path / "wt"
+    wt_root.mkdir()
+    (wt_root / "master" / "odoo" / ".git").mkdir(parents=True)
+    
+    config = config_mgr.config
+    config["wt_root"] = str(wt_root)
+    
+    monkeypatch.setattr("odoo_wt.main_tui.get_remote", lambda _: "odoo")
+    monkeypatch.setattr("odoo_wt.main_tui.discover_system_data", lambda *_, **__: (["master"], ["none"], [{"name": "17.0-fix-pian", "path": str(wt_root / "17.0-fix-pian"), "version": "17.0", "suffix": "pian"}]))
+    monkeypatch.setattr("odoo_wt.main_tui.OdooWtApp.run_runbot_checker", lambda self: None)
+    
+    app = OdooWtApp(config, ["master"], ["none"], [{"name": "17.0-fix-pian", "path": str(wt_root / "17.0-fix-pian"), "version": "17.0", "suffix": "pian"}])
+    async with app.run_test() as pilot:
+        table = pilot.app.query_one("#wt-table")
+        
+        cols = [col.label.plain for col in table.columns.values()]
+        assert "Branch Name" in cols
+        assert "Runbot Status" in cols
+        assert "Link" in cols
+        
+        assert "col-branch" in table.columns
+        assert "col-runbot" in table.columns
+        assert "col-link" in table.columns
+
+def test_tui_base_branch_minimal_status(monkeypatch):
+    from odoo_wt.main_tui import OdooWtApp
+    
+    app = OdooWtApp(
+        config={"wt_root": "/path/root", "suffix": "pian"},
+        v_list=["17.0"], s_list=["pian"],
+        worktrees=[{"name": "master", "path": "/path/root/master", "version": "master"}],
+        version_str="dev"
+    )
+    
+    # Mock DataTable and Input elements for synchronous run
+    rows_added = []
+    class MockDataTable:
+        def clear(self): pass
+        def add_row(self, *args, **kwargs):
+            rows_added.append(args)
+            
+    def mock_query_one(selector, *args, **kwargs):
+        if selector == "#wt-table":
+            return MockDataTable()
+        class MockSearch:
+            value = ""
+        return MockSearch()
+        
+    app.query_one = mock_query_one
+    
+    # Run the synchronous table populator
+    app.populate_table()
+    
+    # Verify that base branches get minimal symbols
+    assert len(rows_added) == 1
+    branch_name, status, link, comment = rows_added[0]
+    assert branch_name == "master"
+    assert status == "⚪"
+    assert "Board" in link
