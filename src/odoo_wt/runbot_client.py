@@ -216,6 +216,31 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
                                     })
     except Exception:
         pass
+
+    # 3. Fetch inline review comments using standard GitHub pulls/comments API
+    try:
+        cmd_inline = ["gh", "api", f"repos/{repo_name}/pulls/{pr_number}/comments"]
+        res_inline = subprocess.run(cmd_inline, capture_output=True, text=True, check=True)
+        if res_inline.stdout.strip():
+            raw_inline = json.loads(res_inline.stdout)
+            if isinstance(raw_inline, list):
+                for item in raw_inline:
+                    if isinstance(item, dict):
+                        user_obj = item.get("user")
+                        if user_obj and isinstance(user_obj, dict):
+                            login = user_obj.get("login")
+                            if login:
+                                comments.append({
+                                    "user": login,
+                                    "created_at": item.get("created_at", ""),
+                                    "html_url": item.get("html_url", ""),
+                                    "body": item.get("body", ""),
+                                    "is_ent": "enterprise" in repo_name,
+                                    "is_upg": "upgrade" in repo_name
+                                })
+    except Exception:
+        pass
+        
     return comments
 
 def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optional[str], upgrade_pr_url: Optional[str] = None) -> Optional[dict]:
