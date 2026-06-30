@@ -746,102 +746,15 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
 
         if matched_wt:
             from rich.console import Console
-            from .runbot_client import check_branch_status_and_comments
-            
             console = Console()
-            console.print(f"✨ Found worktree '[cyan]{matched_wt['name']}[/cyan]' locally!")
+            console.print(f"🚀 Changing directory to [cyan]{matched_wt['path']}[/cyan]...\n")
             
-            with console.status("[cyan]Fetching live Runbot and GitHub details..."):
-                res = check_branch_status_and_comments(matched_wt["name"], verbose_level=verbose_level)
-                
-            if res:
-                batch_url = res["batch_url"]
-                ts_str = res["ts_str"]
-                success = res["success"]
-                failed = res["failed"]
-                warning = res["warning"]
-                running = res["running"]
-                odoo_pr = res["odoo_pr"]
-                enterprise_pr = res["enterprise_pr"]
-                comment_data = res["comment_data"]
-                
-                warn_str = f"[yellow]{warning}w[/yellow]" if warning > 0 else "0w"
-                fail_str = f"[red]{failed}f[/red]" if failed > 0 else "0f"
-                
-                # Fetch relative time function local reference
-                def relative_time(ts_str: str) -> str:
-                    if not ts_str: return ""
-                    try:
-                        dt = datetime.datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
-                        now = datetime.datetime.utcnow()
-                        delta = now - dt
-                        total_seconds = int(delta.total_seconds())
-                        if total_seconds < 0: total_seconds = 0
-                        if total_seconds < 60: return "just now"
-                        elif total_seconds < 3600: return f"{total_seconds // 60}m ago"
-                        elif total_seconds < 86400: return f"{total_seconds // 3600}h ago"
-                        else: return f"{total_seconds // 86400}d ago"
-                    except Exception: return ""
-                
-                time_suffix = f" {relative_time(ts_str)}" if ts_str else ""
-                
-                if running > 0:
-                    status = f"⏳ Running {warn_str} {fail_str}{time_suffix}"
-                elif failed > 0:
-                    status = f"🔴 Failed {fail_str}{time_suffix}"
-                elif warning > 0:
-                    status = f"🟡 Warning {warn_str}{time_suffix}"
-                else:
-                    status = f"🟢 Passed{time_suffix}"
-                    
-                console.print(f"  [bold]Runbot Status:[/bold] {status}")
-                console.print(f"  [bold]Batch URL:[/bold]     [link={batch_url}]{batch_url}[/link]")
-                
-                # Failing tests summary if any
-                failing_tests = res.get("failing_tests", [])
-                if failing_tests:
-                    console.print("  [bold red]Failing Tests:[/bold red]")
-                    for t in failing_tests[:3]:
-                        console.print(f"    - [red]{t}[/red]")
-                    if len(failing_tests) > 3:
-                        console.print(f"    - [dim]... and {len(failing_tests) - 3} more[/dim]")
-                
-                # Linked pull requests
-                parts = []
-                if odoo_pr: parts.append(f"[link={odoo_pr}]Comm[/link]")
-                if enterprise_pr: parts.append(f"[link={enterprise_pr}]Ent[/link]")
-                if parts:
-                    console.print(f"  [bold]PR Links:[/bold]      {' | '.join(parts)}")
-                    
-                # Latest human PR comment/review
-                if comment_data:
-                    user = comment_data["user"]
-                    relative = comment_data["relative"]
-                    body_clean = comment_data["body_clean"]
-                    
-                    # Symmetrical adaptive terminal width truncation to prevent any wrapping
-                    try:
-                        terminal_width = console.width
-                    except Exception:
-                        terminal_width = 120
-                        
-                    meta_len = len(user) + len(relative) + 32
-                    allowed_len = terminal_width - meta_len
-                    if allowed_len >= 10:
-                        if len(body_clean) > allowed_len:
-                            body_clean = body_clean[:allowed_len].strip() + "..."
-                            
-                    console.print(f"  [bold]Last Comment:[/bold]  👤 [bold cyan]@{user}[/bold cyan] [dim]({relative})[/dim]: [italic]\"{body_clean}\"[/italic]")
-            else:
-                console.print("  [bold]Runbot Status:[/bold] ⚪ No batch")
-
             # Touch worktree recency
             if "worktree_recency" not in config: config["worktree_recency"] = {}
             import datetime
             config["worktree_recency"][matched_wt["path"]] = datetime.datetime.utcnow().isoformat()
             config_mgr.save(config)
             
-            console.print(f"🚀 Changing directory to [cyan]{matched_wt['path']}[/cyan]...\n")
             os.environ["OLDPWD"] = original_cwd
             os.chdir(matched_wt["path"])
             os.environ["PWD"] = matched_wt["path"]
