@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+            <html data-bs-theme="legacy">
+                <head>
+                    <meta charset="utf-8"/>
+                    <title>Batch 2613019 (master)</title>
+
+                    <link type="text/css" rel="stylesheet" href="/web/assets/1/d362ba3/runbot.assets_frontend.min.css"/>
+                    <script type="text/javascript" defer="defer" src="/web/assets/1/706e851/runbot.assets_frontend.min.js" onerror="__odooAssetError=1"></script>
+
+
+                        <link rel="icon" type="image/png" href="/runbot/static/src/img/icon_killed.png"/>
+                        <link rel="icon" type="image/svg+xml" href="/runbot/static/src/img/icon_killed.svg"/>
+                </head>
+                <body>
+                    <header>
+                        <nav class="navbar navbar-expand-md bg-body-tertiary">
+                            <a href="/runbot/rd-1">
+                                <b class="active_project">
+                                    R&amp;D
+                                </b>
+                            </a>
+                            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#top_menu_collapse">
+                                <span class="navbar-toggler-icon"></span>
+                            </button>
+                            <div class="collapse navbar-collapse" id="top_menu_collapse">
+                                <ul class="nav navbar-nav ms-auto text-end" id="top_menu">
+                                            <li class="nav-item">
+                                                <a class="nav-link" href="/runbot/rd-1">
+                                                    R&amp;D
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" href="/runbot/industry-9">
+                                                    Industry
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" href="/runbot/tutorials-12">
+                                                    Tutorials
+                                                </a>
+                                            </li>
+                                    <li class="nav-item divider"></li>
+
+                                    <li class="nav-item">
+                                        <button command="show-modal" commandfor="collapsePreference" type="button" class="nav-link">
+                                            <i class="fa fa-gear"></i>
+                                        </button>
+                                    </li>
+                                    <li class="nav-item divider"></li>
+                                        <li class="nav-item dropdown">
+                                            <b>
+                                                <a class="nav-link" href="/web/login?redirect=/runbot/batch/2613019">Login</a>
+                                            </b>
+                                        </li>
+                                </ul>
+                                
+                            </div>
+                        </nav>
+                    </header>
+                    <dialog id="collapsePreference" class="modal modal-xl">
+                        <div class="modal-dialog">
+                            <form class="modal-content" method="post" action="/runbot/submit" id="preferences_form">
+                                <header class="modal-header">
+                                    <h5 class="modal-title">Preferences</h5>
+                                    <button type="button" class="btn-close" command="close" commandfor="collapsePreference"></button>
+                                </header>
+                                <div class="modal-body">
+                                    <input type="hidden" name="redirect" value="/runbot/batch/2613019?"/>
+                                    <div>
+                                        <div class="form-check form-switch">
+                                        <label for="more" class="form-check-label">More info</label>
+                                        <input onclick="document.getElementById(&#39;preferences_form&#39;).submit()" class="form-check-input" type="checkbox" role="switch" id="more" name="more"/>
+                                    </div></div>
+                                    <div>
+                                        <label for="theme_selection" style="min-width: 80px">Theme:</label>
+                                        <div id="theme_selection" class="text-nowrap btn-group btn-group-sm" role="group">
+                                        <button onclick="document.cookie = &#39;theme=legacy; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/&#39;; location.reload();" type="button" class="btn btn-primary">Legacy</button>
+                                        <button onclick="document.cookie = &#39;theme=dark; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/&#39;; location.reload();" type="button" class="btn btn-secondary">Dark</button>
+                                        <button onclick="document.cookie = &#39;theme=light; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/&#39;; location.reload();" type="button" class="btn btn-secondary">Light</button>
+                                        <button onclick="document.cookie = &#39;theme=red404; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/&#39;; location.reload();" type="button" class="btn btn-secondary">Red404</button>
+                                    </div></div>
+                                    <div>
+                                        <label for="theme_selection" style="min-width: 80px">Sticky:</label>
+                                        <div class="text-nowrap btn-group btn-group-sm" role="group">
+                                        <button onclick="document.cookie = &#39;filter_mode=default; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/&#39;; location.reload();" type="button" help="Only display sticky except if searching" class="btn btn-primary">Default</button>
+                                        <button onclick="document.cookie = &#39;filter_mode=all; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/&#39;; location.reload();" type="button" class="btn btn-secondary">All</button>
+                                        <button onclick="document.cookie = &#39;filter_mode=sticky; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/&#39;; location.reload();" type="button" class="btn btn-secondary">Sticky only</button>
+                                        <button onclick="document.cookie = &#39;filter_mode=nosticky; expires=Thu, 1 Dec 2942 12:00:00 UTC; path=/&#39;; location.reload();" type="button" class="btn btn-secondary">Dev only</button>
+                                    </div></div>
+                                    <div>
+                                        <label for="theme_selection" style="min-width: 80px">Category:</label>
+                                        <div class="text-nowrap btn-group btn-group-sm" role="group">
+                                    </div></div>
+
+                                    <hr class="separator"/>
+                                </div>
+                                <footer class="modal-footer">
+                                    <button onclick="Array.from(document.getElementsByClassName(&#39;trigger_selection_show&#39;)).forEach((element) =&gt; element.checked = true); Array.from(document.getElementsByClassName(&#39;trigger_selection_hide&#39;)).forEach((element) =&gt; element.checked = false); event.preventDefault();" class="btn btn-secondary">Reset to default</button>
+                                    <button onclick="Array.from(document.getElementsByClassName(&#39;trigger_selection&#39;)).forEach((element) =&gt; element.checked = true); event.preventDefault();" class="btn btn-secondary">All</button>
+                                    <button onclick="Array.from(document.getElementsByClassName(&#39;trigger_selection&#39;)).forEach((element) =&gt; element.checked = false); event.preventDefault();" class="btn btn-secondary">None</button>
+                                    <button type="submit" class="btn btn-primary">Save</button>
+                                </footer>
+                            </form>
+                        </div>
+                    </dialog>
+                    
+                <div class="row g-0">
+                    <div class="col-lg-6">
+                    <table class="table table-stripped">
+                        <tr>
+                            <td>Bundle</td>
+                            <td>
+                                <a href="/runbot/bundle/1">master</a>
+                                &emsp;
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Priority</td>
+                            <td>
+                                        Normal
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Category</td>
+                            <td>Nightly</td>
+                        </tr>
+                        <tr>
+                            <td>Version</td>
+                            <td>master</td>
+                        </tr>
+                        <tr>
+                            <td>Create date</td>
+                            <td>2026-06-29 17:30:15.584789</td>
+                        </tr>
+                        <tr>
+                            <td class="bg-success-subtle">Commits</td>
+                            <td class="bg-success-subtle">
+                                <div>
+                                    <span></span>
+                                    <a href="/runbot/commit/2770068">
+                                        <i class="fa fa-fw fa-link" title="This commit is an existing head from bundle branches"></i>
+                                        <span class="label">odoo:22f23301</span>
+                                    </a>
+                                    <a title="View Commit on Github" href="https://github.com/odoo/odoo/commit/22f233016283ae5a5096957a6d080ff2b5752c1f"><i class="fa fa-github"></i></a>
+                                    <small>
+                                        found in branch
+                                        <span>master</span>
+                                            <span class="text-success">+681</span>
+                                            <span class="text-danger">-156</span>
+                                            <span class="text-info">
+                                                (
+                                                <span>50</span>
+                                                <i class="fa fa-file"></i>
+                                                )
+                                                <span io="behind">(
+                                                    <span class="text-success">22 ahead</span>
+                                                    ,
+                                                    <span class="text-danger">0 behind</span>
+                                                )</span>
+                                            </span>
+                                        <br/>
+                                    </small>
+                                        Subject:
+                                        <span>[CLA] David Sonnet</span>
+                                        <br/>
+                                        Author:
+                                        <span>David Sonnet</span>
+                                        (
+                                        <span>&lt;david@kemushi.eu&gt;</span>
+                                        )
+                                        <br/>
+                                        Commit date:
+                                        <span>2026-06-29 15:12:34</span>
+                                        <br/>
+                                    <hr/>
+                                </div><div>
+                                    <span></span>
+                                    <a href="/runbot/commit/2770062">
+                                        <i class="fa fa-fw fa-link" title="This commit is an existing head from bundle branches"></i>
+                                        <span class="label">enterprise:f2cd80e2</span>
+                                    </a>
+                                    <a title="View Commit on Github" href="https://github.com/odoo/enterprise/commit/f2cd80e2637b5cdc07d0b9cc2bafe26edf5e78b4"><i class="fa fa-github"></i></a>
+                                    <small>
+                                        found in branch
+                                        <span>master</span>
+                                            <span class="text-success">+82</span>
+                                            <span class="text-danger">-3</span>
+                                            <span class="text-info">
+                                                (
+                                                <span>10</span>
+                                                <i class="fa fa-file"></i>
+                                                )
+                                                <span io="behind">(
+                                                    <span class="text-success">5 ahead</span>
+                                                    ,
+                                                    <span class="text-danger">0 behind</span>
+                                                )</span>
+                                            </span>
+                                        <br/>
+                                    </small>
+                                        Subject:
+                                        <span>[FIX] website_generator: fix page limit note</span>
+                                        <br/>
+                                        Author:
+                                        <span>Christopher du Toit (chto)</span>
+                                        (
+                                        <span>&lt;chto@odoo.com&gt;</span>
+                                        )
+                                        <br/>
+                                        Commit date:
+                                        <span>2026-06-29 15:12:28</span>
+                                        <br/>
+                                    <hr/>
+                                </div><div>
+                                    <span></span>
+                                    <a href="/runbot/commit/2766465">
+                                        <i class="fa fa-fw fa-link" title="This commit is an existing head from bundle branches"></i>
+                                        <span class="label">design-themes:f5b9d576</span>
+                                    </a>
+                                    <a title="View Commit on Github" href="https://github.com/odoo/design-themes/commit/f5b9d5763b864ea3f9c53f3b9fd08fc5df2f9e56"><i class="fa fa-github"></i></a>
+                                    <small>
+                                        found in branch
+                                        <span>master</span>
+                                            <span class="text-success">+0</span>
+                                            <span class="text-danger">-0</span>
+                                            <span class="text-info">
+                                                (
+                                                <span>0</span>
+                                                <i class="fa fa-file"></i>
+                                                )
+                                                <span io="behind">(
+                                                    <span class="text-success">0 ahead</span>
+                                                    ,
+                                                    <span class="text-danger">0 behind</span>
+                                                )</span>
+                                            </span>
+                                        <br/>
+                                    </small>
+                                        Subject:
+                                        <span>[FIX] theme_*: update themes previews</span>
+                                        <br/>
+                                        Author:
+                                        <span>mano-odoo</span>
+                                        (
+                                        <span>&lt;mano@odoo.com&gt;</span>
+                                        )
+                                        <br/>
+                                        Commit date:
+                                        <span>2026-06-26 21:45:37</span>
+                                        <br/>
+                                    <hr/>
+                                </div><div>
+                                    <span></span>
+                                    <a href="/runbot/commit/2769162">
+                                        <i class="fa fa-fw fa-link" title="This commit is an existing head from bundle branches"></i>
+                                        <span class="label">upgrade:b795a033</span>
+                                    </a>
+                                    <a title="View Commit on Github" href="https://github.com/odoo/upgrade/commit/b795a033130431a1a822835f83ff6ade16d6a89a"><i class="fa fa-github"></i></a>
+                                    <small>
+                                        found in branch
+                                        <span>master</span>
+                                            <span class="text-success">+7</span>
+                                            <span class="text-danger">-5</span>
+                                            <span class="text-info">
+                                                (
+                                                <span>1</span>
+                                                <i class="fa fa-file"></i>
+                                                )
+                                                <span io="behind">(
+                                                    <span class="text-success">1 ahead</span>
+                                                    ,
+                                                    <span class="text-danger">0 behind</span>
+                                                )</span>
+                                            </span>
+                                        <br/>
+                                    </small>
+                                        Subject:
+                                        <span>[FIX] account_asset/saas~16.3.1: batch record deletion</span>
+                                        <br/>
+                                        Author:
+                                        <span>kdes-odoo</span>
+                                        (
+                                        <span>&lt;kdes@odoo.com&gt;</span>
+                                        )
+                                        <br/>
+                                        Commit date:
+                                        <span>2026-06-29 11:33:45</span>
+                                        <br/>
+                                    <hr/>
+                                </div><div>
+                                    <span></span>
+                                    <a href="/runbot/commit/2767866">
+                                        <i class="fa fa-fw fa-link" title="This commit is an existing head from bundle branches"></i>
+                                        <span class="label">documentation:10726fb5</span>
+                                    </a>
+                                    <a title="View Commit on Github" href="https://github.com/odoo/documentation/commit/10726fb5c9e11d28957e48ebfe75574e7374a3ee"><i class="fa fa-github"></i></a>
+                                    <small>
+                                        found in branch
+                                        <span>master</span>
+                                            <span class="text-success">+5</span>
+                                            <span class="text-danger">-1</span>
+                                            <span class="text-info">
+                                                (
+                                                <span>1</span>
+                                                <i class="fa fa-file"></i>
+                                                )
+                                                <span io="behind">(
+                                                    <span class="text-success">1 ahead</span>
+                                                    ,
+                                                    <span class="text-danger">0 behind</span>
+                                                )</span>
+                                            </span>
+                                        <br/>
+                                    </small>
+                                        Subject:
+                                        <span>[FIX] Recruitment: Add required module</span>
+                                        <br/>
+                                        Author:
+                                        <span>larm-odoo</span>
+                                        (
+                                        <span>&lt;larm@odoo.com&gt;</span>
+                                        )
+                                        <br/>
+                                        Commit date:
+                                        <span>2026-06-28 23:44:34</span>
+                                        <br/>
+                                    <hr/>
+                                </div><div>
+                                    <span></span>
+                                    <a href="/runbot/commit/2761615">
+                                        <i class="fa fa-fw fa-link" title="This commit is an existing head from bundle branches"></i>
+                                        <span class="label">upgrade-util:dd049d68</span>
+                                    </a>
+                                    <a title="View Commit on Github" href="https://github.com/odoo/upgrade-util/commit/dd049d689dae60112b3893f78d598c4f6783c455"><i class="fa fa-github"></i></a>
+                                    <small>
+                                        found in branch
+                                        <span>master</span>
+                                            <span class="text-success">+0</span>
+                                            <span class="text-danger">-0</span>
+                                            <span class="text-info">
+                                                (
+                                                <span>0</span>
+                                                <i class="fa fa-file"></i>
+                                                )
+                                                <span io="behind">(
+                                                    <span class="text-success">0 ahead</span>
+                                                    ,
+                                                    <span class="text-danger">0 behind</span>
+                                                )</span>
+                                            </span>
+                                        <br/>
+                                    </small>
+                                        Subject:
+                                        <span>[FIX] util/misc: correctly handle symlinks in `util.once`</span>
+                                        <br/>
+                                        Author:
+                                        <span>Alvaro Fuentes</span>
+                                        (
+                                        <span>&lt;afu@odoo.com&gt;</span>
+                                        )
+                                        <br/>
+                                        Commit date:
+                                        <span>2026-06-25 05:50:53</span>
+                                        <br/>
+                                    <hr/>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                    </div>
+                    <div class="col-lg-6">
+                    <table class="table table-stripped">
+                        <tr>
+                            <td>Builds</td>
+                            <td>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876412" class="btn btn-default slot_name">
+                    <span>Multi design theme</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot244.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876413" class="btn btn-default slot_name">
+                    <span>Multi enterprise</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot110.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876414" class="btn btn-default slot_name">
+                    <span>Multi enterprise without autotags</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot261.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876415" class="btn btn-default slot_name">
+                    <span>Multi community</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot278.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876416" class="btn btn-default slot_name">
+                    <span>Multi l10n</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot313.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-warning disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876417" class="btn btn-default slot_name">
+                    <span>Multi l10n no autotags</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot115.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876418" class="btn btn-default slot_name">
+                    <span>Single upgrade</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/27"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot205.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876419" class="btn btn-default slot_name">
+                    <span>Community Test</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot308.odoo.com/runbot/static/build/115876419-master/logs/install_all.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_all
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot308.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876420" class="btn btn-default slot_name">
+                    <span>Single module install</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/23"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot286.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876421" class="btn btn-default slot_name">
+                    <span>Single module install skip auto install</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/150"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot139.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876422" class="btn btn-default slot_name">
+                    <span>Single app Test</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/22"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot309.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876423" class="btn btn-default slot_name">
+                    <span>Single L10n</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/53"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot296.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876424" class="btn btn-default slot_name">
+                    <span>Update module list</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot118.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876425" class="btn btn-default slot_name">
+                    <span>Multi Qunit Community</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot288.odoo.com/runbot/static/build/115876425-master/logs/install_all.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_all
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot288.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876426" class="btn btn-default slot_name">
+                    <span>Multi Qunit Enterprise</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot127.odoo.com/runbot/static/build/115876426-master/logs/install_all.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_all
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot127.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-warning disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876427" class="btn btn-default slot_name">
+                    <span>Test docker future</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/121"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot127.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876428" class="btn btn-default slot_name">
+                    <span>With demo</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/123"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot229.odoo.com/runbot/static/build/115876428-master/logs/install_all.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_all
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot229.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-warning disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876429" class="btn btn-default slot_name">
+                    <span>With Network</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/129"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot328.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876430" class="btn btn-default slot_name">
+                    <span>Faketime Builds</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/130"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot160.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876431" class="btn btn-default slot_name">
+                    <span>Profiling</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot304.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876432" class="btn btn-default slot_name">
+                    <span>Tour step delay</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot275.odoo.com/runbot/static/build/115876432-master/logs/install_all.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_all
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot275.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876433" class="btn btn-default slot_name">
+                    <span>Test no auto-tag</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/140"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot222.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876434" class="btn btn-default slot_name">
+                    <span>Coverage</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot121.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-default disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <span class="btn btn-default disabled slot_name">
+                    <span>Coverage reports</span>
+                </span>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876435" class="btn btn-default slot_name">
+                    <span>Uninstall</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot212.odoo.com/runbot/static/build/115876435-master/logs/install_all_without_stats.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_all_without_stats
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot212.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876436" class="btn btn-default slot_name">
+                    <span>Website Standalone</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot268.odoo.com/runbot/static/build/115876436-master/logs/test_website_install.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        test_website_install
+                        logs
+                    </a>
+                    <a class="dropdown-item" href="http://runbot268.odoo.com/runbot/static/build/115876436-master/logs/test_website_standalone.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        test_website_standalone
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot268.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876437" class="btn btn-default slot_name">
+                    <span>External</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot302.odoo.com/runbot/static/build/115876437-master/logs/external_tests.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        external_tests
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot302.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876438" class="btn btn-default slot_name">
+                    <span>External l10n</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot130.odoo.com/runbot/static/build/115876438-master/logs/l10n_account.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        l10n_account
+                        logs
+                    </a>
+                    <a class="dropdown-item" href="http://runbot130.odoo.com/runbot/static/build/115876438-master/logs/l10n_standalone.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        l10n_standalone
+                        logs
+                    </a>
+                    <a class="dropdown-item" href="http://runbot130.odoo.com/runbot/static/build/115876438-master/logs/l10n_external.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        l10n_external
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot130.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876439" class="btn btn-default slot_name">
+                    <span>Website Nightly</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot233.odoo.com/runbot/static/build/115876439-master/logs/website_nightly.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        website_nightly
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot233.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-warning disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876440" class="btn btn-default slot_name">
+                    <span>upgrade odoo</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot233.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876441" class="btn btn-default slot_name">
+                    <span>Click All commmunity</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot233.odoo.com/runbot/static/build/115876441-master/logs/install_for_new_click_all.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_for_new_click_all
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot233.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876442" class="btn btn-default slot_name">
+                    <span>Click All enterprise</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot233.odoo.com/runbot/static/build/115876442-master/logs/install_for_new_click_all.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_for_new_click_all
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot233.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876443" class="btn btn-default slot_name">
+                    <span>Translations Export Community</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot241.odoo.com/runbot/static/build/115876443-master/logs/install_all_translations.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_all_translations
+                        logs
+                    </a>
+                    <a class="dropdown-item" href="http://runbot241.odoo.com/runbot/static/build/115876443-master/logs/translations_export.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        translations_export
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot241.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-warning disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876444" class="btn btn-default slot_name">
+                    <span>Translations Export Enterprise</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot241.odoo.com/runbot/static/build/115876444-master/logs/install_all_translations.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_all_translations
+                        logs
+                    </a>
+                    <a class="dropdown-item" href="http://runbot241.odoo.com/runbot/static/build/115876444-master/logs/translations_export.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        translations_export
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot241.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876445" class="btn btn-default slot_name">
+                    <span>Translations Export L10n</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot241.odoo.com/runbot/static/build/115876445-master/logs/install_all_translations_with_l10n.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_all_translations_with_l10n
+                        logs
+                    </a>
+                    <a class="dropdown-item" href="http://runbot241.odoo.com/runbot/static/build/115876445-master/logs/translations_export.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        translations_export
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot241.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876446" class="btn btn-default slot_name">
+                    <span>Translations Export Documentation</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot241.odoo.com/runbot/static/build/115876446-master/logs/export_translations_documentation.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        export_translations_documentation
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot241.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876447" class="btn btn-default slot_name">
+                    <span>Translations Export Design-Themes</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot171.odoo.com/runbot/static/build/115876447-master/logs/install_all_translations.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_all_translations
+                        logs
+                    </a>
+                    <a class="dropdown-item" href="http://runbot171.odoo.com/runbot/static/build/115876447-master/logs/translations_export.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        translations_export
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot171.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876448" class="btn btn-default slot_name">
+                    <span>Distro Builds</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/55"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot233.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876449" class="btn btn-default slot_name">
+                    <span>Latest Chrome builds</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot233.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876450" class="btn btn-default slot_name">
+                    <span>Docker infos</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot281.odoo.com/runbot/static/build/115876450-master/logs/docker_versions.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        docker_versions
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot281.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-secondary disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876451" class="btn btn-default slot_name">
+                    <span>Nightly Test statistics</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot294.odoo.com/runbot/static/build/115876451-master/logs/test_all_tests_stats.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        test_all_tests_stats
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot294.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-default disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <span class="btn btn-default disabled slot_name">
+                    <span>Stats summary</span>
+                </span>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-danger disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876452" class="btn btn-default slot_name">
+                    <span>Ruff checks</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot228.odoo.com/runbot/static/build/115876452-master/logs/ruff-generate-configs.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        ruff-generate-configs
+                        logs
+                    </a>
+                    <a class="dropdown-item" href="http://runbot228.odoo.com/runbot/static/build/115876452-master/logs/test_ruff.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        test_ruff
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot228.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-warning disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876453" class="btn btn-default slot_name">
+                    <span>Upgrade nightly l10n</span>
+                </a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot303.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+            <div class="btn-group btn-group-ssm slot_button_group">
+                <span class="btn btn-success disabled" title="created">
+                    <i class="fa fa-hashtag"></i>
+                </span>
+                <a href="/runbot/batch/2613019/build/115876454" class="btn btn-default slot_name">
+                    <span>Templates without blacklist nightly</span>
+                </a>
+                <a title="View last trigger report" class="fa fa-eye btn btn-info" href="/runbot/trigger/report/112"></a>
+            <button data-bs-toggle="dropdown" title="Build options" aria-label="Build options" aria-expanded="false" class="btn btn-default dropdown-toggle">
+                <i class="fa  fa-cog  fa-fw"></i>
+                <span class="caret"></span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" role="menu">
+                    <a class="dropdown-item" href="http://runbot273.odoo.com/runbot/static/build/115876454-master/logs/install_all_except_test_no_demo_no_blacklist.txt">
+                        <i class="fa fa-file-text-o"></i>
+                        Full
+                        install_all_except_test_no_demo_no_blacklist
+                        logs
+                    </a>
+   <div class="dropdown-divider"></div>
+    <a class="dropdown-item" target="new" href="http://mail.runbot273.odoo.com">
+        <i class="fa fa-envelope"></i>
+        Mailhog
+    </a>
+            </div>
+            </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Manual</td>
+                            <td>
+                            </td>
+                        </tr>
+                    </table>
+                    </div>
+                </div>
+                    <div class="alert alert-info">
+                        <b>INFO</b>
+                        --
+                        Batch done
+                    </div>
+            
+                </body>
+            </html>
