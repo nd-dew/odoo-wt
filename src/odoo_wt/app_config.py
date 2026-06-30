@@ -3,6 +3,32 @@ import datetime
 import os
 import shutil
 from pathlib import Path
+import time
+import inspect
+import sys
+
+_start_time = time.perf_counter()
+
+def debug_log(msg: str):
+    if "--debug" in sys.argv:
+        elapsed = (time.perf_counter() - _start_time) * 1000
+        
+        # Symmetrical frame inspection to resolve caller details
+        frame = inspect.currentframe().f_back
+        func_name = frame.f_code.co_name
+        
+        class_name = ""
+        if "self" in frame.f_locals:
+            class_name = frame.f_locals["self"].__class__.__name__ + "."
+        elif "cls" in frame.f_locals:
+            class_name = frame.f_locals["cls"].__name__ + "."
+            
+        module_name = frame.f_globals.get("__name__", "")
+        if module_name.startswith("odoo_wt."):
+            module_name = module_name.replace("odoo_wt.", "")
+            
+        caller_str = f"{module_name}.{class_name}{func_name}"
+        print(f"  {elapsed:7.2f}ms | {caller_str:<45} | {msg}")
 
 DEFAULT_CONFIG_FILE = Path.home() / ".config" / "odoo-wt.json"
 DEFAULT_LOG_FILE = Path.home() / ".config" / "odoo-wt-logs.jsonl"
@@ -89,6 +115,7 @@ class ConfigManager:
                     self.config.update(data)
             except (OSError, IOError, json.JSONDecodeError):
                 pass
+        debug_log(f"Successfully loaded configuration from disk (config_file: {self.config_file})")
         return self.config
 
     def save(self, new_config):
@@ -132,6 +159,7 @@ class ConfigManager:
         self.config_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.config_file, "w") as f:
             json.dump(self.config, f, indent=4)
+        debug_log(f"Successfully saved and serialized configuration to disk (config_file: {self.config_file})")
 
 # Global Instance
 config_mgr = ConfigManager()
