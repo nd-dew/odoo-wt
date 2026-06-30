@@ -189,14 +189,16 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
                             if author_obj and isinstance(author_obj, dict):
                                 login = author_obj.get("login")
                                 if login:
-                                    comments.append({
-                                        "user": login,
-                                        "created_at": item.get("createdAt", ""),
-                                        "html_url": item.get("url", ""),
-                                        "body": item.get("body", ""),
-                                        "is_ent": "enterprise" in repo_name,
-                                        "is_upg": "upgrade" in repo_name
-                                    })
+                                    body_text = item.get("body", "")
+                                    if body_text.strip():
+                                        comments.append({
+                                            "user": login,
+                                            "created_at": item.get("createdAt", ""),
+                                            "html_url": item.get("url", ""),
+                                            "body": body_text,
+                                            "is_ent": "enterprise" in repo_name,
+                                            "is_upg": "upgrade" in repo_name
+                                        })
                 # 2. Parse reviews
                 raw_reviews = data.get("reviews", [])
                 if isinstance(raw_reviews, list):
@@ -206,14 +208,16 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
                             if author_obj and isinstance(author_obj, dict):
                                 login = author_obj.get("login")
                                 if login:
-                                    comments.append({
-                                        "user": login,
-                                        "created_at": item.get("submittedAt", ""),
-                                        "html_url": f"https://github.com/{repo_name}/pull/{pr_number}",
-                                        "body": item.get("body", ""),
-                                        "is_ent": "enterprise" in repo_name,
-                                        "is_upg": "upgrade" in repo_name
-                                    })
+                                    body_text = item.get("body", "")
+                                    if body_text.strip():
+                                        comments.append({
+                                            "user": login,
+                                            "created_at": item.get("submittedAt", ""),
+                                            "html_url": f"https://github.com/{repo_name}/pull/{pr_number}",
+                                            "body": body_text,
+                                            "is_ent": "enterprise" in repo_name,
+                                            "is_upg": "upgrade" in repo_name
+                                        })
     except Exception:
         pass
 
@@ -230,14 +234,16 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
                         if user_obj and isinstance(user_obj, dict):
                             login = user_obj.get("login")
                             if login:
-                                comments.append({
-                                    "user": login,
-                                    "created_at": item.get("created_at", ""),
-                                    "html_url": item.get("html_url", ""),
-                                    "body": item.get("body", ""),
-                                    "is_ent": "enterprise" in repo_name,
-                                    "is_upg": "upgrade" in repo_name
-                                })
+                                body_text = item.get("body", "")
+                                if body_text.strip():
+                                    comments.append({
+                                        "user": login,
+                                        "created_at": item.get("created_at", ""),
+                                        "html_url": item.get("html_url", ""),
+                                        "body": body_text,
+                                        "is_ent": "enterprise" in repo_name,
+                                        "is_upg": "upgrade" in repo_name
+                                    })
     except Exception:
         pass
         
