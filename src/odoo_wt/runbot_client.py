@@ -1,6 +1,8 @@
 import urllib.request
 import re
+import json
 from typing import Optional, Tuple
+from .app_config import debug_log
 
 def find_runbot_batch_url(branch_name: str) -> Optional[Tuple[str, str]]:
     """
@@ -11,6 +13,7 @@ def find_runbot_batch_url(branch_name: str) -> Optional[Tuple[str, str]]:
         return None
         
     search_url = f"https://runbot.odoo.com/runbot?search={branch_name}"
+    debug_log(f"Searching Runbot search index for branch: '{branch_name}' (URL: {search_url})")
     req = urllib.request.Request(
         search_url, 
         headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -18,21 +21,25 @@ def find_runbot_batch_url(branch_name: str) -> Optional[Tuple[str, str]]:
     try:
         with urllib.request.urlopen(req, timeout=5) as response:
             html = response.read().decode('utf-8')
+        debug_log(f"Downloaded search index page successfully. Length: {len(html)} characters")
         
         # Odoo Runbot links batches inside href="/runbot/batch/<id>" with title="YYYY-MM-DD HH:MM:SS"
         match = re.search(r'href="/runbot/batch/(\d+)" title="([^"]+)"', html)
         if match:
             batch_id = match.group(1)
             timestamp_str = match.group(2)
+            debug_log(f"Matched batch on index! ID: {batch_id}, Timestamp: {timestamp_str}")
             return f"https://runbot.odoo.com/runbot/batch/{batch_id}", timestamp_str
             
         # Fallback to match just batch ID if title is not present
         match_id = re.search(r'href="/runbot/batch/(\d+)"', html)
         if match_id:
             batch_id = match_id.group(1)
+            debug_log(f"Matched batch on index! ID: {batch_id} (fallback no timestamp)")
             return f"https://runbot.odoo.com/runbot/batch/{batch_id}", ""
-    except Exception:
-        pass
+        debug_log("No matching batch found on index page.")
+    except Exception as e:
+        debug_log(f"Exception during Runbot search index fetch: {e}")
     return None
 
 def check_batch_details(batch_url: str) -> Tuple[int, int, int, int]:
@@ -48,10 +55,11 @@ def check_batch_details(batch_url: str) -> Tuple[int, int, int, int]:
         with urllib.request.urlopen(req, timeout=5) as response:
             html = response.read().decode('utf-8')
         
-        success = html.count("btn-success")
-        failed = html.count("btn-danger")
-        warning = html.count("btn-warning")
-        running = html.count("fa-spinner")
+        slot_badges = re.findall(r'<div[^>]*class="[^"]*slot_button_group[^"]*"[^>]*>\s*<(?:span|a)[^>]*class="btn btn-(success|danger|warning|default|info) disabled"', html)
+        success = slot_badges.count("success")
+        failed = slot_badges.count("danger")
+        warning = slot_badges.count("warning")
+        running = html.count("fa-spinner") + html.count("fa-circle-o-notch") + slot_badges.count("info")
         
         return success, failed, warning, running
     except Exception:
@@ -66,6 +74,7 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
         return None
         
     search_url = f"https://runbot.odoo.com/runbot?search={branch_name}"
+    debug_log(f"Querying Runbot search index for branch: '{branch_name}' (URL: {search_url})")
     req = urllib.request.Request(
         search_url, 
         headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -73,6 +82,7 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
     try:
         with urllib.request.urlopen(req, timeout=5) as response:
             html = response.read().decode('utf-8')
+        debug_log(f"Downloaded search index page successfully. Length: {len(html)} characters")
             
         # Parse Batch ID and Timestamp
         match = re.search(r'href="/runbot/batch/(\d+)" title="([^"]+)"', html)
@@ -80,6 +90,7 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             batch_id = match.group(1)
             ts_str = match.group(2)
             batch_url = f"https://runbot.odoo.com/runbot/batch/{batch_id}"
+            debug_log(f"Matched batch on index! ID: {batch_id}, URL: {batch_url}")
             
             # Symmetrically search backward to capture the entire bundle_row including its column 1 GitHub dropdown links!
             tile_start = html.find(f'href="/runbot/batch/{batch_id}"')
@@ -91,19 +102,24 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             
             # Symmetrically fetch the actual batch detailed page to parse the complete build statuses (including minor/hidden failures and warnings!)
             try:
+                debug_log(f"Downloading detailed batch page content from: {batch_url}")
                 req_batch = urllib.request.Request(
                     batch_url,
                     headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
                 )
                 with urllib.request.urlopen(req_batch, timeout=5) as response:
                     batch_html = response.read().decode('utf-8')
-            except Exception:
+                debug_log(f"Successfully downloaded detailed batch page. Length: {len(batch_html)} characters")
+            except Exception as e:
+                debug_log(f"Failed to download detailed batch page ({e}), falling back to dashboard block.")
                 batch_html = block # Fallback to block if batch page fails
             
-            success = batch_html.count("btn-success")
-            failed = batch_html.count("btn-danger")
-            warning = batch_html.count("btn-warning")
-            running = batch_html.count("fa-spinner") + batch_html.count("fa-spin") + batch_html.count("fa-circle-o-notch")
+            slot_badges = re.findall(r'<div[^>]*class="[^"]*slot_button_group[^"]*"[^>]*>\s*<(?:span|a)[^>]*class="btn btn-(success|danger|warning|default|info) disabled"', batch_html)
+            success = slot_badges.count("success")
+            failed = slot_badges.count("danger")
+            warning = slot_badges.count("warning")
+            running = batch_html.count("fa-spinner") + batch_html.count("fa-circle-o-notch") + slot_badges.count("info")
+            debug_log(f"Parsed build counts -> success: {success}, failed: {failed}, warning: {warning}, running: {running}")
             
             # If the batch exists but has no completed or spinning builds yet, it is preparing/pending
             if success == 0 and failed == 0 and warning == 0 and running == 0:
@@ -121,6 +137,7 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
                     enterprise_pr = url
                 elif repo == "upgrade" and not upgrade_pr:
                     upgrade_pr = url
+            debug_log(f"Extracted PR links -> Odoo: {odoo_pr}, Enterprise: {enterprise_pr}, Upgrade: {upgrade_pr}")
             
             return batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr
             
@@ -129,6 +146,7 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
         if match_id:
             batch_id = match_id.group(1)
             batch_url = f"https://runbot.odoo.com/runbot/batch/{batch_id}"
+            debug_log(f"Matched batch on index (fallback no title)! ID: {batch_id}, URL: {batch_url}")
             
             # Symmetrically search backward to capture the entire bundle_row including its column 1 GitHub dropdown links!
             tile_start = html.find(f'href="/runbot/batch/{batch_id}"')
@@ -140,19 +158,24 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             
             # Symmetrically fetch the actual batch detailed page to parse the complete build statuses (including minor/hidden failures and warnings!)
             try:
+                debug_log(f"Downloading detailed batch page content from: {batch_url} (fallback)")
                 req_batch = urllib.request.Request(
                     batch_url,
                     headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
                 )
                 with urllib.request.urlopen(req_batch, timeout=5) as response:
                     batch_html = response.read().decode('utf-8')
-            except Exception:
+                debug_log(f"Successfully downloaded detailed batch page (fallback). Length: {len(batch_html)} characters")
+            except Exception as e:
+                debug_log(f"Failed to download detailed batch page ({e}), falling back to dashboard block.")
                 batch_html = block # Fallback to block if batch page fails
             
-            success = batch_html.count("btn-success")
-            failed = batch_html.count("btn-danger")
-            warning = batch_html.count("btn-warning")
-            running = batch_html.count("fa-spinner") + batch_html.count("fa-spin") + batch_html.count("fa-circle-o-notch")
+            slot_badges = re.findall(r'<div[^>]*class="[^"]*slot_button_group[^"]*"[^>]*>\s*<(?:span|a)[^>]*class="btn btn-(success|danger|warning|default|info) disabled"', batch_html)
+            success = slot_badges.count("success")
+            failed = slot_badges.count("danger")
+            warning = slot_badges.count("warning")
+            running = batch_html.count("fa-spinner") + batch_html.count("fa-circle-o-notch") + slot_badges.count("info")
+            debug_log(f"Parsed build counts (fallback) -> success: {success}, failed: {failed}, warning: {warning}, running: {running}")
             
             # If the batch exists but has no completed or spinning builds yet, it is preparing/pending
             if success == 0 and failed == 0 and warning == 0 and running == 0:
@@ -170,6 +193,7 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
                     enterprise_pr = url
                 elif repo == "upgrade" and not upgrade_pr:
                     upgrade_pr = url
+            debug_log(f"Extracted PR links (fallback) -> Odoo: {odoo_pr}, Enterprise: {enterprise_pr}, Upgrade: {upgrade_pr}")
             
             return batch_url, "", success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr
     except Exception:
@@ -206,6 +230,7 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
     
     comments = []
     cmd = ["gh", "pr", "view", pr_number, "-R", repo_name, "--json", "comments,reviews"]
+    debug_log(f"Fetching GitHub PR comments for repo '{repo_name}' PR #{pr_number} using 'gh pr view'...")
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         if res.stdout.strip():
@@ -249,12 +274,15 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
                                             "is_ent": "enterprise" in repo_name,
                                             "is_upg": "upgrade" in repo_name
                                         })
-    except Exception:
+        debug_log(f"Fetched and parsed {len(comments)} global/review comments via 'gh pr view'.")
+    except Exception as e:
+        debug_log(f"Exception during 'gh pr view' comments fetch: {e}")
         pass
 
     # 3. Fetch inline review comments using standard GitHub pulls/comments API
     try:
         cmd_inline = ["gh", "api", f"repos/{repo_name}/pulls/{pr_number}/comments"]
+        debug_log(f"Fetching inline files-changed review comments via standard: 'gh api repos/{repo_name}/pulls/{pr_number}/comments'")
         res_inline = subprocess.run(cmd_inline, capture_output=True, text=True, check=True)
         if res_inline.stdout.strip():
             raw_inline = json.loads(res_inline.stdout)
@@ -275,7 +303,9 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
                                         "is_ent": "enterprise" in repo_name,
                                         "is_upg": "upgrade" in repo_name
                                     })
-    except Exception:
+        debug_log(f"Successfully fetched and parsed total of {len(comments)} comments combined.")
+    except Exception as e:
+        debug_log(f"Exception during 'gh api pulls/comments' fetch: {e}")
         pass
         
     return comments
@@ -285,6 +315,7 @@ def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optiona
     Fetches the absolute latest human PR comment from Odoo Community, Enterprise, or Upgrade PRs.
     """
     if not is_gh_authenticated():
+        debug_log("Skipping GitHub comments lookup because 'gh' CLI is not authenticated.")
         return None
         
     odoo_pr_num = None
@@ -306,11 +337,14 @@ def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optiona
             upg_pr_num = match.group(1)
             
     if not odoo_pr_num and not ent_pr_num and not upg_pr_num:
+        debug_log("No linked Pull Requests found on batch, skipping comments lookup.")
         return None
         
     import concurrent.futures
     all_comments = []
     
+    debug_log(f"Gathering latest PR comments from Odoo, Enterprise, and Upgrade PRs (Odoo PR: {odoo_pr_num}, Enterprise PR: {ent_pr_num}, Upgrade PR: {upg_pr_num})...")
+    debug_log("Spawning concurrent ThreadPoolExecutor to fetch repo comments from GitHub...")
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
         if odoo_pr_num:
@@ -378,6 +412,7 @@ def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optiona
         relative = "yesterday" if days == 1 else f"{days}d ago"
         
     latest["relative"] = relative
+    debug_log(f"Latest comment resolved -> User: @{latest['user']} ({latest['relative']}), Body snippet: '{latest['body_clean'][:60]}...'")
     
     # Symmetrically extract the history of the last 10 comments chronologically
     history = []
@@ -460,6 +495,7 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
     if not batch_url:
         return []
         
+    debug_log(f"Starting live failing tests scraping from batch URL: {batch_url} (verbose_level: {verbose_level})...")
     req_batch = urllib.request.Request(
         batch_url, 
         headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -476,11 +512,13 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                 m = re.search(r'href="(/runbot/batch/\d+/build/\d+|/runbot/build/\d+)"', b)
                 if m:
                     failed_build_links.append("https://runbot.odoo.com" + m.group(1))
+        debug_log(f"Parsed {len(failed_build_links)} failed/warning build links inside batch: {failed_build_links}")
                     
         # Limit to checking at most 2 failed builds to keep execution extremely fast and safe
         tests = []
         for build_url in failed_build_links[:2]:
             try:
+                debug_log(f"Scraping build detailed page to find logs: {build_url}...")
                 req_build = urllib.request.Request(
                     build_url,
                     headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -488,57 +526,128 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                 with urllib.request.urlopen(req_build, timeout=5) as resp_build:
                     html_build = resp_build.read().decode('utf-8')
                     
-                # Find all .txt log links on the build page
+                # Find all .txt log links on the build page and de-duplicate them
                 log_links = re.findall(r'href="(http[s]?://[^"]+/logs/[^"]+\.txt)"', html_build)
+                unique_log_links = []
+                for link in log_links:
+                    if link not in unique_log_links:
+                        unique_log_links.append(link)
+                debug_log(f"Extracted log links from build page: {log_links} (deduplicated down to {len(unique_log_links)} unique logs)")
                 
-                # Check at most 3 log files per build to avoid network overhead
-                for log_url in log_links[:3]:
+                # Symmetrically prioritize important test-related logs and filter/deprioritize setup logs to never miss failures
+                important_logs = []
+                other_logs = []
+                for link in unique_log_links:
+                    link_lower = link.lower()
+                    if "restore" in link_lower or "pre_run_config" in link_lower or "install_all" in link_lower or "install_base" in link_lower:
+                        other_logs.append(link)
+                    elif "test" in link_lower or "lint" in link_lower or "migration" in link_lower:
+                        important_logs.append(link)
+                    else:
+                        other_logs.append(link)
+                
+                prioritized_log_links = important_logs + other_logs
+                debug_log(f"Prioritized log links order: {prioritized_log_links}")
+                
+                # Check at most 5 log files per build to avoid network overhead while capturing all tests
+                for log_url in prioritized_log_links[:5]:
                     try:
+                        debug_log(f"Downloading build log content from URL: {log_url}...")
                         req_log = urllib.request.Request(
                             log_url,
                             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
                         )
-                        # Fetch first 100KB of the log file
+                        # Fetch the entire log file to ensure we never truncate failures at the bottom
                         with urllib.request.urlopen(req_log, timeout=5) as resp_log:
-                            log_text = resp_log.read(100000).decode('utf-8', errors='ignore')
+                            log_text = resp_log.read().decode('utf-8', errors='ignore')
+                        debug_log(f"Successfully downloaded full log file. Length: {len(log_text)} characters")
                             
-                        # A. Search for full TestClass.test_method formats (highest signal!)
-                        matches_class = re.findall(r'\b(Test[A-Za-z0-9_]+\.test_[A-Za-z0-9_]+)\b', log_text)
-                        for m in matches_class:
-                            if m not in tests:
-                                display_name = m
+                        # A. Search for actual unittest failures in the unittest summary (e.g. ERROR: test_method (path.TestClass) or FAIL: test_method (path.TestClass))
+                        unittest_matches = re.findall(r'\b(?:ERROR|FAIL):\s+(test_[A-Za-z0-9_]+)\s+\((?:[A-Za-z0-9_]+\.)*(Test[A-Za-z0-9_]+)\)', log_text)
+                        for test_method, test_class in unittest_matches:
+                            display_name = f"{test_class}.{test_method}"
+                            if display_name not in tests:
+                                if verbose_level >= 2:
+                                    err_msg = extract_error_message(log_text, test_method)
+                                    if err_msg:
+                                        display_name = f"{display_name}  ➔  {err_msg}"
+                                if display_name not in tests:
+                                    tests.append(display_name)
+                                
+                        # B. Search for direct ERROR/FAIL listings (e.g. ERROR: TestClass.test_method) or Tour/JS failures
+                        direct_matches = re.findall(r'\b(?:ERROR|FAIL):\s+(Test[A-Za-z0-9_]+\.test_[A-Za-z0-9_]+)\b', log_text)
+                        for m in direct_matches:
+                            display_name = m
+                            if display_name not in tests:
                                 if verbose_level >= 2:
                                     err_msg = extract_error_message(log_text, m)
                                     if err_msg:
                                         display_name = f"{m}  ➔  {err_msg}"
                                 if display_name not in tests:
                                     tests.append(display_name)
-                                
-                        # B. Search for standalone test_xxxx names
-                        matches_raw = re.findall(r'\b(test_[A-Za-z0-9_]{6,})\b', log_text)
-                        for m in matches_raw:
-                            if m not in tests and not any(m in existing for existing in tests):
-                                if not any(fw in m.lower() for fw in ("test_option", "test_config", "test_success", "test_param")):
-                                    display_name = m
-                                    if verbose_level >= 2:
-                                        err_msg = extract_error_message(log_text, m)
-                                        if err_msg:
-                                            display_name = f"{m}  ➔  {err_msg}"
-                                    if display_name not in tests:
-                                        tests.append(display_name)
+                                    
+                        tour_matches = re.findall(r'\b(?:tour|Tour)\s+([A-Za-z0-9_]+)\s+failed\b', log_text)
+                        for m in tour_matches:
+                            display_name = f"Tour.{m}"
+                            if display_name not in tests:
+                                if verbose_level >= 2:
+                                    err_msg = extract_error_message(log_text, m) or "Tour failed"
+                                    display_name = f"{display_name}  ➔  {err_msg}"
+                                if display_name not in tests:
+                                    tests.append(display_name)
                                     
                         # C. If it is a static check / linter error, parse the log file name itself!
                         if "check_" in log_url or "lint" in log_url:
                             log_name = log_url.split("/")[-1].replace(".txt", "")
-                            if not any(t in log_text for t in tests):
+                            # Symmetrically guard linter fallback additions: only add if actual failures exist in this specific log text
+                            log_text_lower = log_text.lower()
+                            has_log_failures = (
+                                any(x in log_text_lower for x in ("fail:", "error:", "exception:", "style violation", "exit code")) or
+                                ("failed" in log_text_lower and "0 failed" not in log_text_lower)
+                            )
+                            if not any(t in log_text for t in tests) and has_log_failures:
                                 if log_name not in tests:
-                                    display_name = log_name
                                     if verbose_level >= 2:
-                                        err_msg = extract_error_message(log_text, log_name) or extract_error_message(log_text, "failed")
-                                        if err_msg:
-                                            display_name = f"{log_name}  ➔  {err_msg}"
-                                    if display_name not in tests:
-                                        tests.append(display_name)
+                                        has_json = False
+                                        if "ruff" in log_url.lower():
+                                            # Symmetrically fetch the actual Ruff JSON report for high-fidelity errors!
+                                            try:
+                                                json_url = log_url.replace(".txt", "-ruff-output.json")
+                                                debug_log(f"Ruff log detected, resolving its JSON style report URL: {json_url}...")
+                                                req_json = urllib.request.Request(
+                                                    json_url,
+                                                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                                                )
+                                                with urllib.request.urlopen(req_json, timeout=5) as resp_json:
+                                                    raw_json = json.loads(resp_json.read().decode('utf-8'))
+                                                    if isinstance(raw_json, list) and raw_json:
+                                                        debug_log(f"Successfully downloaded Ruff JSON report, parsed {len(raw_json)} style violations.")
+                                                        for item in raw_json[:3]:  # Show first 3 violations separately
+                                                            code = item.get("code", "")
+                                                            msg = item.get("message", "")
+                                                            filename = item.get("filename", "")
+                                                            rel_path = filename.replace("/data/build/", "")
+                                                            row = item.get("location", {}).get("row", 0)
+                                                            col = item.get("location", {}).get("column", 0)
+                                                            display_name = f"{log_name}  ➔  {rel_path}:{row}:{col}  ➔  [{code}] {msg}"
+                                                            if display_name not in tests:
+                                                                tests.append(display_name)
+                                                        has_json = True
+                                            except Exception as e:
+                                                debug_log(f"Failed to fetch/parse Ruff JSON report ({e}), falling back to text log parsing.")
+                                                has_json = False
+                                        else:
+                                            has_json = False
+                                                
+                                        if not has_json or not any(log_name in t for t in tests):
+                                            err_msg = extract_error_message(log_text, log_name) or extract_error_message(log_text, "failed")
+                                            if err_msg:
+                                                display_name = f"{log_name}  ➔  {err_msg}"
+                                                if display_name not in tests:
+                                                    tests.append(display_name)
+                                    else:
+                                        if log_name not in tests:
+                                            tests.append(log_name)
                     except Exception:
                         continue
             except Exception:
