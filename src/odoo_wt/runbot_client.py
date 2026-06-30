@@ -419,23 +419,35 @@ def extract_error_message(log_text: str, test_name: str) -> str:
     pos = log_text.find(test_name)
     if pos == -1:
         return ""
-    chunk = log_text[pos:pos+1000]
+    chunk = log_text[pos:pos+1500]
     lines = chunk.splitlines()
-    for line in lines[1:15]:
+    
+    IGNORE_PATTERNS = (
+        "adding readonly volume", "pointing to", "docker", "runbot",
+        "database:", "using config file", "postgresql", "container",
+        "starting server", "command:", "host:", "port:", "volume"
+    )
+    
+    for line in lines[1:25]:
         line_strip = line.strip()
         if not line_strip:
             continue
         # Skip divider-only lines (e.g. ===, ---, ____, ***)
         if len(line_strip) > 3 and all(char in "-=_* " for char in line_strip):
             continue
+        # Skip generic Docker/Runbot container setup log lines
+        if any(pat in line_strip.lower() for pat in IGNORE_PATTERNS):
+            continue
         if "AssertionError:" in line_strip or "Error:" in line_strip or "Exception:" in line_strip or "FAIL:" in line_strip:
             return line_strip
         if "failed" in line_strip or "error" in line_strip.lower() or "warning" in line_strip.lower():
             return line_strip
-    for line in lines[1:6]:
+    for line in lines[1:10]:
         line_strip = line.strip()
         if line_strip:
             if len(line_strip) > 3 and all(char in "-=_* " for char in line_strip):
+                continue
+            if any(pat in line_strip.lower() for pat in IGNORE_PATTERNS):
                 continue
             return line_strip[:80]
     return ""
