@@ -10,10 +10,8 @@ try:
 except PackageNotFoundError:
     VERSION = "dev"
 
-from .app_config import config_mgr
+from .app_config import config_mgr, debug_log
 from .system_discovery import discover_system_data, decompose_branch, is_base_branch
-from .setup_wizard import WizardApp
-from .main_tui import OdooWtApp
 
 def show_help():
     from rich.console import Console
@@ -176,12 +174,17 @@ def main():
         if arg == "--verbose":
             verbose_level += 1
             to_remove.append(arg)
-        elif arg.startswith("-") and not arg.startswith("--"):
-            v_count = arg.count("v")
-            if v_count > 0:
-                verbose_level += v_count
-                clean_arg = "-" + "".join(char for char in arg[1:] if char != "v")
-                to_remove.append((arg, clean_arg))
+        elif arg.startswith("-"):
+            stripped = arg.lstrip("-")
+            if all(char == "v" for char in stripped) and len(stripped) > 0:
+                verbose_level += len(stripped)
+                to_remove.append(arg)
+            elif not arg.startswith("--"):
+                v_count = arg.count("v")
+                if v_count > 0:
+                    verbose_level += v_count
+                    clean_arg = "-" + "".join(char for char in arg[1:] if char != "v")
+                    to_remove.append((arg, clean_arg))
                 
     for item in to_remove:
         if isinstance(item, tuple):
@@ -243,6 +246,7 @@ def main():
     # Initialize configuration first (required for all CLI commands)
     if not config_mgr.config_file.exists():
         check_dependencies()
+        from .setup_wizard import WizardApp
         app = WizardApp()
         config = app.run()
         if not config:
@@ -416,6 +420,7 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
     # Wizard command
     if "wizard" in sys.argv:
         check_dependencies()
+        from .setup_wizard import WizardApp
         app = WizardApp()
         config = app.run()
         sys.exit(0)
@@ -745,16 +750,19 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
             matched_wt = None
 
         if matched_wt:
+            debug_log(f"Smart Switcher active. Match found: '{matched_wt['name']}' at path '{matched_wt['path']}'")
             from rich.console import Console
             console = Console()
             console.print(f"🚀 Changing directory to [cyan]{matched_wt['path']}[/cyan]...\n")
             
             # Touch worktree recency
+            debug_log("Updating worktree recency in configuration...")
             if "worktree_recency" not in config: config["worktree_recency"] = {}
             import datetime
             config["worktree_recency"][matched_wt["path"]] = datetime.datetime.utcnow().isoformat()
             config_mgr.save(config)
             
+            debug_log(f"Preparing to spawn sub-shell inside target path (shell: {os.environ.get('SHELL', '/bin/bash')})...")
             os.environ["OLDPWD"] = original_cwd
             os.chdir(matched_wt["path"])
             os.environ["PWD"] = matched_wt["path"]
@@ -813,6 +821,7 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
             data = asyncio.run(run_cli_deployment(config, data, verbose=verbose))
     else:
         # Standard TUI App mode
+        from .main_tui import OdooWtApp
         app = OdooWtApp(config, v_list, s_list, worktrees, VERSION)
         data = app.run()
 
@@ -1315,14 +1324,15 @@ def print_single_branch_detailed_status(config, branch_name, verbose_level=0, mo
                     grouped = {}
                     for t in failing_tests:
                         addon = "core/base"
-                        if "addons." in t:
-                            parts = t.split("addons.")[1].split(".")
+                        raw_test = t.split("  ➔  ")[0].strip()
+                        if "addons." in raw_test:
+                            parts = raw_test.split("addons.")[1].split(".")
                             if parts: addon = parts[0]
-                        elif "addons/" in t:
-                            parts = t.split("addons/")[1].split("/")
+                        elif "addons/" in raw_test:
+                            parts = raw_test.split("addons/")[1].split("/")
                             if parts: addon = parts[0]
-                        elif "." in t:
-                            parts = t.split(".")
+                        elif "." in raw_test:
+                            parts = raw_test.split(".")
                             if parts[0] not in ("odoo", "src"):
                                 addon = parts[0]
                                 
