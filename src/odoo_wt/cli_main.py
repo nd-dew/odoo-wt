@@ -796,6 +796,19 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
                     user = comment_data["user"]
                     relative = comment_data["relative"]
                     body_clean = comment_data["body_clean"]
+                    
+                    # Symmetrical adaptive terminal width truncation to prevent any wrapping
+                    try:
+                        terminal_width = console.width
+                    except Exception:
+                        terminal_width = 120
+                        
+                    meta_len = len(user) + len(relative) + 32
+                    allowed_len = terminal_width - meta_len
+                    if allowed_len >= 10:
+                        if len(body_clean) > allowed_len:
+                            body_clean = body_clean[:allowed_len].strip() + "..."
+                            
                     console.print(f"  [bold]Last Comment:[/bold]  👤 [bold cyan]@{user}[/bold cyan] [dim]({relative})[/dim]: [italic]\"{body_clean}\"[/italic]")
             else:
                 console.print("  [bold]Runbot Status:[/bold] ⚪ No batch")
