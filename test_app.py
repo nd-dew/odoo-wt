@@ -673,13 +673,26 @@ def test_cli_list_command(monkeypatch, tmp_path, capsys):
 
 def test_cli_delete_command(monkeypatch, tmp_path, capsys):
     from odoo_wt import cli_main
-    monkeypatch.setattr("sys.argv", ["odoo-wt", "-d", "17.0-fix-pian"])
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "-d", "master-pdp-fix"])
     
-    config_path = tmp_path / "odoo-wt.json"
+    # Pre-setup mock directories
+    target_dir = tmp_path / "master-pdp-fix"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    (target_dir / "odoo").mkdir()
+    (target_dir / "enterprise").mkdir()
+
+    # Pre-setup base repositories on disk inside tmp_path to satisfy .exists() checks
+    base_odoo_dir = tmp_path / "odoo"
+    base_odoo_dir.mkdir()
+    base_ent_dir = tmp_path / "enterprise"
+    base_ent_dir.mkdir()
+
+    config_path = tmp_path / "odoo-wt-history.json"
     config_path.write_text("{}")
     monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
     monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
-        "wt_root": "/path/root",
+        "wt_root": str(tmp_path),
+        "env_root": str(tmp_path),
         "suffix": "pian"
     })
     
@@ -687,17 +700,17 @@ def test_cli_delete_command(monkeypatch, tmp_path, capsys):
     
     # Mock discover_system_data to return existing worktrees
     monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
-        ["17.0"], ["pian"], [{"name": "17.0-fix-pian", "path": "/path/root/17.0-fix-pian", "version": "17.0"}]
+        ["17.0"], ["pian"], [{"name": "master-pdp-fix", "path": str(target_dir), "version": "17.0"}]
     ))
     
     # Mock inputs to return yes
     monkeypatch.setattr("builtins.input", lambda _: "y")
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
     
-    # Mock subprocess.run to avoid actual shell command triggers
+    # Mock subprocess.run to capture both commands and execution directories
     sub_called = []
     def mock_run(cmd, **kwargs):
-        sub_called.append(cmd)
+        sub_called.append((cmd, kwargs.get("cwd")))
     monkeypatch.setattr("subprocess.run", mock_run)
     
     # Mock shutil.rmtree to avoid directory deletion error
@@ -707,10 +720,21 @@ def test_cli_delete_command(monkeypatch, tmp_path, capsys):
         cli_main.main()
         
     assert excinfo.value.code == 0
-    assert len(sub_called) > 0
     captured = capsys.readouterr()
     assert "Deleting worktree" in captured.out
     assert "Success: Deleted successfully." in captured.out
+    
+    # Verify that odoo worktree remove was run inside community repository
+    assert any(
+        "remove" in cmd and str(target_dir / "odoo") in cmd and cwd == base_odoo_dir.absolute()
+        for cmd, cwd in sub_called
+    )
+    
+    # Verify that worktree prune was executed inside community repository
+    assert any(
+        "prune" in cmd and cwd == base_odoo_dir.absolute()
+        for cmd, cwd in sub_called
+    )
 
 def test_cli_switcher_multiple_matches(monkeypatch, tmp_path, capsys):
     from odoo_wt import cli_main
