@@ -425,13 +425,18 @@ def extract_error_message(log_text: str, test_name: str) -> str:
         line_strip = line.strip()
         if not line_strip:
             continue
+        # Skip divider-only lines (e.g. ===, ---, ____, ***)
+        if len(line_strip) > 3 and all(char in "-=_* " for char in line_strip):
+            continue
         if "AssertionError:" in line_strip or "Error:" in line_strip or "Exception:" in line_strip or "FAIL:" in line_strip:
             return line_strip
         if "failed" in line_strip or "error" in line_strip.lower() or "warning" in line_strip.lower():
             return line_strip
-    for line in lines[1:4]:
+    for line in lines[1:6]:
         line_strip = line.strip()
         if line_strip:
+            if len(line_strip) > 3 and all(char in "-=_* " for char in line_strip):
+                continue
             return line_strip[:80]
     return ""
 
