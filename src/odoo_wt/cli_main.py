@@ -43,6 +43,7 @@ def show_help():
     console.print("  [bold cyan]-d, --delete[/bold cyan] [cyan]<branch>[/cyan]        Alias for 'delete <branch>'")
     console.print("  [bold cyan]-s, --sort[/bold cyan] [cyan]<mode>[/cyan]           Sort status tables by: recency, version, name, runbot, reviews")
     console.print("  [bold cyan]-v, --verbose[/bold cyan]                 Show all failing tests (grouped by module) / verbose deployment logs")
+    console.print("  [bold cyan]-vv, --verbose --verbose[/bold cyan]     Verboser Verbose: Shows actual failed test traceback/error messages")
     console.print("  [bold cyan]--no-magic[/bold cyan]                    Disable automatic 'Magic Fix' branch decomposition")
     console.print("  [bold cyan]--config-path[/bold cyan]                 Print the active odoo-wt.json configuration path")
     console.print("  [bold cyan]--log-path[/bold cyan]                    Print the active odoo-wt-logs.jsonl path")
@@ -1537,12 +1538,14 @@ def show_subcommand_help(subcommand):
         console.print("  If there are failing builds on the branch, odoo-wt automatically downloads the batch pages and detailed static logs,")
         console.print("  extracting the exact names of failing unittests or linter checks (like 'check_semgrep_security') and listing them.")
         console.print("  - Default: Shows the top 5 failing tests on clean, hyphen-free lines for [bold cyan]easy double-click copying[/bold cyan].")
-        console.print("  - `--verbose` or `-v`: Displays all failing tests [bold cyan]grouped by their Odoo module/addon[/bold cyan] under bold headers.\n")
+        console.print("  - `--verbose` or `-v`: Displays all failing tests [bold cyan]grouped by their Odoo module/addon[/bold cyan] under bold headers.")
+        console.print("  - `-vv` (Verboser Verbose): Displays failing test names [bold cyan]alongside their actual error messages or traceback summaries[/bold cyan] extracted from the logs!\n")
         
         console.print("[bold yellow]Examples:[/bold yellow]")
         console.print("  [bold green]odoo-wt runbot[/bold green]                    [dim]# Show CI card of current worktree branch[/dim]")
         console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]-a[/cyan]                 [dim]# Force display the high-level CI table of all branches[/dim]")
-        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]fix-paymob --verbose[/cyan]  [dim]# Show all failing tests of 'fix-paymob' grouped by module[/dim]\n")
+        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]fix-paymob --verbose[/cyan]  [dim]# Show all failing tests of 'fix-paymob' grouped by module[/dim]")
+        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]fix-paymob -vv[/cyan]        [dim]# Show all failing tests with their real traceback errors![/dim]\n")
         
     elif subcommand == "reviews":
         console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'reviews'[/cyan]\n")
