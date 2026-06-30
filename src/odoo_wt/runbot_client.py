@@ -89,10 +89,21 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             else:
                 block = html
             
-            success = block.count("btn-success")
-            failed = block.count("btn-danger")
-            warning = block.count("btn-warning")
-            running = block.count("fa-spinner") + block.count("fa-spin") + block.count("fa-circle-o-notch")
+            # Symmetrically fetch the actual batch detailed page to parse the complete build statuses (including minor/hidden failures and warnings!)
+            try:
+                req_batch = urllib.request.Request(
+                    batch_url,
+                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                )
+                with urllib.request.urlopen(req_batch, timeout=5) as response:
+                    batch_html = response.read().decode('utf-8')
+            except Exception:
+                batch_html = block # Fallback to block if batch page fails
+            
+            success = batch_html.count("btn-success")
+            failed = batch_html.count("btn-danger")
+            warning = batch_html.count("btn-warning")
+            running = batch_html.count("fa-spinner") + batch_html.count("fa-spin") + batch_html.count("fa-circle-o-notch")
             
             # If the batch exists but has no completed or spinning builds yet, it is preparing/pending
             if success == 0 and failed == 0 and warning == 0 and running == 0:
@@ -127,10 +138,21 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             else:
                 block = html
             
-            success = block.count("btn-success")
-            failed = block.count("btn-danger")
-            warning = block.count("btn-warning")
-            running = block.count("fa-spinner") + block.count("fa-spin") + block.count("fa-circle-o-notch")
+            # Symmetrically fetch the actual batch detailed page to parse the complete build statuses (including minor/hidden failures and warnings!)
+            try:
+                req_batch = urllib.request.Request(
+                    batch_url,
+                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                )
+                with urllib.request.urlopen(req_batch, timeout=5) as response:
+                    batch_html = response.read().decode('utf-8')
+            except Exception:
+                batch_html = block # Fallback to block if batch page fails
+            
+            success = batch_html.count("btn-success")
+            failed = batch_html.count("btn-danger")
+            warning = batch_html.count("btn-warning")
+            running = batch_html.count("fa-spinner") + batch_html.count("fa-spin") + batch_html.count("fa-circle-o-notch")
             
             # If the batch exists but has no completed or spinning builds yet, it is preparing/pending
             if success == 0 and failed == 0 and warning == 0 and running == 0:
