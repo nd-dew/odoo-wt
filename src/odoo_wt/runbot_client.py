@@ -415,7 +415,27 @@ def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optiona
     latest["history"] = history
     return latest
 
-def fetch_failing_tests_from_batch(batch_url: str) -> list:
+def extract_error_message(log_text: str, test_name: str) -> str:
+    pos = log_text.find(test_name)
+    if pos == -1:
+        return ""
+    chunk = log_text[pos:pos+1000]
+    lines = chunk.splitlines()
+    for line in lines[1:15]:
+        line_strip = line.strip()
+        if not line_strip:
+            continue
+        if "AssertionError:" in line_strip or "Error:" in line_strip or "Exception:" in line_strip or "FAIL:" in line_strip:
+            return line_strip
+        if "failed" in line_strip or "error" in line_strip.lower() or "warning" in line_strip.lower():
+            return line_strip
+    for line in lines[1:4]:
+        line_strip = line.strip()
+        if line_strip:
+            return line_strip[:80]
+    return ""
+
+def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> list:
     """
     Downloads the Runbot batch page, identifies failed builds, scrapes their detailed build pages,
     and extracts failing unit tests or static check errors from the logs.
@@ -469,21 +489,39 @@ def fetch_failing_tests_from_batch(batch_url: str) -> list:
                         matches_class = re.findall(r'\b(Test[A-Za-z0-9_]+\.test_[A-Za-z0-9_]+)\b', log_text)
                         for m in matches_class:
                             if m not in tests:
-                                tests.append(m)
+                                display_name = m
+                                if verbose_level >= 2:
+                                    err_msg = extract_error_message(log_text, m)
+                                    if err_msg:
+                                        display_name = f"{m}  ➔  {err_msg}"
+                                if display_name not in tests:
+                                    tests.append(display_name)
                                 
                         # B. Search for standalone test_xxxx names
                         matches_raw = re.findall(r'\b(test_[A-Za-z0-9_]{6,})\b', log_text)
                         for m in matches_raw:
                             if m not in tests and not any(m in existing for existing in tests):
                                 if not any(fw in m.lower() for fw in ("test_option", "test_config", "test_success", "test_param")):
-                                    tests.append(m)
+                                    display_name = m
+                                    if verbose_level >= 2:
+                                        err_msg = extract_error_message(log_text, m)
+                                        if err_msg:
+                                            display_name = f"{m}  ➔  {err_msg}"
+                                    if display_name not in tests:
+                                        tests.append(display_name)
                                     
                         # C. If it is a static check / linter error, parse the log file name itself!
                         if "check_" in log_url or "lint" in log_url:
                             log_name = log_url.split("/")[-1].replace(".txt", "")
                             if not any(t in log_text for t in tests):
                                 if log_name not in tests:
-                                    tests.append(log_name)
+                                    display_name = log_name
+                                    if verbose_level >= 2:
+                                        err_msg = extract_error_message(log_text, log_name) or extract_error_message(log_text, "failed")
+                                        if err_msg:
+                                            display_name = f"{log_name}  ➔  {err_msg}"
+                                    if display_name not in tests:
+                                        tests.append(display_name)
                     except Exception:
                         continue
             except Exception:
@@ -493,7 +531,7 @@ def fetch_failing_tests_from_batch(batch_url: str) -> list:
     except Exception:
         return []
 
-def check_branch_status_and_comments(branch_name: str, skip_comments: bool = False) -> Optional[dict]:
+def check_branch_status_and_comments(branch_name: str, skip_comments: bool = False, verbose_level: int = 0) -> Optional[dict]:
     """
     Unified high-speed worker function to fetch runbot status and comments sequentially in a single worker thread.
     """
@@ -523,7 +561,7 @@ def check_branch_status_and_comments(branch_name: str, skip_comments: bool = Fal
         failing_tests = []
         if failed > 0:
             try:
-                failing_tests = fetch_failing_tests_from_batch(batch_url)
+                failing_tests = fetch_failing_tests_from_batch(batch_url, verbose_level)
             except Exception:
                 pass
                 
