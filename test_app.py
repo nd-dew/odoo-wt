@@ -1205,6 +1205,44 @@ def test_fetch_failing_tests_from_batch(monkeypatch):
     assert "TestDiscuss.test_channel_creation" in tests
     assert "test_options" not in tests
 
+def test_fetch_failing_tests_from_batch_with_vv(monkeypatch):
+    from odoo_wt.runbot_client import fetch_failing_tests_from_batch
+    
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def read(self, *args):
+            return self.content.encode("utf-8")
+            
+    def mock_urlopen(request, *args, **kwargs):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if "batch" in url and "build" not in url:
+            return MockResponse(
+                '<div class="btn-group slot_button_group">\n'
+                '  <span class="btn btn-danger"></span>\n'
+                '  <a href="/runbot/batch/123/build/456">Build</a>\n'
+                '</div>'
+            )
+        elif "build" in url:
+            return MockResponse('href="http://runbot.odoo.com/logs/job_20_test.txt"')
+        else:
+            return MockResponse(
+                'TestMail.test_mail_sending is failing...\n'
+                'AssertionError: expected False but got True\n'
+                'TestDiscuss.test_channel_creation was a error.\n'
+                'ValueError: cannot create channel'
+            )
+            
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+    
+    tests = fetch_failing_tests_from_batch("https://runbot.odoo.com/batch/123", verbose_level=2)
+    assert any("TestMail.test_mail_sending" in t and "AssertionError" in t for t in tests)
+    assert any("TestDiscuss.test_channel_creation" in t and "ValueError" in t for t in tests)
+
 def test_query_branch_status_empty_batch_is_running(monkeypatch):
     from odoo_wt.runbot_client import query_branch_status
     
