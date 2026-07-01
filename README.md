@@ -1,5 +1,8 @@
 # Odoo Worktree Assistant (odoo-wt)
 
+[![PyPI Version](https://img.shields.io/pypi/v/odoo-wt.svg)](https://pypi.org/project/odoo-wt/)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/odoo-wt.svg)](https://pypi.org/project/odoo-wt/)
+
 A professional, modern TUI-driven Git worktree manager explicitly designed for Odoo developers. Built with Python, Textual, and uv.
 
 ## The Pitch
@@ -48,7 +51,7 @@ The tool creates and manages a standardized folder structure that looks like thi
 ## Installation
 
 ### 1. From PyPI (Recommended)
-`odoo-wt` is officially published on PyPI. The easiest way to install it globally is using `uv tool`:
+`odoo-wt` is officially published and hosted on [PyPI (pypi.org/project/odoo-wt)](https://pypi.org/project/odoo-wt/). The easiest way to install it globally is using `uv tool`:
 
 ```bash
 uv tool install odoo-wt
