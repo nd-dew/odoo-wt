@@ -1,0 +1,36 @@
+[
+  {
+    "cell": null,
+    "code": "F401",
+    "end_location": {
+      "column": 69,
+      "row": 10
+    },
+    "filename": "/data/build/enterprise/ai/models/ai_session.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "from odoo.exceptions import MissingError, UserError",
+          "end_location": {
+            "column": 69,
+            "row": 10
+          },
+          "location": {
+            "column": 1,
+            "row": 10
+          }
+        }
+      ],
+      "message": "Remove unused import: `odoo.exceptions.ValidationError`"
+    },
+    "location": {
+      "column": 54,
+      "row": 10
+    },
+    "message": "`odoo.exceptions.ValidationError` imported but unused",
+    "noqa_row": 10,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-import"
+  }
+]
