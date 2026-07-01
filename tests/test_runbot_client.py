@@ -720,3 +720,90 @@ def test_query_branch_status_with_raw_batch_id(monkeypatch):
     assert failed == 1
     assert warning == 0
     assert running == 0
+
+def test_real_runbot_batch_2618484_traceback_fallback(monkeypatch):
+    from odoo_wt.runbot_client import query_branch_status, fetch_failing_tests_from_batch
+    import os
+    
+    batch_path = "tests/fixtures/batch_2618484_failing_with_traceback_fallback.html"
+    build_03_path = "tests/fixtures/build_116156703_parent.html"
+    post_install_log_path = "tests/fixtures/log_116157795_start_post_install_tests.txt"
+    ruff_log_path = "tests/fixtures/log_116156707_check_style_ruff.txt"
+    ruff_json_path = "tests/fixtures/log_116156707_check_style_ruff-ruff-output.json"
+    
+    with open(batch_path, "r", encoding="utf-8") as f:
+        batch_html = f.read()
+    with open(build_03_path, "r", encoding="utf-8") as f:
+        build_03_html = f.read()
+    with open(post_install_log_path, "r", encoding="utf-8") as f:
+        post_install_log = f.read()
+    with open(ruff_log_path, "r", encoding="utf-8") as f:
+        ruff_log = f.read()
+    with open(ruff_json_path, "r", encoding="utf-8") as f:
+        ruff_json = f.read()
+        
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def read(self, *args):
+            return self.content.encode("utf-8")
+            
+    def mock_urlopen(request, *args, **kwargs):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if "batch/2618484/build/116156703" in url:
+            return MockResponse(build_03_html)
+        elif "batch/2618484/build/116156707" in url:
+            mock_07_parent = (
+                '<a href="http://runbot321.odoo.com/runbot/static/build/116156707-master/logs/check_style_ruff.txt">Ruff Log</a>'
+            )
+            return MockResponse(mock_07_parent)
+        elif "batch/2618484" in url:
+            return MockResponse(batch_html)
+        elif "116157795" in url and "start_post_install_tests" in url:
+            return MockResponse(post_install_log)
+        elif "116156707" in url and "check_style_ruff-ruff-output.json" in url:
+            return MockResponse(ruff_json)
+        elif "116156707" in url and "check_style_ruff" in url:
+            return MockResponse(ruff_log)
+        else:
+            return MockResponse("Successfully completed with no errors")
+            
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+    
+    def mock_urlopen_index(request, *args, **kwargs):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if "static/build" in url or "batch" in url:
+            return mock_urlopen(request, *args, **kwargs)
+        else:
+            mock_index = (
+                '<div class="row bundle_row">\n'
+                '  <a href="https://github.com/odoo/odoo/pull/123">PR 123</a>\n'
+                '  <a href="/runbot/batch/2618484" title="2026-07-01 16:10:00">Batch</a>\n'
+                '</div>'
+            )
+            return MockResponse(mock_index)
+            
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen_index)
+    
+    res = query_branch_status("master")
+    assert res is not None
+    batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr = res
+    assert "2618484" in batch_url
+    assert success == 8
+    assert failed == 2
+    assert warning == 1
+    assert running == 0
+    
+    # 2. Test failed tests extraction
+    tests = fetch_failing_tests_from_batch("https://runbot.odoo.com/runbot/batch/2618484", verbose_level=2)
+    print("PYTEST TESTS PARSED:", tests)
+    
+    # Verify that Ruff linter failure is detected
+    assert any("check_style_ruff  ➔  enterprise/ai/models/ai_session.py:10:54  ➔  [F401] `odoo.exceptions.ValidationError` imported but unused" in t for t in tests)
+    
+    # Verify that the traceback exception fallback (Rule E) correctly captures the unhandled ValueError in post install tests
+    assert any("start_post_install_tests  ➔  ValueError: Model 'uninstalled.purchase.order' is not found in the Odoo registry." in t for t in tests)
