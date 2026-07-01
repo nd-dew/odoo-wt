@@ -618,6 +618,13 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                         with urllib.request.urlopen(req_log, timeout=5) as resp_log:
                             log_text = resp_log.read().decode('utf-8', errors='ignore')
                         debug_log(f"Successfully downloaded full log file. Length: {len(log_text)} characters")
+                        
+                        tests_in_this_log = []
+                        def add_to_tests(item):
+                            if item not in tests:
+                                tests.append(item)
+                            if item not in tests_in_this_log:
+                                tests_in_this_log.append(item)
                             
                         # 0. Symmetrically parse Odoo's final ThreadedServer summary list (absolute 100% accuracy!)
                         summary_matches = re.findall(
@@ -629,8 +636,7 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                             if verbose_level >= 2:
                                 clean_err = err_msg.strip()
                                 display_name = f"{display_name}  ➔  {clean_err}"
-                            if display_name not in tests:
-                                tests.append(display_name)
+                            add_to_tests(display_name)
                                 
                         # A. Search for actual unittest failures in the unittest summary (e.g. ERROR: test_method (path.TestClass) or FAIL: test_method (path.TestClass))
                         unittest_matches = re.findall(r'\b(?:ERROR|FAIL):\s+(test_[A-Za-z0-9_]+)\s+\((?:[A-Za-z0-9_]+\.)*(Test[A-Za-z0-9_]+)\)', log_text)
@@ -641,8 +647,7 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                                     err_msg = extract_error_message(log_text, test_method)
                                     if err_msg:
                                         display_name = f"{display_name}  ➔  {err_msg}"
-                                if display_name not in tests:
-                                    tests.append(display_name)
+                                add_to_tests(display_name)
                                 
                         # B. Search for direct ERROR/FAIL listings (e.g. ERROR: TestClass.test_method) or Tour/JS failures
                         direct_matches = re.findall(r'\b(?:ERROR|FAIL):\s+(Test[A-Za-z0-9_]+\.test_[A-Za-z0-9_]+)\b', log_text)
@@ -653,8 +658,7 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                                     err_msg = extract_error_message(log_text, m)
                                     if err_msg:
                                         display_name = f"{m}  ➔  {err_msg}"
-                                if display_name not in tests:
-                                    tests.append(display_name)
+                                add_to_tests(display_name)
                                     
                         tour_matches = re.findall(r'\b(?:tour|Tour)\s+([A-Za-z0-9_]+)\s+failed\b', log_text)
                         for m in tour_matches:
@@ -663,8 +667,7 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                                 if verbose_level >= 2:
                                     err_msg = extract_error_message(log_text, m) or "Tour failed"
                                     display_name = f"{display_name}  ➔  {err_msg}"
-                                if display_name not in tests:
-                                    tests.append(display_name)
+                                add_to_tests(display_name)
                                     
                         # C. If it is a static check / linter error, parse the log file name itself!
                         if "check_" in log_url or "lint" in log_url:
@@ -702,8 +705,7 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                                                             row = item.get("location", {}).get("row", 0)
                                                             col = item.get("location", {}).get("column", 0)
                                                             display_name = f"{log_name}  ➔  {rel_path}:{row}:{col}  ➔  [{code}] {msg}"
-                                                            if display_name not in tests:
-                                                                tests.append(display_name)
+                                                            add_to_tests(display_name)
                                                         has_json = True
                                             except Exception as e:
                                                 debug_log(f"Failed to fetch/parse Ruff JSON report ({e}), falling back to text log parsing.")
@@ -715,11 +717,35 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                                             err_msg = extract_error_message(log_text, log_name) or extract_error_message(log_text, "failed")
                                             if err_msg:
                                                 display_name = f"{log_name}  ➔  {err_msg}"
-                                                if display_name not in tests:
-                                                    tests.append(display_name)
+                                                add_to_tests(display_name)
                                     else:
-                                        if log_name not in tests:
-                                            tests.append(log_name)
+                                        add_to_tests(log_name)
+                                        
+                        # E. Fallback: If this log is from a failed build, but we found no unittests or tours,
+                        # scan for uncaught Python traceback exceptions!
+                        if not tests_in_this_log and "restore" not in log_url.lower() and "install_all" not in log_url.lower() and "install_base" not in log_url.lower():
+                            log_name = log_url.split("/")[-1].replace(".txt", "")
+                            traceback_exceptions = []
+                            for match in re.finditer(r"Traceback \(most recent call last\):", log_text):
+                                pos = match.start()
+                                chunk = log_text[pos:pos+2500]
+                                lines = chunk.splitlines()
+                                exception_line = ""
+                                for line in lines[1:]:
+                                    line_strip = line.strip()
+                                    if not line_strip:
+                                        continue
+                                    if line.startswith("  ") or line.startswith("    "):
+                                        continue
+                                    if ":" in line_strip and not line_strip.startswith("File "):
+                                        exception_line = line_strip
+                                        break
+                                if exception_line and exception_line not in traceback_exceptions:
+                                    traceback_exceptions.append(exception_line)
+                                    
+                            for exc in traceback_exceptions[:3]:
+                                display_name = f"{log_name}  ➔  {exc[:120]}"
+                                add_to_tests(display_name)
                     except Exception:
                         continue
             except Exception:
