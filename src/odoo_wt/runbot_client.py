@@ -73,6 +73,37 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
     if not branch_name:
         return None
         
+    if branch_name.isdigit() and len(branch_name) >= 6:
+        # Symmetrically support raw batch ID queries, bypassing the search index entirely
+        batch_id = branch_name
+        batch_url = f"https://runbot.odoo.com/runbot/batch/{batch_id}"
+        ts_str = "Recent"
+        odoo_pr = None
+        enterprise_pr = None
+        upgrade_pr = None
+        
+        try:
+            debug_log(f"Direct raw Batch ID detected! Downloading detailed batch page content from: {batch_url}")
+            req_batch = urllib.request.Request(
+                batch_url,
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            )
+            with urllib.request.urlopen(req_batch, timeout=5) as response:
+                batch_html = response.read().decode('utf-8')
+            debug_log(f"Successfully downloaded detailed batch page directly. Length: {len(batch_html)} characters")
+        except Exception as e:
+            debug_log(f"Direct batch page download failed: {e}")
+            return None
+            
+        slot_badges = re.findall(r'<div[^>]*class="[^"]*slot_button_group[^"]*"[^>]*>\s*<(?:span|a)[^>]*class="btn btn-(success|danger|warning|default|info) disabled"', batch_html)
+        success = slot_badges.count("success")
+        failed = slot_badges.count("danger")
+        warning = slot_badges.count("warning")
+        running = batch_html.count("fa-spinner") + batch_html.count("fa-circle-o-notch") + slot_badges.count("info")
+        debug_log(f"Direct Batch parsed -> success: {success}, failed: {failed}, warning: {warning}, running: {running}")
+        
+        return batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr
+
     search_url = f"https://runbot.odoo.com/runbot?search={branch_name}"
     debug_log(f"Querying Runbot search index for branch: '{branch_name}' (URL: {search_url})")
     req = urllib.request.Request(
