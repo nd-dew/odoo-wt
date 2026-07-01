@@ -136,6 +136,7 @@ uv tool install . --force
 - [ ] check on the runbot's PRs (Resolved: fetched and displayed direct Com/Ent PR links on CLI/TUI; todo: log their last comments and by who).
 - [x] the runbot/PR checks should work in cli, what would be super cool (Completed: integrated parallel concurrent polling into 'odoo-wt status').
 - [ ] the top space on the app could be tighter, we dont need such big header
+- [ ] **Community-Only Worktrees:** Add support for running in a purely open-source community-only mode (without requiring the Enterprise clone) to empower the Odoo open-source developer ecosystem.
 - [ ] we could inform users that to select text they need to hold Shift
 - [ ] would be cool to have like an `odoo-wt links` option that way I could very quickly get links to like runbts PRs, or maybe tickets in the future
 
@@ -162,6 +163,13 @@ uv tool install odoo-wt
 
 # 4. Launch odoo-wt to experience the clean first-time Welcome Wizard!
 odoo-wt
+
+# 5. Bootstrapping Odoo Base Clones (Shallow Clone Shortcut!)
+# To test worktree creation inside your sandbox without downloading Odoo's complete 10+ GB history,
+# use the Shallow Clone (--depth 1) shortcut to download only the latest snapshot in under 15 seconds:
+mkdir -p /repos/master
+git clone --depth 1 https://github.com/odoo/odoo.git /repos/master/odoo
+git clone --depth 1 https://github.com/odoo/enterprise.git /repos/master/enterprise
 ```
 
 Once you exit the container, everything is completely destroyed and cleaned up, leaving your local PC's production configuration 100% untouched!

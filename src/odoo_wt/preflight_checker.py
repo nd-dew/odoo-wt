@@ -96,9 +96,15 @@ def run_preflight_checks(config: dict) -> list[DiagnosticResult]:
             missing_repos.append(ent_dir)
             
         if missing_repos:
+            advice_lines = []
+            if comm_dir in missing_repos:
+                advice_lines.append(f"git clone --depth 1 https://github.com/odoo/odoo.git {wt_root}/master/{comm_dir}")
+            if ent_dir in missing_repos:
+                advice_lines.append(f"git clone --depth 1 https://github.com/odoo/enterprise.git {wt_root}/master/{ent_dir}")
+                
             advice = (
                 f"Base clones for {', '.join(missing_repos)} are missing inside {wt_root}/master/!\n"
-                f"       -> Please run: git clone https://github.com/odoo/odoo.git {wt_root}/master/{comm_dir}"
+                f"       -> Please run:\n          " + "\n          ".join(advice_lines)
             )
             results.append(DiagnosticResult(
                 "repos", "Odoo Base Repositories", "error", f"Missing {', '.join(missing_repos)}",
