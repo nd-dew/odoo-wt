@@ -1,0 +1,353 @@
+Docker command:
+python3 odoo/odoo-bin --addons-path enterprise,odoo/addons,odoo/odoo/addons -d 116110245-master-all -i test_lint --test-enable --test-tags "-post_install,/test_lint,-/website_event_booth_exhibitor/tests/test_wevent_booth_exhibitor.py:TestWEventBoothExhibitorCommon.test_register,-/knowledge/tests/test_knowledge_editor_commands.py:TestKnowledgeEditorCommands.test_knowledge_calendar_command_tour,-/sale_planning/tests/test_ui.py:TestSalePlanningUi.test_01_ui_inherit,-/sign/tests/test_ui.py:TestUi.test_sign_tour,-/sign/tests/test_ui.py:TestUi.test_sign_tour_without_sign,-/auth_passkey/tests/test_passkey_demo.py:PasskeyTestTours.test_passkey_backend,-:TestIndustryFsmUi.test_ui,-/l10n_gt_edi/tests/test_gt_flow.py:TestGtFlow.test_gt_edi_basic_invoice,-/knowledge/tests/test_knowledge_form_ui.py:TestKnowledgeUI.test_knowledge_main_flow,-/sale_mrp/tests/test_sale_mrp_kit_bom.py:TestSaleMrpKitBom.test_reset_avco_kit,-/point_of_sale/tests/test_frontend.py:MobileTestUi.test_03_pos_with_lots,-/point_of_sale/tests/test_frontend.py:MobileTestUi.test_combo_price_unchanged_with_lot_tracked_product,-/point_of_sale/tests/test_frontend.py:MobileTestUi.test_limited_product_pricelist_loading,-/point_of_sale/tests/test_frontend.py:MobileTestUi.test_lot,-/pos_stock/tests/test_frontend.py:MobileTestUi.test_03_pos_with_lots,-/pos_stock/tests/test_frontend.py:MobileTestUi.test_combo_price_unchanged_with_lot_tracked_product,-/pos_stock/tests/test_frontend.py:MobileTestUi.test_limited_product_pricelist_loading,-/pos_stock/tests/test_frontend.py:MobileTestUi.test_lot,-/l10n_mx_edi_pos/tests/test_tour.py:TestUi.test_mx_pos_invoice_order_and_refund,-/pos_qfpay/tests/test_basic.py:TestQFPayPoS.test_tour_qfpay_order_and_refund,-/account_reports/tests/test_report_sections.py:TestReportSections.test_sections_tour,-/timesheet_grid/tests/test_record_time.py:TestRecordTime.test_timesheet_overtime,-/test_l10n_be_hr_payroll_account/tests/test_ui.py:Testl10nBeHrPayrollAccountUi.test_ui,-/test_l10n_be_hr_payroll_account/tests/test_ui.py:Testl10nBeHrPayrollAccountUi.test_ui_salary_values_with_mobility_budget,-/l10n_id_efaktur_coretax/tests/test_l10n_id_efaktur_coretax.py:TestEfakturCoretax.test_efaktur_with_new_tax_group_in_different_line,-/l10n_id_efaktur_coretax/tests/test_l10n_id_efaktur_coretax.py:TestEfakturCoretax.test_efaktur_xml_multiple_invoices,-/l10n_id_efaktur_coretax/tests/test_l10n_id_efaktur_coretax.py:TestEfakturCoretax.test_efaktur_xml_multiple_lines,-/l10n_id_efaktur_coretax/tests/test_l10n_id_efaktur_coretax.py:TestEfakturCoretax.test_efaktur_xml_partner_edit,-/l10n_id_efaktur_coretax/tests/test_l10n_id_efaktur_coretax.py:TestEfakturCoretax.test_efaktur_xml_trx_04,-/l10n_id_efaktur_coretax/tests/test_l10n_id_efaktur_coretax.py:TestEfakturCoretax.test_invoice_user_main_contact,-:TestEfakturCoretax.test_efaktur_xml_buyer_document_number_when_tin,-/l10n_be_hr_payroll_fix/tests/test_holiday_attest_wizard.py:TestHolidayAttestWizard.test_float_holiday_attest,-/website_sale_stock_renting/tests/test_ui.py:TestUi.test_website_sale_stock_renting_ui,-/website/tests/test_ui.py:TestUi.test_snippet_carousel_clickable_slides,-/pos_urban_piper/tests/test_frontend.py:TestFrontend.test_product_level_discount,-/pos_restaurant_appointment/tests/test_frontend.py:TestUi.test_appointment_kanban_view,-/l10n_mx_edi_website_sale/tests/test_frontend_flow.py:TestFrontendFlow.test_validate_required_additional_fields,-/web_studio/tests/test_ui.py:TestStudioUIUnit.test_apply_group_no_one,-/website/tests/test_snippets.py:TestSnippets.test_03_snippets_all_drag_and_drop,-/l10n_co_edi_pos/tests/test_dian_pos_tour.py:TestGenericCO.test_generic_localization,-/test_l10n_be_hr_payroll_account/tests/test_ui.py:Testl10nBeHrPayrollAccountUi.test_ui,-/hr_payroll_attendance/tests/test_hr_attendance_overtime_ruleset_flow.py:TestOvertimeRulesetFlow.test_overtime_ruleset_flow,-/crm/tests/test_crm_ui.py:TestUi.test_03_crm_tour_forecast,-/pos_restaurant/tests/test_frontend.py:TestFrontend.test_future_orders_are_not_cancelled,-/website/tests/test_snippets.py:TestSnippets.test_custom_popup_snippet,-/sale_planning/tests/test_ui.py:TestSalePlanningUi.test_01_ui_inherit,-/account_reports/tests/test_account_returns_tours.py:TestAccountReturnTours.test_account_return_basic_tax_return,-/project_todo/tests/test_todo_ui.py:TestTodoUi.test_project_todo_history,-/mail/tests/test_mail_template.py:TestMailTemplateUI.test_mail_template_dynamic_field_tour,-/stock/tests/test_picking_tours.py:TestStockPickingTour.test_add_new_line_in_detailled_op,-/l10n_sa_hr_payroll/tests/test_wps_report.py:TestWpsReport.test_wps_report_generation,-/pos_restaurant/tests/test_frontend.py:TestFrontend.test_08_refund_stay_current_table,-/pos_self_order/tests/test_self_order_kiosk.py:TestSelfOrderKiosk.test_self_order_kiosk,-/website_sale/tests/test_customize.py:TestCustomize.test_shop_editor_no_alternative_products_visibility,-/test_http/tests/test_rpc_path.py:TestRpcPath.test_rpc_path_call_button,-/test_http/tests/test_rpc_path.py:TestRpcPath.test_rpc_path_call_kw,-/test_http/tests/test_rpc_path.py:TestRpcPath.test_rpc_path_call_kw_with_path,-/test_http/tests/test_rpc_path.py:TestRpcPath.test_rpc_path_jsonrpc,-/test_http/tests/test_rpc_path.py:TestRpcPath.test_rpc_path_xmlrpc,-/l10n_au_hr_payroll_account/tests/test_single_touch_payroll.py:TestSingleTouchPayroll.test_out_of_cycle_termination,-/planning/tests/test_ui.py:TestUi.test_planning_no_email,-/planning/tests/test_ui.py:TestUi.test_shift_switch_ui,-:WebSuite.test_unit_desktop[@ai/call_debrief/CallDebrief: timeline-transcript-media synchronization],-:WebSuite.test_unit_desktop[@mail/chat_window/chat_window/getting focus of chat window through tab key should jump to new message separator],-:WebSuite.test_unit_desktop[@mail/web/fields/call_debrief/CallDebrief: timeline-media synchronization],-:WebSuite.test_unit_desktop[@ai/call_debrief/CallDebrief: timeline-transcript-media synchronization],-/planning_field_service/tests/test_planning_field_service_ui.py:TestPlanningFieldServiceUi.test_planning_field_service_onboarding_tour,-:WebSuite.test_unit_desktop[@mail/discuss_app/sidebar/Redirect to the thread containing the bookmark and highlight the message],-:WebSuite.test_unit_desktop[@mail/discuss_app/sidebar/Sidebar channels show correct notification counter based on settings],-/planning/tests/test_ui.py:TestUi.test_split_shift_ui" --stop-after-init --log-level=test --max-cron-threads=0
+=================================================
+Adding readonly volume '/data/build/enterprise' pointing to /home/odoo/runbot/runbot/runbot/static/sources/enterprise/907c6a4155669dc64593186c7d2d5502467bbf95 
+Adding readonly volume '/data/build/odoo' pointing to /home/odoo/runbot/runbot/runbot/static/sources/odoo/bed5920067abc8ff51c2fdd9fcc8b8720b851c1f 
+Adding readonly volume '/home/odoo/.odoorc' pointing to /home/odoo/runbot/runbot/runbot/static/build/116110245-master/.odoorc 
+WARNING: Skipping /usr/lib/python3.12/dist-packages/charset_normalizer-3.3.2.dist-info due to invalid metadata entry 'name'
+Ignoring Babel: markers 'python_version >= "3.13"' don't match your environment
+Ignoring freezegun: markers 'python_version >= "3.13"' don't match your environment
+Ignoring gevent: markers 'sys_platform != "win32" and python_version >= "3.13"' don't match your environment
+Ignoring greenlet: markers 'sys_platform != "win32" and python_version >= "3.13" and python_version < "3.14"' don't match your environment
+Ignoring greenlet: markers 'sys_platform != "win32" and python_version >= "3.14"' don't match your environment
+Ignoring lxml: markers 'python_version >= "3.13" and python_version < "3.14"' don't match your environment
+Ignoring lxml: markers 'python_version >= "3.14"' don't match your environment
+Ignoring Pillow: markers 'python_version >= "3.13" and python_version < "3.14"' don't match your environment
+Ignoring Pillow: markers 'python_version >= "3.14"' don't match your environment
+Ignoring psycopg2: markers 'python_version >= "3.13"' don't match your environment
+Ignoring PyPDF: markers 'python_version >= "3.13"' don't match your environment
+Ignoring pypiwin32: markers 'sys_platform == "win32"' don't match your environment
+Ignoring rl-renderPM: markers 'sys_platform == "win32" and python_version >= "3.12"' don't match your environment
+Ignoring tzdata: markers 'sys_platform == "win32"' don't match your environment
+Ignoring vobject: markers 'python_version >= "3.14"' don't match your environment
+Ignoring zeep: markers 'python_version >= "3.13"' don't match your environment
+Requirement already satisfied: asn1crypto==1.5.1 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 3)) (1.5.1)
+Requirement already satisfied: Babel==2.10.3 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 4)) (2.10.3)
+Requirement already satisfied: cbor2==5.6.2 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 6)) (5.6.2)
+Requirement already satisfied: chardet==5.2.0 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 7)) (5.2.0)
+Requirement already satisfied: cryptography==42.0.8 in /venv/main/lib/python3.12/site-packages (from -r odoo/requirements.txt (line 8)) (42.0.8)
+Requirement already satisfied: docutils==0.20.1 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 9)) (0.20.1)
+Requirement already satisfied: freezegun==1.2.1 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 10)) (1.2.1)
+Requirement already satisfied: geoip2==2.9.0 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 12)) (2.9.0)
+Requirement already satisfied: gevent==24.2.1 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 13)) (24.2.1)
+Requirement already satisfied: greenlet==3.0.3 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 15)) (3.0.3)
+Requirement already satisfied: h11==0.16.0 in /venv/main/lib/python3.12/site-packages (from -r odoo/requirements.txt (line 18)) (0.16.0)
+Requirement already satisfied: idna==3.6 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 19)) (3.6)
+Requirement already satisfied: Jinja2==3.1.2 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 20)) (3.1.2)
+Requirement already satisfied: libsass==0.22.0 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 21)) (0.22.0)
+Requirement already satisfied: lxml==5.2.1 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 22)) (5.2.1)
+Requirement already satisfied: lxml-html-clean in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 25)) (0.1.1)
+Requirement already satisfied: MarkupSafe==2.1.5 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 26)) (2.1.5)
+Requirement already satisfied: num2words==0.5.13 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 27)) (0.5.13)
+Requirement already satisfied: ofxparse==0.21 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 28)) (0.21)
+Requirement already satisfied: openpyxl==3.1.2 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 29)) (3.1.2)
+Requirement already satisfied: passlib==1.7.4 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 30)) (1.7.4)
+Requirement already satisfied: Pillow==10.2.0 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 31)) (10.2.0)
+Requirement already satisfied: polib==1.1.1 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 34)) (1.1.1)
+Requirement already satisfied: psutil==5.9.8 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 35)) (5.9.8)
+Requirement already satisfied: psycopg2==2.9.9 in /venv/main/lib/python3.12/site-packages (from -r odoo/requirements.txt (line 36)) (2.9.9)
+Requirement already satisfied: pyopenssl==24.1.0 in /venv/main/lib/python3.12/site-packages (from -r odoo/requirements.txt (line 38)) (24.1.0)
+Requirement already satisfied: PyPDF2==2.12.1 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 39)) (2.12.1)
+Requirement already satisfied: pyserial==3.5 in /venv/main/lib/python3.12/site-packages (from -r odoo/requirements.txt (line 42)) (3.5)
+Requirement already satisfied: python-dateutil==2.8.2 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 43)) (2.8.2)
+Requirement already satisfied: python-magic==0.4.27 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 44)) (0.4.27)
+Requirement already satisfied: python-ldap==3.4.4 in /venv/main/lib/python3.12/site-packages (from -r odoo/requirements.txt (line 45)) (3.4.4)
+Requirement already satisfied: python-stdnum==1.19 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 46)) (1.19)
+Requirement already satisfied: pyusb==1.2.1 in /venv/main/lib/python3.12/site-packages (from -r odoo/requirements.txt (line 47)) (1.2.1)
+Requirement already satisfied: qrcode==7.4.2 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 48)) (7.4.2)
+Requirement already satisfied: reportlab==4.1.0 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 49)) (4.1.0)
+Requirement already satisfied: requests==2.31.0 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 50)) (2.31.0)
+Requirement already satisfied: rjsmin==1.2.0 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 51)) (1.2.0)
+Requirement already satisfied: urllib3==2.0.7 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 54)) (2.0.7)
+Requirement already satisfied: vobject==0.9.6.1 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 55)) (0.9.6.1)
+Requirement already satisfied: Werkzeug==3.0.1 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 57)) (3.0.1)
+Requirement already satisfied: xlrd==2.0.1 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 58)) (2.0.1)
+Requirement already satisfied: XlsxWriter==3.1.9 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 59)) (3.1.9)
+Requirement already satisfied: xlwt==1.3.0 in /venv/main/lib/python3.12/site-packages (from -r odoo/requirements.txt (line 60)) (1.3.0)
+Requirement already satisfied: zeep==4.2.1 in /usr/lib/python3/dist-packages (from -r odoo/requirements.txt (line 61)) (4.2.1)
+Requirement already satisfied: cffi>=1.12 in /venv/main/lib/python3.12/site-packages (from cryptography==42.0.8->-r odoo/requirements.txt (line 8)) (2.0.0)
+Requirement already satisfied: pyasn1>=0.3.7 in /usr/lib/python3/dist-packages (from python-ldap==3.4.4->-r odoo/requirements.txt (line 45)) (0.4.8)
+Requirement already satisfied: pyasn1_modules>=0.1.5 in /usr/lib/python3/dist-packages (from python-ldap==3.4.4->-r odoo/requirements.txt (line 45)) (0.2.8)
+Requirement already satisfied: pycparser in /venv/main/lib/python3.12/site-packages (from cffi>=1.12->cryptography==42.0.8->-r odoo/requirements.txt (line 8)) (3.0)
+WARNING: Skipping /usr/lib/python3.12/dist-packages/charset_normalizer-3.3.2.dist-info due to invalid metadata entry 'name'
+2026-07-01 05:58:53,459 26 INFO ? odoo: Odoo version 19.5a1
+2026-07-01 05:58:53,459 26 INFO ? odoo: Using configuration file at /home/odoo/.odoorc
+2026-07-01 05:58:53,459 26 INFO ? odoo: addons paths: _NamespacePath(['/data/build/odoo/odoo/addons', '/data/build/datadir/addons/19.5', '/data/build/enterprise', '/data/build/odoo/addons'])
+2026-07-01 05:58:53,460 26 INFO ? odoo: database: odoo@default:default
+2026-07-01 05:58:54,162 26 INFO ? odoo.service.server: HTTP service running on 127.0.0.1:8069
+2026-07-01 05:58:54,211 26 INFO 116110245-master-all odoo.tests.common: Importing test framework
+2026-07-01 05:58:54,294 26 INFO 116110245-master-all odoo.modules.loading: Initializing database 116110245-master-all
+2026-07-01 05:58:54,359 26 INFO 116110245-master-all odoo.modules.db: Initializing tables with random ids
+2026-07-01 05:58:56,458 26 INFO 116110245-master-all odoo.modules.loading: loading 1 modules...
+2026-07-01 05:58:56,458 26 INFO 116110245-master-all odoo.modules.loading: Loading module base (1/1)
+2026-07-01 05:58:56,482 26 INFO 116110245-master-all odoo.registry: module base: creating or updating database tables
+2026-07-01 05:58:56,816 26 INFO 116110245-master-all odoo.models: Prepare computation of ir.module.module.menus_by_module
+2026-07-01 05:58:56,816 26 INFO 116110245-master-all odoo.models: Prepare computation of ir.module.module.reports_by_module
+2026-07-01 05:58:56,817 26 INFO 116110245-master-all odoo.models: Prepare computation of ir.module.module.views_by_module
+2026-07-01 05:58:56,943 26 INFO 116110245-master-all odoo.models: Prepare computation of res.partner.user_id
+2026-07-01 05:58:56,943 26 INFO 116110245-master-all odoo.models: Prepare computation of res.partner.commercial_partner_id
+2026-07-01 05:58:56,943 26 INFO 116110245-master-all odoo.models: Prepare computation of res.partner.complete_name
+2026-07-01 05:58:56,943 26 INFO 116110245-master-all odoo.models: Prepare computation of res.partner.lang
+2026-07-01 05:58:56,943 26 INFO 116110245-master-all odoo.models: Prepare computation of res.partner.commercial_company_name
+2026-07-01 05:58:56,943 26 INFO 116110245-master-all odoo.models: Prepare computation of res.partner.properties
+2026-07-01 05:58:56,943 26 INFO 116110245-master-all odoo.models: Prepare computation of res.partner.is_company
+2026-07-01 05:58:56,943 26 INFO 116110245-master-all odoo.models: Prepare computation of res.partner.partner_share
+2026-07-01 05:58:56,971 26 INFO 116110245-master-all odoo.models: Prepare computation of res.currency.decimal_places
+2026-07-01 05:58:56,990 26 INFO 116110245-master-all odoo.models: Prepare computation of res.company.uses_default_logo
+2026-07-01 05:58:56,991 26 INFO 116110245-master-all odoo.models: Computing parent_path for table res_company...
+2026-07-01 05:58:57,022 26 INFO 116110245-master-all odoo.models: Prepare computation of res.users.signature
+2026-07-01 05:58:57,022 26 INFO 116110245-master-all odoo.models: Prepare computation of res.users.share
+2026-07-01 05:58:58,468 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/res.lang.csv
+2026-07-01 05:58:58,528 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/res_lang_data.xml
+2026-07-01 05:58:58,582 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/res_partner_data.xml
+2026-07-01 05:58:58,764 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/res_currency_data.xml
+2026-07-01 05:58:59,657 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/res_company_data.xml
+2026-07-01 05:58:59,680 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/res_users_data.xml
+2026-07-01 05:59:00,739 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/report_paperformat_data.xml
+2026-07-01 05:59:00,746 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/res_country_data.xml
+2026-07-01 05:59:01,630 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/clearing_label_data.xml
+2026-07-01 05:59:01,660 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/ir_demo_data.xml
+2026-07-01 05:59:01,674 26 INFO 116110245-master-all odoo.modules.loading: loading base/security/base_groups.xml
+2026-07-01 05:59:01,825 26 INFO 116110245-master-all odoo.modules.loading: loading base/wizard/wizard_ir_model_menu_create_views.xml
+2026-07-01 05:59:01,839 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/decimal_precision_views.xml
+2026-07-01 05:59:01,854 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_config_views.xml
+2026-07-01 05:59:01,860 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/res.country.state.csv
+2026-07-01 05:59:02,237 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_actions_views.xml
+2026-07-01 05:59:02,399 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_asset_views.xml
+2026-07-01 05:59:02,416 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_config_parameter_views.xml
+2026-07-01 05:59:02,431 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_cron_views.xml
+2026-07-01 05:59:02,454 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_cron_trigger_views.xml
+2026-07-01 05:59:02,471 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_filters_views.xml
+2026-07-01 05:59:02,496 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_mail_server_views.xml
+2026-07-01 05:59:02,517 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_model_views.xml
+2026-07-01 05:59:02,622 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_attachment_views.xml
+2026-07-01 05:59:02,642 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_access_views.xml
+2026-07-01 05:59:02,664 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_sequence_views.xml
+2026-07-01 05:59:02,678 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_ui_menu_views.xml
+2026-07-01 05:59:02,692 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_ui_view_views.xml
+2026-07-01 05:59:02,737 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_default_views.xml
+2026-07-01 05:59:02,757 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/ir_config_parameter_data.xml
+2026-07-01 05:59:02,761 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/ir_cron_data.xml
+2026-07-01 05:59:02,782 26 INFO 116110245-master-all odoo.modules.loading: loading base/report/ir_model_report.xml
+2026-07-01 05:59:02,788 26 INFO 116110245-master-all odoo.modules.loading: loading base/report/ir_model_templates.xml
+2026-07-01 05:59:02,798 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_logging_views.xml
+2026-07-01 05:59:02,819 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_qweb_widget_templates.xml
+2026-07-01 05:59:02,836 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_module_views.xml
+2026-07-01 05:59:02,880 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/ir_module_category_data.xml
+2026-07-01 05:59:02,939 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/ir_module_module.xml
+2026-07-01 05:59:02,989 26 INFO 116110245-master-all odoo.modules.loading: loading base/report/ir_module_reports.xml
+2026-07-01 05:59:02,994 26 INFO 116110245-master-all odoo.modules.loading: loading base/report/ir_module_report_templates.xml
+2026-07-01 05:59:03,000 26 INFO 116110245-master-all odoo.modules.loading: loading base/wizard/base_module_update_views.xml
+2026-07-01 05:59:03,007 26 INFO 116110245-master-all odoo.modules.loading: loading base/wizard/base_language_install_views.xml
+2026-07-01 05:59:03,019 26 INFO 116110245-master-all odoo.modules.loading: loading base/wizard/base_import_language_views.xml
+2026-07-01 05:59:03,027 26 INFO 116110245-master-all odoo.modules.loading: loading base/wizard/base_module_upgrade_views.xml
+2026-07-01 05:59:03,043 26 INFO 116110245-master-all odoo.modules.loading: loading base/wizard/base_module_uninstall_views.xml
+2026-07-01 05:59:03,053 26 INFO 116110245-master-all odoo.modules.loading: loading base/wizard/base_export_language_views.xml
+2026-07-01 05:59:03,063 26 INFO 116110245-master-all odoo.modules.loading: loading base/wizard/base_partner_merge_views.xml
+2026-07-01 05:59:03,078 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/ir_demo_failure_data.xml
+2026-07-01 05:59:03,094 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/ir_profile_views.xml
+2026-07-01 05:59:03,112 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_company_views.xml
+2026-07-01 05:59:03,131 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_lang_views.xml
+2026-07-01 05:59:03,147 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_partner_views.xml
+2026-07-01 05:59:03,267 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/clearing_label_views.xml
+2026-07-01 05:59:03,274 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_partner_bank_views.xml
+2026-07-01 05:59:03,296 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_country_views.xml
+2026-07-01 05:59:03,317 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_country_group_views.xml
+2026-07-01 05:59:03,332 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_country_state_views.xml
+2026-07-01 05:59:03,353 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_currency_views.xml
+2026-07-01 05:59:03,396 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_groups_views.xml
+2026-07-01 05:59:03,447 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_users_views.xml
+2026-07-01 05:59:03,550 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_users_apikeys_views.xml
+2026-07-01 05:59:03,557 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_device_views.xml
+2026-07-01 05:59:03,585 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_users_identitycheck_views.xml
+2026-07-01 05:59:03,591 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/res_config_settings_views.xml
+2026-07-01 05:59:03,597 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/report_paperformat_views.xml
+2026-07-01 05:59:03,609 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/ir_action_data.xml
+2026-07-01 05:59:03,616 26 INFO 116110245-master-all odoo.modules.loading: loading base/data/website.xml
+2026-07-01 05:59:03,620 26 INFO 116110245-master-all odoo.modules.loading: loading base/views/base_menus.xml
+2026-07-01 05:59:03,833 26 INFO 116110245-master-all odoo.modules.loading: loading base/security/ir.access.csv
+2026-07-01 05:59:04,045 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 05:59:04,246 26 INFO 116110245-master-all odoo.modules.loading: Module base loaded in 7.79s, 8426 queries (+8426 other)
+2026-07-01 05:59:04,246 26 INFO 116110245-master-all odoo.modules.loading: 1 modules loaded in 7.79s, 8426 queries (+8426 extra)
+2026-07-01 05:59:04,253 26 INFO 116110245-master-all odoo.modules.loading: updating modules list
+2026-07-01 05:59:04,254 26 INFO 116110245-master-all odoo.addons.base.models.ir_module: ALLOW access to module.update_list on [] to user __system__ #1 via n/a
+2026-07-01 05:59:07,561 26 INFO 116110245-master-all odoo.addons.base.models.ir_module: ALLOW access to module.button_install on ['test-lint'] to user __system__ #1 via n/a
+2026-07-01 05:59:07,635 26 INFO 116110245-master-all odoo.modules.loading: loading 23 modules...
+2026-07-01 05:59:07,635 26 INFO 116110245-master-all odoo.modules.loading: Loading module test_lint (2/23)
+2026-07-01 05:59:07,747 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_checkers: Starting TestGetTextLint.test_gettext_env ...
+2026-07-01 05:59:08,698 26 INFO 116110245-master-all odoo.addons.base.models.ir_attachment: filestore gc 10 checked, 0 removed
+2026-07-01 05:59:08,700 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_checkers: Starting TestSqlLint.test_fstring ...
+2026-07-01 05:59:09,877 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_checkers: Starting TestSqlLint.test_printf ...
+2026-07-01 05:59:11,163 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_checkers: Starting TestSqlLint.test_sql_injection_detection ...
+2026-07-01 05:59:11,263 26 INFO 116110245-master-all odoo.addons.base.models.ir_attachment: filestore gc 0 checked, 0 removed
+2026-07-01 05:59:11,264 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_checkers: Starting TestI18nChecks.test_gettext_placeholders ...
+2026-07-01 05:59:12,156 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_checkers: Starting TestI18nChecks.test_gettext_repr ...
+2026-07-01 05:59:12,584 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_checkers: Starting TestI18nChecks.test_gettext_variable ...
+2026-07-01 05:59:13,100 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_checkers: Starting TestI18nChecks.test_missing_gettext_catching_errors ...
+2026-07-01 05:59:13,536 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_checkers: Starting TestI18nChecks.test_missing_gettext_no_errors ...
+2026-07-01 05:59:14,058 26 INFO 116110245-master-all odoo.addons.base.models.ir_attachment: filestore gc 0 checked, 0 removed
+2026-07-01 05:59:14,059 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_dunderinit: Starting TestDunderinit.test_dunderinit ...
+2026-07-01 05:59:14,470 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_dunderinit: 1463 modules checked
+2026-07-01 05:59:14,473 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_eslint: Starting TestESLint.test_eslint ...
+2026-07-01 05:59:15,382 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_eslint: Testing 7823 js files
+2026-07-01 05:59:51,289 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_eslint: Testing 1473 js files
+2026-07-01 06:00:14,522 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_i18n: Starting TestI18n.test_directives_regex ...
+2026-07-01 06:00:14,522 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_i18n: Starting TestI18n.test_user_content_as_prop_is_translatable ...
+2026-07-01 06:00:15,486 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_jstranslate: Starting TestJsTranslations.test_js_translations ...
+2026-07-01 06:00:17,739 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_jstranslate: 9452 files tested
+2026-07-01 06:00:17,739 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_jstranslate: Starting TestJsTranslations.test_matches_underscore ...
+2026-07-01 06:00:17,740 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_jstranslate: Starting TestJsTranslations.test_regular_expression ...
+2026-07-01 06:00:17,740 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_jstranslate: Starting TestJsTranslations.test_regular_expression_long ...
+2026-07-01 06:00:17,740 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_l10n: Starting L10nLinter.test_l10n_test_tags ...
+2026-07-01 06:00:19,368 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_manifests: Starting ManifestLinter.test_manifests ...
+2026-07-01 06:00:20,367 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_markers: Starting TestConflictMarkers.test_conflict_markers ...
+2026-07-01 06:00:21,633 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_markers: 38515 files tested
+2026-07-01 06:00:21,635 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_onchange_domains: Starting TestOnchangeDomains.test_forbid_domains_in_onchanges ...
+2026-07-01 06:00:38,286 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_orm_import: Starting TestDunderinit.test_addons_orm_import ...
+2026-07-01 06:00:39,971 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_ormcache: Starting TestOrmCacheDecoratorWarnings.test_missing_method_params_in_cache_key_warns ...
+2026-07-01 06:00:41,444 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_pofile: Starting PotLinter.test_pot_duplicate_entries ...
+2026-07-01 06:00:44,779 26 INFO 116110245-master-all odoo.addons.base.models.ir_attachment: filestore gc 0 checked, 0 removed
+2026-07-01 06:00:44,780 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_pylint: Starting TestPyLint.test_pylint ...
+2026-07-01 06:00:44,781 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_pylint: pylint version: 4.0.3
+2026-07-01 06:15:07,468 26 INFO 116110245-master-all odoo.addons.base.models.ir_attachment: filestore gc 0 checked, 0 removed
+2026-07-01 06:15:07,469 26 INFO 116110245-master-all odoo.addons.test_lint.tests.test_test_holes: Starting TestTestHoles.test_check_tests ...
+2026-07-01 06:15:08,148 26 INFO 116110245-master-all odoo.modules.loading: Module test_lint loaded in 960.51s (incl. 960.40s test), 10 queries (+24 test, +10 other)
+2026-07-01 06:15:08,148 26 INFO 116110245-master-all odoo.modules.loading: Loading module test_lint_enterprise (3/23)
+2026-07-01 06:15:08,202 26 INFO 116110245-master-all odoo.modules.loading: Module test_lint_enterprise loaded in 0.05s, 10 queries (+10 other)
+2026-07-01 06:15:08,202 26 INFO 116110245-master-all odoo.modules.loading: Loading module base_report_wkhtmltox (4/23)
+2026-07-01 06:15:08,221 26 INFO 116110245-master-all odoo.registry: module base_report_wkhtmltox: creating or updating database tables
+2026-07-01 06:15:08,285 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:08,291 26 INFO 116110245-master-all odoo.modules.loading: Module base_report_wkhtmltox loaded in 0.09s, 44 queries (+44 other)
+2026-07-01 06:15:08,291 26 INFO 116110245-master-all odoo.modules.loading: Loading module rpc (5/23)
+2026-07-01 06:15:08,321 26 INFO 116110245-master-all odoo.modules.loading: Module rpc loaded in 0.03s, 10 queries (+10 other)
+2026-07-01 06:15:08,321 26 INFO 116110245-master-all odoo.modules.loading: Loading module web (6/23)
+2026-07-01 06:15:08,357 26 INFO 116110245-master-all odoo.registry: module web: creating or updating database tables
+2026-07-01 06:15:08,916 26 INFO 116110245-master-all odoo.modules.loading: loading web/views/webclient_templates.xml
+2026-07-01 06:15:08,973 26 INFO 116110245-master-all odoo.modules.loading: loading web/views/report_templates.xml
+2026-07-01 06:15:09,071 26 INFO 116110245-master-all odoo.modules.loading: loading web/views/base_document_layout_views.xml
+2026-07-01 06:15:09,096 26 INFO 116110245-master-all odoo.modules.loading: loading web/views/partner_view.xml
+2026-07-01 06:15:09,109 26 INFO 116110245-master-all odoo.modules.loading: loading web/views/speedscope_template.xml
+2026-07-01 06:15:09,114 26 INFO 116110245-master-all odoo.modules.loading: loading web/views/memory_template.xml
+2026-07-01 06:15:09,120 26 INFO 116110245-master-all odoo.modules.loading: loading web/views/speedscope_config_wizard.xml
+2026-07-01 06:15:09,127 26 INFO 116110245-master-all odoo.modules.loading: loading web/views/neutralize_views.xml
+2026-07-01 06:15:09,136 26 INFO 116110245-master-all odoo.modules.loading: loading web/views/ir_ui_view_views.xml
+2026-07-01 06:15:09,144 26 INFO 116110245-master-all odoo.modules.loading: loading web/data/ir_attachment.xml
+2026-07-01 06:15:09,149 26 INFO 116110245-master-all odoo.modules.loading: loading web/data/report_layout.xml
+2026-07-01 06:15:09,190 26 INFO 116110245-master-all odoo.modules.loading: loading web/security/ir.access.csv
+2026-07-01 06:15:09,223 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:09,274 26 INFO 116110245-master-all odoo.modules.loading: Module web loaded in 0.95s, 1222 queries (+1222 other)
+2026-07-01 06:15:09,274 26 INFO 116110245-master-all odoo.modules.loading: Loading module api_doc (7/23)
+2026-07-01 06:15:09,284 26 INFO 116110245-master-all odoo.registry: module api_doc: creating or updating database tables
+2026-07-01 06:15:09,303 26 INFO 116110245-master-all odoo.modules.loading: loading api_doc/security/res_groups.xml
+2026-07-01 06:15:09,327 26 INFO 116110245-master-all odoo.modules.loading: loading api_doc/views/docclient.xml
+2026-07-01 06:15:09,336 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:09,344 26 INFO 116110245-master-all odoo.modules.loading: Module api_doc loaded in 0.07s, 61 queries (+61 other)
+2026-07-01 06:15:09,344 26 INFO 116110245-master-all odoo.modules.loading: Loading module auth_totp (8/23)
+2026-07-01 06:15:09,374 26 INFO 116110245-master-all odoo.registry: module auth_totp: creating or updating database tables
+2026-07-01 06:15:09,442 26 INFO 116110245-master-all odoo.modules.loading: loading auth_totp/data/ir_action_data.xml
+2026-07-01 06:15:09,458 26 INFO 116110245-master-all odoo.modules.loading: loading auth_totp/views/res_users_views.xml
+2026-07-01 06:15:09,494 26 INFO 116110245-master-all odoo.modules.loading: loading auth_totp/views/templates.xml
+2026-07-01 06:15:09,500 26 INFO 116110245-master-all odoo.modules.loading: loading auth_totp/wizard/auth_totp_wizard_views.xml
+2026-07-01 06:15:09,506 26 INFO 116110245-master-all odoo.modules.loading: loading auth_totp/security/ir.access.csv
+2026-07-01 06:15:09,528 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:09,536 26 INFO 116110245-master-all odoo.modules.loading: Module auth_totp loaded in 0.19s, 199 queries (+199 other)
+2026-07-01 06:15:09,536 26 INFO 116110245-master-all odoo.modules.loading: Loading module base_import (9/23)
+2026-07-01 06:15:09,575 26 INFO 116110245-master-all odoo.registry: module base_import: creating or updating database tables
+2026-07-01 06:15:10,061 26 INFO 116110245-master-all odoo.modules.loading: loading base_import/security/ir.access.csv
+2026-07-01 06:15:10,080 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:10,084 26 INFO 116110245-master-all odoo.modules.loading: Module base_import loaded in 0.55s, 960 queries (+960 other)
+2026-07-01 06:15:10,084 26 INFO 116110245-master-all odoo.modules.loading: Loading module base_import_module (10/23)
+2026-07-01 06:15:10,105 26 INFO 116110245-master-all odoo.registry: module base_import_module: creating or updating database tables
+2026-07-01 06:15:10,204 26 INFO 116110245-master-all odoo.modules.loading: loading base_import_module/views/base_import_module_view.xml
+2026-07-01 06:15:10,239 26 INFO 116110245-master-all odoo.modules.loading: loading base_import_module/views/ir_module_views.xml
+2026-07-01 06:15:10,279 26 INFO 116110245-master-all odoo.modules.loading: loading base_import_module/security/ir.access.csv
+2026-07-01 06:15:10,304 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:10,487 26 INFO 116110245-master-all odoo.modules.loading: Module base_import_module loaded in 0.40s, 171 queries (+171 other)
+2026-07-01 06:15:10,487 26 INFO 116110245-master-all odoo.modules.loading: Loading module base_setup (11/23)
+2026-07-01 06:15:10,506 26 INFO 116110245-master-all odoo.registry: module base_setup: creating or updating database tables
+2026-07-01 06:15:10,586 26 INFO 116110245-master-all odoo.modules.loading: loading base_setup/data/base_setup_data.xml
+2026-07-01 06:15:10,594 26 INFO 116110245-master-all odoo.modules.loading: loading base_setup/views/res_config_settings_views.xml
+2026-07-01 06:15:10,653 26 INFO 116110245-master-all odoo.modules.loading: loading base_setup/views/res_partner_views.xml
+2026-07-01 06:15:10,668 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:10,676 26 INFO 116110245-master-all odoo.modules.loading: Module base_setup loaded in 0.19s, 143 queries (+143 other)
+2026-07-01 06:15:10,676 26 INFO 116110245-master-all odoo.modules.loading: Loading module bus (12/23)
+2026-07-01 06:15:10,712 26 INFO 116110245-master-all odoo.registry: module bus: creating or updating database tables
+2026-07-01 06:15:10,816 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:10,843 26 INFO 116110245-master-all odoo.modules.loading: Module bus loaded in 0.17s, 133 queries (+133 other)
+2026-07-01 06:15:10,844 26 INFO 116110245-master-all odoo.modules.loading: Loading module web_cohort (13/23)
+2026-07-01 06:15:10,916 26 INFO 116110245-master-all odoo.registry: module web_cohort: creating or updating database tables
+2026-07-01 06:15:11,520 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:11,528 26 INFO 116110245-master-all odoo.modules.loading: Module web_cohort loaded in 0.68s, 934 queries (+934 other)
+2026-07-01 06:15:11,528 26 INFO 116110245-master-all odoo.modules.loading: Loading module web_gantt (14/23)
+2026-07-01 06:15:11,578 26 INFO 116110245-master-all odoo.registry: module web_gantt: creating or updating database tables
+2026-07-01 06:15:12,100 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:12,105 26 INFO 116110245-master-all odoo.modules.loading: Module web_gantt loaded in 0.58s, 934 queries (+934 other)
+2026-07-01 06:15:12,105 26 INFO 116110245-master-all odoo.modules.loading: Loading module web_grid (15/23)
+2026-07-01 06:15:12,136 26 INFO 116110245-master-all odoo.registry: module web_grid: creating or updating database tables
+2026-07-01 06:15:12,646 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:12,649 26 INFO 116110245-master-all odoo.modules.loading: Module web_grid loaded in 0.54s, 934 queries (+934 other)
+2026-07-01 06:15:12,650 26 INFO 116110245-master-all odoo.modules.loading: Loading module web_tour (16/23)
+2026-07-01 06:15:12,664 26 INFO 116110245-master-all odoo.registry: module web_tour: creating or updating database tables
+2026-07-01 06:15:12,669 26 INFO 116110245-master-all odoo.models: Prepare computation of res.users.tour_enabled
+2026-07-01 06:15:12,758 26 INFO 116110245-master-all odoo.modules.loading: loading web_tour/views/tour_views.xml
+2026-07-01 06:15:12,797 26 INFO 116110245-master-all odoo.modules.loading: loading web_tour/security/ir.access.csv
+2026-07-01 06:15:12,824 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:12,828 26 INFO 116110245-master-all odoo.modules.loading: Module web_tour loaded in 0.18s, 200 queries (+200 other)
+2026-07-01 06:15:12,828 26 INFO 116110245-master-all odoo.modules.loading: Loading module auth_passkey (17/23)
+2026-07-01 06:15:12,895 26 INFO 116110245-master-all odoo.registry: module auth_passkey: creating or updating database tables
+2026-07-01 06:15:12,957 26 INFO 116110245-master-all odoo.modules.loading: loading auth_passkey/views/auth_passkey_key_views.xml
+2026-07-01 06:15:12,994 26 INFO 116110245-master-all odoo.modules.loading: loading auth_passkey/views/auth_passkey_login_templates.xml
+2026-07-01 06:15:13,008 26 INFO 116110245-master-all odoo.modules.loading: loading auth_passkey/views/res_users_identitycheck_views.xml
+2026-07-01 06:15:13,018 26 INFO 116110245-master-all odoo.modules.loading: loading auth_passkey/views/res_users_views.xml
+2026-07-01 06:15:13,038 26 INFO 116110245-master-all odoo.modules.loading: loading auth_passkey/security/ir.access.csv
+2026-07-01 06:15:13,068 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:13,076 26 INFO 116110245-master-all odoo.modules.loading: Module auth_passkey loaded in 0.25s, 203 queries (+203 other)
+2026-07-01 06:15:13,076 26 INFO 116110245-master-all odoo.modules.loading: Loading module html_editor (18/23)
+2026-07-01 06:15:13,476 26 INFO 116110245-master-all odoo.registry: module html_editor: creating or updating database tables
+2026-07-01 06:15:14,056 26 INFO 116110245-master-all odoo.modules.loading: loading html_editor/security/ir.access.csv
+2026-07-01 06:15:14,076 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:14,086 26 INFO 116110245-master-all odoo.modules.loading: Module html_editor loaded in 1.01s, 1033 queries (+1033 other)
+2026-07-01 06:15:14,086 26 INFO 116110245-master-all odoo.modules.loading: Loading module iap (19/23)
+2026-07-01 06:15:14,092 26 INFO 116110245-master-all odoo.registry: module iap: creating or updating database tables
+2026-07-01 06:15:14,171 26 INFO 116110245-master-all odoo.modules.loading: loading iap/data/services.xml
+2026-07-01 06:15:14,179 26 INFO 116110245-master-all odoo.modules.loading: loading iap/views/iap_views.xml
+2026-07-01 06:15:14,213 26 INFO 116110245-master-all odoo.modules.loading: loading iap/views/res_config_settings.xml
+2026-07-01 06:15:14,226 26 INFO 116110245-master-all odoo.modules.loading: loading iap/views/res_users_views.xml
+2026-07-01 06:15:14,232 26 INFO 116110245-master-all odoo.modules.loading: loading iap/security/ir.access.csv
+2026-07-01 06:15:14,262 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:14,267 26 INFO 116110245-master-all odoo.modules.loading: Module iap loaded in 0.18s, 228 queries (+228 other)
+2026-07-01 06:15:14,267 26 INFO 116110245-master-all odoo.modules.loading: Loading module web_enterprise (20/23)
+2026-07-01 06:15:14,285 26 INFO 116110245-master-all odoo.registry: module web_enterprise: creating or updating database tables
+2026-07-01 06:15:14,293 26 INFO 116110245-master-all odoo.models: Prepare computation of res.partner.contact_address_complete
+2026-07-01 06:15:14,338 26 INFO 116110245-master-all odoo.modules.loading: loading web_enterprise/views/webclient_templates.xml
+2026-07-01 06:15:14,387 26 INFO 116110245-master-all odoo.modules.loading: loading web_enterprise/views/res_config_settings.xml
+2026-07-01 06:15:14,405 26 INFO 116110245-master-all odoo.modules.loading: loading web_enterprise/views/res_users_views.xml
+2026-07-01 06:15:14,422 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:14,425 26 INFO 116110245-master-all odoo.modules.loading: Module web_enterprise loaded in 0.16s, 157 queries (+157 other)
+2026-07-01 06:15:14,425 26 INFO 116110245-master-all odoo.modules.loading: Loading module web_map (21/23)
+2026-07-01 06:15:14,459 26 INFO 116110245-master-all odoo.registry: module web_map: creating or updating database tables
+2026-07-01 06:15:14,920 26 INFO 116110245-master-all odoo.modules.loading: loading web_map/views/res_partner_views.xml
+2026-07-01 06:15:14,955 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:14,957 26 INFO 116110245-master-all odoo.modules.loading: Module web_map loaded in 0.53s, 1034 queries (+1034 other)
+2026-07-01 06:15:14,957 26 INFO 116110245-master-all odoo.modules.loading: Loading module web_mobile (22/23)
+2026-07-01 06:15:14,969 26 INFO 116110245-master-all odoo.registry: module web_mobile: creating or updating database tables
+2026-07-01 06:15:15,016 26 INFO 116110245-master-all odoo.modules.loading: loading web_mobile/views/views.xml
+2026-07-01 06:15:15,039 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:15,043 26 INFO 116110245-master-all odoo.modules.loading: Module web_mobile loaded in 0.09s, 81 queries (+81 other)
+2026-07-01 06:15:15,043 26 INFO 116110245-master-all odoo.modules.loading: Loading module web_unsplash (23/23)
+2026-07-01 06:15:15,055 26 INFO 116110245-master-all odoo.registry: module web_unsplash: creating or updating database tables
+2026-07-01 06:15:15,094 26 INFO 116110245-master-all odoo.modules.loading: loading web_unsplash/views/res_config_settings_view.xml
+2026-07-01 06:15:15,124 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:15,127 26 INFO 116110245-master-all odoo.modules.loading: Module web_unsplash loaded in 0.08s, 101 queries (+101 other)
+2026-07-01 06:15:15,127 26 INFO 116110245-master-all odoo.modules.loading: 23 modules loaded in 967.49s, 8802 queries (+8826 extra)
+2026-07-01 06:15:15,397 26 INFO 116110245-master-all odoo.modules.loading: Modules loaded.
+2026-07-01 06:15:15,401 26 INFO 116110245-master-all odoo.registry: Registry changed, signaling through the database
+2026-07-01 06:15:15,402 26 INFO 116110245-master-all odoo.registry: Registry loaded in 981.230s
+2026-07-01 06:15:15,402 26 INFO 116110245-master-all odoo.service.server: Starting post tests
+2026-07-01 06:15:15,419 26 INFO 116110245-master-all odoo.service.server: 0 post-tests in 0.02s, 0 queries
+2026-07-01 06:15:15,419 26 INFO 116110245-master-all odoo.tests.stats: test_lint: 58 tests 960.40s 24 queries
+2026-07-01 06:15:15,419 26 INFO 116110245-master-all odoo.tests.result: 0 failed, 0 error(s) of 26 tests when loading database '116110245-master-all'
+2026-07-01 06:15:15,419 26 INFO 116110245-master-all odoo.service.server.ThreadedServer: Initiating shutdown
+2026-07-01 06:15:15,419 26 INFO 116110245-master-all odoo.service.server.ThreadedServer: Hit CTRL-C again or send a second signal to force the shutdown.
+2026-07-01 06:15:15,420 26 INFO 116110245-master-all odoo.addons.bus.websocket: Disconnecting 0 websockets
+2026-07-01 06:15:15,520 26 INFO 116110245-master-all odoo.service.server.ThreadedServer: Logging uses the database, stop logging then close DB connections
