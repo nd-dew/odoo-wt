@@ -685,3 +685,38 @@ def test_real_runbot_batch_2616450_parallel_failures(monkeypatch):
     assert "TestAISession.test_tool_confirmation_request_w_final_message  ➔  StopIteration" in tests
     assert "TestAiToolUpdateRecords.test_update_records_tool  ➔  StopIteration" in tests
     assert "TestAIMethods.test_ai_methods_call_without_error  ➔  TestAICommon._prepare_default_tools() takes [...]" in tests
+
+def test_query_branch_status_with_raw_batch_id(monkeypatch):
+    from odoo_wt.runbot_client import query_branch_status
+    import os
+    
+    path = "tests/fixtures/batch_2616450_failing_with_parallel_child_tests.html"
+    with open(path, "r", encoding="utf-8") as f:
+        real_html = f.read()
+        
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def read(self, *args):
+            return self.content.encode("utf-8")
+            
+    def mock_urlopen(request, *args, **kwargs):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        assert "batch/2616450" in url
+        return MockResponse(real_html)
+        
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+    
+    res = query_branch_status("2616450")
+    assert res is not None
+    batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr = res
+    
+    assert "2616450" in batch_url
+    assert success == 12
+    assert failed == 1
+    assert warning == 0
+    assert running == 0
