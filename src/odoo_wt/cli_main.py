@@ -1299,11 +1299,14 @@ def print_single_branch_detailed_status(config, branch_name, verbose_level=0, mo
         except Exception: return ""
         
     time_suffix = f" {relative_time(ts_str)}" if ts_str else ""
+    failing_tests = res.get("failing_tests", [])
     
     if running > 0:
         status_line = f"⏳ [bold cyan]Running[/bold cyan] {status_suffix}{time_suffix}"
     elif failed > 0:
         status_line = f"🔴 [bold red]Failed[/bold red] {status_suffix}{time_suffix}"
+        if failing_tests:
+            status_line += f"  ➔  [bold red]{len(failing_tests)} failing tests[/bold red]"
         if is_base:
             status_line += "\n  [bold red]⚠️  Note: Some upstream builds are currently FAILING on this base branch![/bold red]"
     elif warning > 0:
