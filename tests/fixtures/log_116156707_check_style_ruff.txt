@@ -1,0 +1,11 @@
+Docker command:
+python3 -m pip install ruff==0.15.15;python3 -m ruff --version;python3 -m ruff check --isolated --output-format json --select ALL --preview --ignore A,ARG,ANN,B,C901,D,DTZ,DOC,E501,ERA001,FBT,N,PD,PERF,PIE790,PLR,PT,Q,RSE102,RUF001,RUF012,S,SIM102,SIM108,SLF001,TID252,UP031,TRY003,TRY300,E713,SIM117,PGH003,RUF005,FIX,TD,TRY400,C408,PLW2901,PTH,EM102,INP001,CPY001,E266,PIE808,PLC2701,RUF100,FA100,FURB,C420,RUF067,PLW0717,RUF075,COM812,TRY002,B904,EM101,I001,UP006,UP007,RET,RUF021,E741,RUF102,FAST,ASYNC,AIR,DJ,NPY,FA102  -o logs/check_style_ruff-ruff-output.json @logs/ruff_files_to_check.txt;python3 -m ruff check --isolated --output-format json --select ALL --preview --ignore A,ARG,ANN,B,C901,D,DTZ,DOC,E501,ERA001,FBT,N,PD,PERF,PIE790,PLR,PT,Q,RSE102,RUF001,RUF012,S,SIM102,SIM108,SLF001,TID252,UP031,TRY003,TRY300,E713,SIM117,PGH003,RUF005,FIX,TD,TRY400,C408,PLW2901,PTH,EM102,INP001,CPY001,E266,PIE808,PLC2701,RUF100,FA100,FURB,C420,RUF067,PLW0717,RUF075,COM812,TRY002,B904,EM101,I001,UP006,UP007,RET,RUF021,E741,RUF102,FAST,ASYNC,AIR,DJ,NPY,FA102  -o logs/merge_base_check_style_ruff-ruff-output.json @logs/ruff_merge_base_files_to_check.txt
+=================================================
+Adding readonly volume '/data/build/enterprise' pointing to /home/odoo/runbot/runbot/runbot/static/sources/enterprise/b67610b6aae724408726becc9889bb77fd0c268e 
+Adding readonly volume '/data/build/odoo' pointing to /home/odoo/runbot/runbot/runbot/static/sources/odoo/496053937a22ecf5b4b922713151d12d5cc15dda 
+Adding readonly volume '/data/build/merge_base_enterprise' pointing to /home/odoo/runbot/runbot/runbot/static/sources/enterprise/0b6fa2fdbb034a28eb3e350ad2a9523087c60098 
+Adding readonly volume '/data/build/merge_base_odoo' pointing to /home/odoo/runbot/runbot/runbot/static/sources/odoo/496053937a22ecf5b4b922713151d12d5cc15dda 
+Adding readonly volume '/home/odoo/.odoorc' pointing to /home/odoo/runbot/runbot/runbot/static/build/116156707-master/.odoorc 
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: ruff==0.15.15 in /home/odoo/.local/lib/python3.12/site-packages (0.15.15)
+ruff 0.15.15
