@@ -613,3 +613,73 @@ def test_real_runbot_batch_2615942_running_and_green(monkeypatch):
     assert failed == 0
     assert warning == 0
     assert running == 1
+
+def test_real_runbot_batch_2616450_parallel_failures(monkeypatch):
+    from odoo_wt.runbot_client import query_branch_status, fetch_failing_tests_from_batch
+    import os
+    
+    batch_path = "tests/fixtures/batch_2616450_failing_with_parallel_child_tests.html"
+    build_path = "tests/fixtures/build_116110236_parent.html"
+    ai_log_path = "tests/fixtures/log_116111351_start_post_install_tests.txt"
+    lint_log_path = "tests/fixtures/log_116110245_start_test_lint.txt"
+    
+    with open(batch_path, "r", encoding="utf-8") as f:
+        batch_html = f.read()
+    with open(build_path, "r", encoding="utf-8") as f:
+        build_html = f.read()
+    with open(ai_log_path, "r", encoding="utf-8") as f:
+        ai_log = f.read()
+    with open(lint_log_path, "r", encoding="utf-8") as f:
+        lint_log = f.read()
+        
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def read(self, *args):
+            return self.content.encode("utf-8")
+            
+    def mock_urlopen(request, *args, **kwargs):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if "batch/2616450/build" in url or "build/116110236" in url:
+            return MockResponse(build_html)
+        elif "batch" in url:
+            return MockResponse(batch_html)
+        elif "116111351" in url and "start_post_install_tests" in url:
+            return MockResponse(ai_log)
+        elif "116110245" in url and "start_test_lint" in url:
+            return MockResponse(lint_log)
+        else:
+            # Symmetrically return an index page containing the batch link pointing to our detailed HTML
+            mock_index = (
+                '<div class="row bundle_row">\n'
+                '  <a href="https://github.com/odoo/odoo/pull/456">PR 456</a>\n'
+                '  <a href="/runbot/batch/2616450" title="2026-06-30 15:10:00">Batch</a>\n'
+                '</div>'
+            )
+            return MockResponse(mock_index)
+            
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+    
+    # 1. Test status parsing
+    res = query_branch_status("master")
+    assert res is not None
+    batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr = res
+    assert "2616450" in batch_url
+    assert success == 12
+    assert failed == 1
+    assert warning == 0
+    assert running == 0
+    
+    # 2. Test failed tests extraction
+    tests = fetch_failing_tests_from_batch("https://runbot.odoo.com/runbot/batch/2616450")
+    
+    # Verify that start_test_lint is NOT reported as failed because its log was successful
+    assert "start_test_lint" not in tests
+    
+    # Verify that the actual failing AI tests are detected and reported
+    assert any("TestAISession.test_tool_confirmation_multi_confirmation" in t for t in tests)
+    assert any("TestAiToolUpdateRecords.test_update_records_tool" in t for t in tests)
