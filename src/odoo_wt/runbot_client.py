@@ -671,7 +671,9 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                             log_name = log_url.split("/")[-1].replace(".txt", "")
                             # Symmetrically guard linter fallback additions: only add if actual failures exist in this specific log text
                             log_text_lower = log_text.lower()
+                            is_ruff = "ruff" in log_url.lower()
                             has_log_failures = (
+                                is_ruff or
                                 any(x in log_text_lower for x in ("fail:", "error:", "exception:", "style violation", "exit code")) or
                                 ("failed" in log_text_lower and "0 failed" not in log_text_lower)
                             )
