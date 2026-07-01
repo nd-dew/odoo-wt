@@ -454,37 +454,63 @@ def extract_error_message(log_text: str, test_name: str) -> str:
     pos = log_text.find(test_name)
     if pos == -1:
         return ""
-    chunk = log_text[pos:pos+1500]
+    chunk = log_text[pos:pos+2500]
     lines = chunk.splitlines()
     
     IGNORE_PATTERNS = (
         "adding readonly volume", "pointing to", "docker", "runbot",
         "database:", "using config file", "postgresql", "container",
-        "starting server", "command:", "host:", "port:", "volume"
+        "starting server", "command:", "host:", "port:", "volume",
+        "starting test"
     )
     
-    for line in lines[1:25]:
+    for line in lines[1:35]:
         line_strip = line.strip()
         if not line_strip:
             continue
-        # Skip divider-only lines (e.g. ===, ---, ____, ***)
         if len(line_strip) > 3 and all(char in "-=_* " for char in line_strip):
             continue
-        # Skip generic Docker/Runbot container setup log lines
         if any(pat in line_strip.lower() for pat in IGNORE_PATTERNS):
             continue
-        if "AssertionError:" in line_strip or "Error:" in line_strip or "Exception:" in line_strip or "FAIL:" in line_strip:
-            return line_strip
-        if "failed" in line_strip or "error" in line_strip.lower() or "warning" in line_strip.lower():
-            return line_strip
-    for line in lines[1:10]:
+            
+        clean_line = line_strip
+        if any(level in line_strip for level in (" ERROR ", " _ERROR ", " INFO ", " WARNING ")):
+            if ": " in line_strip:
+                parts = line_strip.split(": ", 1)
+                if len(parts) > 1:
+                    clean_line = parts[1]
+                
+        clean_strip = clean_line.strip()
+        if test_name in clean_strip and (clean_strip.startswith("ERROR:") or clean_strip.startswith("FAIL:") or clean_strip == test_name or "ERROR: " + test_name in line_strip or "FAIL: " + test_name in line_strip):
+            continue
+            
+        clean_lower = clean_strip.lower()
+        if any(x in clean_lower for x in ("assertionerror:", "error:", "exception:", "fail:", "stopiteration", "typeerror:", "valueerror:", "keyerror:", "attributeerror:")) or "raised" in clean_lower:
+            return clean_strip[:120]
+            
+    for line in lines[1:15]:
         line_strip = line.strip()
-        if line_strip:
-            if len(line_strip) > 3 and all(char in "-=_* " for char in line_strip):
-                continue
-            if any(pat in line_strip.lower() for pat in IGNORE_PATTERNS):
-                continue
-            return line_strip[:80]
+        if not line_strip:
+            continue
+        if len(line_strip) > 3 and all(char in "-=_* " for char in line_strip):
+            continue
+        if any(pat in line_strip.lower() for pat in IGNORE_PATTERNS):
+            continue
+            
+        clean_line = line_strip
+        if any(level in line_strip for level in (" ERROR ", " _ERROR ", " INFO ", " WARNING ")):
+            if ": " in line_strip:
+                parts = line_strip.split(": ", 1)
+                if len(parts) > 1:
+                    clean_line = parts[1]
+                
+        clean_strip = clean_line.strip()
+        if test_name in clean_strip and (clean_strip.startswith("ERROR:") or clean_strip.startswith("FAIL:") or clean_strip == test_name or "ERROR: " + test_name in line_strip or "FAIL: " + test_name in line_strip):
+            continue
+            
+        if clean_strip:
+            return clean_strip[:120]
+            
     return ""
 
 def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> list:
