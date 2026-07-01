@@ -1,17 +1,19 @@
-name: Publish to PyPI
+name: Build, Release and Publish
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
 jobs:
-  publish:
-    name: Build and publish to PyPI
+  release-and-publish:
+    name: Build, Release on GitHub & Publish to PyPI
     runs-on: ubuntu-latest
-    # These permissions are required for Trusted Publishing (OIDC) to PyPI
     permissions:
-      id-token: write 
-      contents: read
+      # Required for softprops/action-gh-release to create GitHub releases
+      contents: write
+      # Required for Trusted Publishing (OIDC) to PyPI
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -27,6 +29,15 @@ jobs:
 
       - name: Build package
         run: uv build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
