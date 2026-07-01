@@ -675,11 +675,12 @@ def test_real_runbot_batch_2616450_parallel_failures(monkeypatch):
     assert running == 0
     
     # 2. Test failed tests extraction
-    tests = fetch_failing_tests_from_batch("https://runbot.odoo.com/runbot/batch/2616450")
+    tests = fetch_failing_tests_from_batch("https://runbot.odoo.com/runbot/batch/2616450", verbose_level=2)
     
     # Verify that start_test_lint is NOT reported as failed because its log was successful
     assert "start_test_lint" not in tests
     
-    # Verify that the actual failing AI tests are detected and reported
-    assert any("TestAISession.test_tool_confirmation_multi_confirmation" in t for t in tests)
-    assert any("TestAiToolUpdateRecords.test_update_records_tool" in t for t in tests)
+    # Verify that the actual failing AI tests are detected and reported with clean, high-signal traceback details
+    assert "TestAISession.test_tool_confirmation_multi_confirmation  ➔  StopIteration" in tests
+    assert "TestAISession.test_tool_confirmation_request_w_final_message  ➔  StopIteration" in tests
+    assert "TestAiToolUpdateRecords.test_update_records_tool  ➔  StopIteration" in tests
