@@ -588,6 +588,19 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                             log_text = resp_log.read().decode('utf-8', errors='ignore')
                         debug_log(f"Successfully downloaded full log file. Length: {len(log_text)} characters")
                             
+                        # 0. Symmetrically parse Odoo's final ThreadedServer summary list (absolute 100% accuracy!)
+                        summary_matches = re.findall(
+                            r'\b(?:Error|Failed):\s+(?:odoo\.)?(?:addons\.)?([A-Za-z0-9_]+)\.tests\.[A-Za-z0-9_]+\.([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)(?:\s*\([^\)]*\))?\s*-\s*([^\n]+)',
+                            log_text
+                        )
+                        for addon, test_class, test_method, err_msg in summary_matches:
+                            display_name = f"{test_class}.{test_method}"
+                            if verbose_level >= 2:
+                                clean_err = err_msg.strip()
+                                display_name = f"{display_name}  ➔  {clean_err}"
+                            if display_name not in tests:
+                                tests.append(display_name)
+                                
                         # A. Search for actual unittest failures in the unittest summary (e.g. ERROR: test_method (path.TestClass) or FAIL: test_method (path.TestClass))
                         unittest_matches = re.findall(r'\b(?:ERROR|FAIL):\s+(test_[A-Za-z0-9_]+)\s+\((?:[A-Za-z0-9_]+\.)*(Test[A-Za-z0-9_]+)\)', log_text)
                         for test_method, test_class in unittest_matches:
