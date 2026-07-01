@@ -684,3 +684,4 @@ def test_real_runbot_batch_2616450_parallel_failures(monkeypatch):
     assert "TestAISession.test_tool_confirmation_multi_confirmation  ➔  StopIteration" in tests
     assert "TestAISession.test_tool_confirmation_request_w_final_message  ➔  StopIteration" in tests
     assert "TestAiToolUpdateRecords.test_update_records_tool  ➔  StopIteration" in tests
+    assert "TestAIMethods.test_ai_methods_call_without_error  ➔  TestAICommon._prepare_default_tools() takes [...]" in tests
