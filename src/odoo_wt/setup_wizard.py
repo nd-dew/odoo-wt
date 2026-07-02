@@ -148,8 +148,22 @@ class WizardApp(App):
     @on(Button.Pressed, "#btn-finish")
     def on_finish(self):
         root_sel = self.query_one("#root-select").value
-        wt_root_raw = self.query_one("#custom-root").value if (root_sel == "custom" or str(root_sel) == "Select.BLANK") or not root_sel else root_sel
-        wt_root = expand_path(str(wt_root_raw))
+        use_custom = (
+            self.query_one("#root-select").has_class("hidden") or
+            root_sel == "custom" or
+            not root_sel or
+            "Select." in str(root_sel)
+        )
+        wt_root_raw = self.query_one("#custom-root").value if use_custom else root_sel
+        
+        # Symmetrical input validation: do not allow empty, blank, or Select sentinels!
+        wt_root_str = str(wt_root_raw).strip()
+        if not wt_root_str or "Select." in wt_root_str:
+            self.notify("Error: Please enter or select a valid Worktree Root path!", severity="error")
+            self.query_one("#custom-root").focus()
+            return
+            
+        wt_root = expand_path(wt_root_str)
         
         env_path_raw = self.query_one("#env-path").value
         env_path = Path(expand_path(str(env_path_raw)))
