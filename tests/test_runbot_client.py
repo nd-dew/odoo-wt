@@ -895,3 +895,45 @@ def test_real_runbot_batch_2620761_inline_warning(monkeypatch):
     
     # Verify that the inline log warning is parsed and formatted beautifully!
     assert "code_owner  ➔  Some pr are draft, skipping: 120984" in tests
+
+def test_real_runbot_batch_2621224_level_less_inline_error(monkeypatch):
+    from odoo_wt.runbot_client import query_branch_status, fetch_failing_tests_from_batch
+    import os
+    
+    build_path = "tests/fixtures/build_116302920_parent.html"
+    with open(build_path, "r", encoding="utf-8") as f:
+        build_html = f.read()
+        
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def read(self, *args):
+            return self.content.encode("utf-8")
+            
+    def mock_urlopen(request, *args, **kwargs):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if "batch/2621224/build/116302920" in url or "build/116302920" in url:
+            return MockResponse(build_html)
+        elif "batch/2621224" in url:
+            mock_batch = (
+                '<div class="btn-group btn-group-ssm slot_button_group slot_link_created">\n'
+                '  <span class="btn btn-danger disabled">Failed</span>\n'
+                '  <a href="/runbot/batch/2621224/build/116302920" class="btn btn-default slot_name"><span>Build</span></a>\n'
+                '</div>'
+            )
+            return MockResponse(mock_batch)
+        else:
+            return MockResponse("Successfully completed with no errors")
+            
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+    
+    # Test failed tests extraction directly on failed batch
+    tests = fetch_failing_tests_from_batch("https://runbot.odoo.com/runbot/batch/2621224", verbose_level=2)
+    
+    # Verify that both level-less inline errors are parsed and HTML-tag stripped beautifully!
+    assert "minimal_check  ➔  This bundle contains some pull requests but no corresponding pr was found for branch odoo-dev/odoo:master-browse_audit-pian. Did you forget to create it? If not, please delete the branch" in tests
+    assert "minimal_check  ➔  Branch odoo-dev/odoo:master-browse_audit-pian has the same commit as the base and is not needed, please delete it." in tests
