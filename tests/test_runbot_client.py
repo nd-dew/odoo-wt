@@ -807,3 +807,50 @@ def test_real_runbot_batch_2618484_traceback_fallback(monkeypatch):
     
     # Verify that the traceback exception fallback (Rule E) correctly captures the unhandled ValueError in post install tests
     assert any("start_post_install_tests  ➔  ValueError: Model 'uninstalled.purchase.order' is not found in the Odoo registry." in t for t in tests)
+
+def test_runbot_client_verbosity_levels(monkeypatch):
+    from odoo_wt.runbot_client import fetch_failing_tests_from_batch
+    
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def read(self, *args):
+            return self.content.encode("utf-8")
+            
+    def mock_urlopen(request, *args, **kwargs):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if "/build/456" in url and "static" not in url:
+            mock_build = (
+                '<a href="http://runbot321.odoo.com/runbot/static/build/456-master/logs/start_post_install_tests.txt">Logs</a>'
+            )
+            return MockResponse(mock_build)
+        elif "batch/123" in url:
+            mock_batch = (
+                '<div class="btn-group btn-group-ssm slot_button_group slot_link_created">\n'
+                '  <span class="btn btn-danger disabled">Failed</span>\n'
+                '  <a href="/runbot/batch/123/build/456" class="btn btn-default slot_name"><span>Build</span></a>\n'
+                '</div>'
+            )
+            return MockResponse(mock_batch)
+        else:
+            mock_log = (
+                '2026-07-01 12:00:00 ERROR: test_foo (odoo.TestFoo)\n'
+                'AssertionError: Expected 1 but got 0\n'
+                '2026-07-01 12:01:00 odoo.service.server.ThreadedServer: Error: odoo.addons.ai.tests.test_ai.TestFoo.test_foo - AssertionError: Expected 1 but got 0'
+            )
+            return MockResponse(mock_log)
+            
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+    
+    # 1. Test verbose_level == 1 (-v) -> should return just flat test names, NO tracebacks
+    tests_v1 = fetch_failing_tests_from_batch("https://runbot.odoo.com/runbot/batch/123", verbose_level=1)
+    assert "TestFoo.test_foo" in tests_v1
+    assert "TestFoo.test_foo  ➔  AssertionError: Expected 1 but got 0" not in tests_v1
+    
+    # 2. Test verbose_level == 2 (-vv) -> should return test names WITH tracebacks
+    tests_v2 = fetch_failing_tests_from_batch("https://runbot.odoo.com/runbot/batch/123", verbose_level=2)
+    assert "TestFoo.test_foo  ➔  AssertionError: Expected 1 but got 0" in tests_v2
