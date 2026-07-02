@@ -112,7 +112,7 @@ async def test_magic_fix_ui_manual(tmp_path, monkeypatch):
     monkeypatch.setattr("odoo_wt.main_tui.discover_system_data", lambda *args, **kwargs: (["master", "17.0"], ["pian", "mate"], []))
 
     app = OdooWtApp(config, ["master", "17.0"], ["pian", "mate"], [])
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(100, 40)) as pilot:
         await pilot.click("#desc")
         await pilot.press(*"odoo-dev:17.0-new-logic-mate")
         await pilot.pause(0.6)

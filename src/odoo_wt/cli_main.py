@@ -81,19 +81,35 @@ def show_help():
 
 def check_dependencies():
     from rich.console import Console
-    missing = []
-    if not shutil.which("git"):
-        missing.append("git")
-    if not shutil.which("uv"):
-        missing.append("uv")
+    from .preflight_checker import run_preflight_checks
     
-    if missing:
-        console = Console()
-        console.print(f"[bold red]Error: Required dependencies not found in PATH: {', '.join(missing)}[/bold red]")
-        console.print("Please install them and try again.")
-        console.print("  - [bold cyan]git[/bold cyan]: [underline blue]https://git-scm.com/[/underline blue]")
-        console.print("  - [bold cyan]uv[/bold cyan]:  [underline blue]https://docs.astral.sh/uv/[/underline blue]")
+    console = Console()
+    active_config = config_mgr.config if config_mgr.config_file.exists() else {}
+    results = run_preflight_checks(active_config)
+    
+    # Filter out repository checks if config is empty (wizard not run yet)
+    if not active_config:
+        results = [r for r in results if r.key != "repos"]
+        
+    has_errors = any(r.status == "error" for r in results)
+    
+    if has_errors:
+        console.print("\n[bold red]❌ PRE-FLIGHT DIAGNOSTICS FAILURE:[/bold red]")
+        for r in results:
+            if r.status == "error":
+                console.print(f"  [bold red]• {r.title}:[/bold red] {r.value}")
+                console.print(f"    [dim]{r.advice}[/dim]")
+        console.print("\nPlease resolve these issues before running odoo-wt.\n")
         sys.exit(1)
+        
+    has_warnings = any(r.status == "warn" for r in results)
+    if has_warnings:
+        console.print("\n[bold yellow]⚠️  PRE-FLIGHT DIAGNOSTICS WARNINGS:[/bold yellow]")
+        for r in results:
+            if r.status == "warn":
+                console.print(f"  [bold yellow]• {r.title}:[/bold yellow] {r.value}")
+                console.print(f"    [dim]{r.advice}[/dim]")
+        console.print()
 
 def get_edit_distance(s1: str, s2: str) -> int:
     if len(s1) > len(s2):
