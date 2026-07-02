@@ -146,5 +146,25 @@ To apply changes made to the source:
 uv tool install . --force
 ```
 
+## Testing a Fresh Installation (Without Affecting Your Local Setup)
+
+If you want to simulate and test the entire "first-time" onboarding experience of `odoo-wt` (the welcome wizard, dependency checks, and default setup) without uninstalling the tool or affecting your existing local production config (`~/.config/odoo-wt.json`), you can run an isolated, self-destroying sandbox container using Podman (or Docker):
+
+```bash
+# 1. Boot up the official Astral UV container (contains both Python 3.12 and uv pre-installed)
+podman run -it --rm -v ~/repos:/home/developer/repos:Z ghcr.io/astral-sh/uv:python3.12-bookworm-slim bash
+
+# 2. Inside the container shell, install git (takes 2 seconds)
+apt-get update && apt-get install -y git
+
+# 3. Install odoo-wt globally
+uv tool install odoo-wt
+
+# 4. Launch odoo-wt to experience the clean first-time Welcome Wizard!
+odoo-wt
+```
+
+Once you exit the container, everything is completely destroyed and cleaned up, leaving your local PC's production configuration 100% untouched!
+
 ## License
 MIT
