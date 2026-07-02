@@ -604,12 +604,22 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                             build_name = (m_config.group(1) or m_config.group(2)).strip().lower()
                             
                     inline_logs = re.findall(
-                        r'<td[^>]*><b>(WARNING|ERROR)</b>\s*</td>\s*<td[^>]*class="bg-[^"]*subtle"><span>(.*?)</span>',
+                        r'<td[^>]*class="bg-(danger|warning)-subtle"><span>(.*?)</span>',
                         html_build,
                         re.DOTALL
                     )
+                    # Backup check for legacy tables containing explicit BOLD level headings
+                    if not inline_logs:
+                        legacy_logs = re.findall(
+                            r'<td[^>]*><b>(WARNING|ERROR)</b>\s*</td>\s*<td[^>]*class="bg-[^"]*subtle"><span>(.*?)</span>',
+                            html_build,
+                            re.DOTALL
+                        )
+                        inline_logs = [(level.lower(), msg) for level, msg in legacy_logs]
+                        
                     for level, msg in inline_logs[:5]:
-                        display_name = f"{build_name}  ➔  {msg.strip()}"
+                        clean_msg = re.sub(r'<[^>]+>', '', msg).strip()
+                        display_name = f"{build_name}  ➔  {clean_msg}"
                         if display_name not in tests:
                             tests.append(display_name)
                 
