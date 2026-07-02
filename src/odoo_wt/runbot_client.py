@@ -591,6 +591,28 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
                         unique_log_links.append(link)
                 debug_log(f"Extracted log links from build page: {log_links} (deduplicated down to {len(unique_log_links)} unique logs)")
                 
+                # Symmetrically parse the inline log messages table if no separate log text links are present on the page
+                if not unique_log_links:
+                    debug_log("No separate text log files found on build page. Symmetrically parsing inline build logs...")
+                    build_name = "build"
+                    m_title = re.search(r'batch-\d+\s*\(([^)]+)\)', html_build, re.IGNORECASE)
+                    if m_title:
+                        build_name = m_title.group(1).strip().replace(" ", "_").lower()
+                    else:
+                        m_config = re.search(r'config\s+<strong>([^<]+)</strong>|config\s+([A-Za-z0-9_]+)', html_build, re.IGNORECASE)
+                        if m_config:
+                            build_name = (m_config.group(1) or m_config.group(2)).strip().lower()
+                            
+                    inline_logs = re.findall(
+                        r'<td[^>]*><b>(WARNING|ERROR)</b>\s*</td>\s*<td[^>]*class="bg-[^"]*subtle"><span>(.*?)</span>',
+                        html_build,
+                        re.DOTALL
+                    )
+                    for level, msg in inline_logs[:5]:
+                        display_name = f"{build_name}  ➔  {msg.strip()}"
+                        if display_name not in tests:
+                            tests.append(display_name)
+                
                 # Symmetrically prioritize important test-related logs and filter/deprioritize setup logs to never miss failures
                 important_logs = []
                 other_logs = []
@@ -783,7 +805,7 @@ def check_branch_status_and_comments(branch_name: str, skip_comments: bool = Fal
                 pass
                 
         failing_tests = []
-        if failed > 0:
+        if failed > 0 or warning > 0:
             try:
                 failing_tests = fetch_failing_tests_from_batch(batch_url, verbose_level)
             except Exception:
