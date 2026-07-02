@@ -39,6 +39,16 @@ Button {
     margin: 0 1;
 }
 
+#preflight-banner {
+    background: $error-muted;
+    color: $error;
+    padding: 1;
+    margin: 1 0;
+    border: solid $error;
+    height: auto;
+    width: 100%;
+}
+
 /* Wizard */
 #wizard-scroll {
     width: 100%;
