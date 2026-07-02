@@ -228,6 +228,7 @@ class OdooWtApp(App):
             with TabbedContent(id="tabs"):
                 with TabPane("Creation", id="tab-create"):
                     yield Label("What branch do you need?", classes="tab-description")
+                    yield Label("", id="preflight-banner", classes="hidden")
 
                     with Horizontal(classes="main-row"):
                         with Vertical(id="version-col"):
@@ -388,9 +389,39 @@ class OdooWtApp(App):
         v_sel = self.query_one("#version", Select).value
         if v_sel and str(v_sel) != "custom...":
             self.background_fetch(str(v_sel))
+            
+        self.run_preflight_diagnostics()
 
     def on_ready(self) -> None:
         self.run_runbot_checker()
+
+    def run_preflight_diagnostics(self) -> None:
+        from .preflight_checker import run_preflight_checks
+        results = run_preflight_checks(self.config)
+        has_error = any(r.status == "error" for r in results)
+        has_warn = any(r.status == "warn" for r in results)
+        
+        if has_error:
+            err_msg = next(r.advice for r in results if r.status == "error")
+            self.notify(f"PRE-FLIGHT ERROR: {err_msg}", severity="error", timeout=12.0)
+            try:
+                banner = self.query_one("#preflight-banner", Label)
+                banner.update(f"[bold red]❌ PRE-FLIGHT ERROR:[/bold red]\n{err_msg}")
+                banner.remove_class("hidden")
+            except Exception:
+                pass
+        elif has_warn:
+            warn_msg = next(r.advice for r in results if r.status == "warn")
+            self.notify(f"PRE-FLIGHT WARNING: {warn_msg}", severity="warning", timeout=8.0)
+            try:
+                banner = self.query_one("#preflight-banner", Label)
+                banner.update(f"[bold yellow]⚠️  PRE-FLIGHT WARNING:[/bold yellow]\n{warn_msg}")
+                banner.remove_class("hidden")
+                banner.styles.background = "$warning-subtle"
+                banner.styles.border = ("solid", "$warning")
+                banner.styles.color = "$warning"
+            except Exception:
+                pass
 
     def apply_visibility_settings(self):
         prefix_col = self.query_one("#version-col")
