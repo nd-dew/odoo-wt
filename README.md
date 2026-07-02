@@ -128,6 +128,8 @@ uv tool install . --force
 
 - [x] **Config Reset Bug:** Resolved (caused by a hijacked local virtualenv paths during testing).
 - [ ] **Action Selection:** Add flags to directly trigger 'terminal' or 'vscode' actions from the command line after deployment.
+- [x] **Pre-flight Checker:** Automatically verify Git, Astral UV, GitHub CLI dependencies, and Odoo base repository clones on startup to fail faster and guide new hires. (Completed in `v2.58.0`)
+- [ ] **Onboarding Wizard Upgrades:** Dynamically prompt and guide developers through automated Git, GitHub CLI installation, and cloning Odoo/Enterprise base master repositories directly within the welcome wizard.
 - [x] **Improved Logging:** Add more granular log levels for troubleshooting. (Completed: added comprehensive multi-stage diagnostic and event logging).
 - [x] add cli option to --list existing wt (Completed: integrated into 'odoo-wt status' command-line table).
 - [ ] opening the directory in terminal is very slow (like 10s)
