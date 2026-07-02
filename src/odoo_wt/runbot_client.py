@@ -563,7 +563,7 @@ def fetch_failing_tests_from_batch(batch_url: str, verbose_level: int = 0) -> li
             
         # 1. Parse failed build links from the batch slots
         failed_build_links = []
-        blocks = re.findall(r'<div class="btn-group[^"]*slot_button_group">.*?</div>', html_batch, re.DOTALL)
+        blocks = re.findall(r'<div[^>]*class="[^"]*slot_button_group[^"]*"[^>]*>.*?</div>', html_batch, re.DOTALL)
         for b in blocks:
             if "btn-danger" in b or "btn-warning" in b:
                 m = re.search(r'href="(/runbot/batch/\d+/build/\d+|/runbot/build/\d+)"', b)
