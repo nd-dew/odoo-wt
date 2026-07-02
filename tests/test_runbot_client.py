@@ -854,3 +854,44 @@ def test_runbot_client_verbosity_levels(monkeypatch):
     # 2. Test verbose_level == 2 (-vv) -> should return test names WITH tracebacks
     tests_v2 = fetch_failing_tests_from_batch("https://runbot.odoo.com/runbot/batch/123", verbose_level=2)
     assert "TestFoo.test_foo  ➔  AssertionError: Expected 1 but got 0" in tests_v2
+
+def test_real_runbot_batch_2620761_inline_warning(monkeypatch):
+    from odoo_wt.runbot_client import query_branch_status, fetch_failing_tests_from_batch
+    import os
+    
+    warning_build_path = "tests/fixtures/build_116293286_warning.html"
+    with open(warning_build_path, "r", encoding="utf-8") as f:
+        warning_build_html = f.read()
+        
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def read(self, *args):
+            return self.content.encode("utf-8")
+            
+    def mock_urlopen(request, *args, **kwargs):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if "batch/2620761/build/116293286" in url or "build/116293286" in url:
+            return MockResponse(warning_build_html)
+        elif "batch/2620761" in url:
+            mock_batch = (
+                '<div class="btn-group btn-group-ssm slot_button_group slot_link_created">\n'
+                '  <span class="btn btn-warning disabled">Warning</span>\n'
+                '  <a href="/runbot/batch/2620761/build/116293286" class="btn btn-default slot_name"><span>Code Owner</span></a>\n'
+                '</div>'
+            )
+            return MockResponse(mock_batch)
+        else:
+            return MockResponse("Successfully completed with no errors")
+            
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+    
+    # Test failed tests extraction directly on warning batch
+    tests = fetch_failing_tests_from_batch("https://runbot.odoo.com/runbot/batch/2620761", verbose_level=2)
+    
+    # Verify that the inline log warning is parsed and formatted beautifully!
+    assert "code_owner  ➔  Some pr are draft, skipping: 120984" in tests
