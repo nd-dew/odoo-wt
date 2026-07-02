@@ -84,31 +84,38 @@ def check_dependencies():
     from .preflight_checker import run_preflight_checks
     
     console = Console()
+    
+    # 1. If we are starting the setup wizard or explicitly editing settings, 
+    # we ONLY block if Git is missing from the system entirely.
+    is_config_mode = "settings" in sys.argv or "wizard" in sys.argv or not config_mgr.config_file.exists()
+    if is_config_mode:
+        if not shutil.which("git"):
+            console.print("\n[bold red]❌ ERROR: Git is not installed on your system![/bold red]")
+            console.print("Please install Git and try again.\n")
+            sys.exit(1)
+        return
+        
     active_config = config_mgr.config if config_mgr.config_file.exists() else {}
     results = run_preflight_checks(active_config)
     
-    # Filter out repository checks if config is empty (wizard not run yet)
-    if not active_config:
-        results = [r for r in results if r.key != "repos"]
-        
-    has_errors = any(r.status == "error" for r in results)
-    
-    if has_errors:
-        console.print("\n[bold red]❌ PRE-FLIGHT DIAGNOSTICS FAILURE:[/bold red]")
-        for r in results:
-            if r.status == "error":
-                console.print(f"  [bold red]• {r.title}:[/bold red] {r.value}")
-                console.print(f"    [dim]{r.advice}[/dim]")
-        console.print("\nPlease resolve these issues before running odoo-wt.\n")
+    # 2. To prevent catch-22 deadlocks, we ONLY treat missing Git as an absolute exit blocker.
+    # Other issues (missing UV, missing GH, or invalid Odoo base clones) are printed as highly informative
+    # warnings, but we let the user continue so they can run 'settings' or launch the TUI to resolve them.
+    git_result = next((r for r in results if r.key == "git"), None)
+    if git_result and git_result.status == "error":
+        console.print("\n[bold red]❌ CRITICAL SYSTEM FAILURE:[/bold red]")
+        console.print(f"  [bold red]• {git_result.title}:[/bold red] {git_result.value}")
+        console.print(f"    [dim]{git_result.advice}[/dim]\n")
         sys.exit(1)
         
-    has_warnings = any(r.status == "warn" for r in results)
-    if has_warnings:
+    # Print all other errors/warnings as pretty, informative pre-flight warning cards
+    other_issues = [r for r in results if r.status in ("error", "warn") and r.key != "git"]
+    if other_issues:
         console.print("\n[bold yellow]⚠️  PRE-FLIGHT DIAGNOSTICS WARNINGS:[/bold yellow]")
-        for r in results:
-            if r.status == "warn":
-                console.print(f"  [bold yellow]• {r.title}:[/bold yellow] {r.value}")
-                console.print(f"    [dim]{r.advice}[/dim]")
+        for r in other_issues:
+            level_str = "ERROR" if r.status == "error" else "WARNING"
+            console.print(f"  [bold yellow]• {r.title} ({level_str}):[/bold yellow] {r.value}")
+            console.print(f"    [dim]{r.advice}[/dim]")
         console.print()
 
 def get_edit_distance(s1: str, s2: str) -> int:
