@@ -79,7 +79,7 @@ def run_preflight_checks(config: dict) -> list[DiagnosticResult]:
     if not wt_root_val or "Select." in str(wt_root_val) or not str(wt_root_val).strip():
         results.append(DiagnosticResult(
             "repos", "Worktree Root Path", "error", "Invalid or Empty",
-            "The configured Worktree Root is empty or invalid! Run 'odoo-wt status -a' to re-configure."
+            "The configured Worktree Root is empty or invalid! Run 'odoo-wt settings' to re-configure."
         ))
     else:
         wt_root = Path(wt_root_val).expanduser().absolute()
