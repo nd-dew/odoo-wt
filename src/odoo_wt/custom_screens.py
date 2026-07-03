@@ -148,6 +148,10 @@ class DeployScreen(Screen):
         except Exception as e:
             self.query_one("#log-uv", RichLog).write(f"[bold red]Failed to create VS Code launch config: {e}[/bold red]")
 
+        if self.engine.has_errors:
+            self.show_failure_footer()
+            return
+
         config_mgr.append_log("Deployment Success", {"branch": self.engine.branch_name, "path": str(self.engine.target_dir)})
         self.show_success_footer()
 
@@ -156,6 +160,20 @@ class DeployScreen(Screen):
         msg.update(f"SUCCESS! Worktree ready at: {self.engine.target_dir}\nWhat would you like to do next?")
         self.query_one("#success-footer").remove_class("hidden")
         self.query_one("#btn-terminal").focus()
+
+    def show_failure_footer(self):
+        msg = self.query_one("#success-message", Label)
+        msg.update(f"[bold red]❌ DEPLOYMENT FAILED![/bold red] Base repositories were not found, or worktree operations aborted.\nPlease check the logs above.")
+        
+        # Hide action buttons that depend on successful worktrees
+        try:
+            self.query_one("#btn-terminal").add_class("hidden")
+            self.query_one("#btn-vscode").add_class("hidden")
+        except Exception:
+            pass
+            
+        self.query_one("#success-footer").remove_class("hidden")
+        self.query_one("#btn-back").focus()
 
     @on(Button.Pressed, "#btn-terminal")
     def on_terminal(self):
@@ -170,6 +188,11 @@ class DeployScreen(Screen):
     @on(Button.Pressed, "#btn-back")
     def on_back(self):
         config_mgr.append_log("Deployment Complete", {"choice": "back"})
+        try:
+            self.query_one("#btn-terminal").remove_class("hidden")
+            self.query_one("#btn-vscode").remove_class("hidden")
+        except Exception:
+            pass
         self.dismiss()
 
     @on(Button.Pressed, "#btn-exit")
