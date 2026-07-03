@@ -45,6 +45,7 @@ class DeployEngine:
         self.comm_dir = config.get("community_dir", "odoo")
         self.ent_dir = config.get("enterprise_dir", "enterprise")
         self.env_root = Path(config["env_root"]).expanduser().absolute()
+        self.has_errors = False
         
         clean_desc = data["desc"].strip().replace(" ", "_")
         parts = [p for p in [data["version"], clean_desc, data["suffix"]] if p]
@@ -64,6 +65,7 @@ class DeployEngine:
         yield DeployUpdate(category=category, total=3)
         
         if not repo_path.exists():
+            self.has_errors = True
             yield DeployUpdate(category=category, log_line=f"[bold red]Error: Base repository not found at {repo_path}[/bold red]", advance=3)
             return
 
@@ -127,6 +129,7 @@ class DeployEngine:
             
             yield DeployUpdate(category=category, advance=1, log_line="✅ Done.")
         except RuntimeError as e:
+            self.has_errors = True
             yield DeployUpdate(category=category, log_line=f"[bold red]CRITICAL FAILURE: Repo deployment aborted.[/bold red]")
 
     async def setup_uv(self) -> AsyncGenerator[DeployUpdate, None]:
