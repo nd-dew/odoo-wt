@@ -969,8 +969,9 @@ class OdooWtApp(App):
             if search_term and search_term not in name.lower():
                 continue
 
+            display_name = name
             if path in self.deleting_paths:
-                name = f"[strike]{name}[/strike] [bold red](Deleting...)[/bold red]"
+                display_name = f"[strike]{name}[/strike] [bold red](Deleting...)[/bold red]"
                 
             # Read from local status and URL caches
             status = self.resolved_runbot_statuses.get(name, "⏳ checking... ")
@@ -1014,7 +1015,7 @@ class OdooWtApp(App):
             else:
                 comment_cell = ""
 
-            table.add_row(name, status, link, comment_cell, key=path)
+            table.add_row(display_name, status, link, comment_cell, key=path)
             
         self.adjust_column_widths()
 
