@@ -162,3 +162,43 @@ async def test_vscode_launch_generation(tmp_path, monkeypatch):
         
     # Assert global port was incremented
     assert engine.config["next_debug_port"] == 8070
+
+@pytest.mark.asyncio
+async def test_deployment_engine_upstream_tracking(monkeypatch):
+    from odoo_wt.deployment_engine import DeployEngine
+
+    commands_run = []
+    async def mock_run_cmd_stream_gen(cmd, *args, **kwargs):
+        commands_run.append(cmd)
+        # Symmetrically raise RuntimeError to simulate fetch failure for brand new feature branch
+        if "fetch" in cmd and "odoo-dev" in cmd:
+            raise RuntimeError("Fetch failed")
+        yield None
+
+    monkeypatch.setattr("odoo_wt.deployment_engine.run_cmd_stream_gen", mock_run_cmd_stream_gen)
+    monkeypatch.setattr("odoo_wt.deployment_engine.get_remote", lambda _: "odoo")
+    monkeypatch.setattr("odoo_wt.deployment_engine.check_local", lambda _, __: False)
+
+    config = {
+        "wt_root": "/tmp",
+        "env_root": "/tmp/envs",
+        "remote_name": "odoo-dev",
+        "community_dir": "odoo",
+        "enterprise_dir": "enterprise"
+    }
+
+    # Case A: Feature branch (should run --unset-upstream)
+    engine_feature = DeployEngine(config, {"version": "19.0", "desc": "fix-bug", "suffix": "test"})
+    commands_run.clear()
+    async for _ in engine_feature.deploy_repo(Path("/tmp"), "odoo", "odoo"):
+        pass
+
+    assert ["git", "branch", "--unset-upstream", "19.0-fix-bug-test"] in commands_run
+
+    # Case B: Base release branch (should NOT run --unset-upstream!)
+    engine_base = DeployEngine(config, {"version": "19.0", "desc": "", "suffix": ""})
+    commands_run.clear()
+    async for _ in engine_base.deploy_repo(Path("/tmp"), "odoo", "odoo"):
+        pass
+
+    assert ["git", "branch", "--unset-upstream", "19.0"] not in commands_run
