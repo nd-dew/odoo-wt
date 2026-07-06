@@ -197,3 +197,42 @@ def test_tui_base_branch_minimal_status(monkeypatch):
     assert branch_name == "master"
     assert status == "⚪"
     assert "Board" in link
+
+def test_tui_deleting_row_markup_safety(monkeypatch):
+    from odoo_wt.main_tui import OdooWtApp
+    
+    app = OdooWtApp(
+        config={"wt_root": "/path/root", "suffix": "pian"},
+        v_list=["17.0"], s_list=["pian"],
+        worktrees=[{"name": "saas-19.4-my_feature", "path": "/path/root/saas-19.4-my_feature", "version": "saas-19.4"}],
+        version_str="dev"
+    )
+    
+    # Mark the path as currently deleting
+    app.deleting_paths.add("/path/root/saas-19.4-my_feature")
+    
+    rows_added = []
+    class MockDataTable:
+        def clear(self): pass
+        def add_row(self, *args, **kwargs):
+            rows_added.append(args)
+            
+    def mock_query_one(selector, *args, **kwargs):
+        if selector == "#wt-table":
+            return MockDataTable()
+        class MockSearch:
+            value = ""
+        return MockSearch()
+        
+    app.query_one = mock_query_one
+    
+    # Populate the table (should format deleting row without raising MarkupError!)
+    app.populate_table()
+    
+    assert len(rows_added) == 1
+    branch_name, status, link, comment = rows_added[0]
+    
+    # Assert display_name has the strike-through, but raw name in link does NOT have nested strike!
+    assert "[strike]saas-19.4-my_feature[/strike]" in branch_name
+    assert "search=saas-19.4-my_feature" in link
+    assert "[strike]" not in link  # Symmetrical shield against nested markup crash!
