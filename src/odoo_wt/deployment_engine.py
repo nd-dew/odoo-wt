@@ -127,6 +127,11 @@ class DeployEngine:
                     if not is_base_branch:
                         async for update in run_cmd_stream_gen(["git", "branch", "--unset-upstream", self.branch_name], repo_path, category):
                             yield update
+
+                # Ensure base release branches always have their correct upstream tracking configured
+                if is_base_branch:
+                    async for update in run_cmd_stream_gen(["git", "branch", f"--set-upstream-to={remote}/{self.base_v}", self.branch_name], repo_path, category):
+                        yield update
             
             yield DeployUpdate(category=category, advance=1, log_line="✅ Done.")
         except RuntimeError as e:
