@@ -124,8 +124,9 @@ class DeployEngine:
                     async for update in run_cmd_stream_gen(["git", "worktree", "add", "--force", "-b", self.branch_name, str(self.target_dir / dest_label), f"{remote}/{self.base_v}"], repo_path, category):
                         yield update
                     # Unset upstream tracking to keep the local feature branch pristine with no mismatched tracking
-                    async for update in run_cmd_stream_gen(["git", "branch", "--unset-upstream", self.branch_name], repo_path, category):
-                        yield update
+                    if not is_base_branch:
+                        async for update in run_cmd_stream_gen(["git", "branch", "--unset-upstream", self.branch_name], repo_path, category):
+                            yield update
             
             yield DeployUpdate(category=category, advance=1, log_line="✅ Done.")
         except RuntimeError as e:
