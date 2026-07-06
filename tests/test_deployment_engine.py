@@ -202,3 +202,4 @@ async def test_deployment_engine_upstream_tracking(monkeypatch):
         pass
 
     assert ["git", "branch", "--unset-upstream", "19.0"] not in commands_run
+    assert ["git", "branch", "--set-upstream-to=odoo/19.0", "19.0"] in commands_run
