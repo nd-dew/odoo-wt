@@ -1014,3 +1014,120 @@ def test_cli_switcher_debug_log_output(monkeypatch, tmp_path, capsys):
     assert "ms | " in captured.out
     assert "cli_main.main" in captured.out
     assert "Smart Switcher active" in captured.out
+
+def test_cli_magic_fix_switcher_success(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "odoo-dev:saas-19.1-ai-preserve_list-bso"])
+    
+    config_path = tmp_path / "odoo-wt-magic.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock discover_system_data to return existing worktree matching the cleaned name
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["saas-19.1"], ["bso", "pian"], [{"name": "saas-19.1-ai-preserve_list-bso", "path": "/path/root/saas-19.1-ai-preserve_list-bso", "version": "saas-19.1"}]
+    ))
+    
+    monkeypatch.setattr("odoo_wt.runbot_client.query_branch_status", lambda name: None)
+    
+    chdir_called = None
+    def mock_chdir(path):
+        nonlocal chdir_called
+        chdir_called = path
+    monkeypatch.setattr("os.chdir", mock_chdir)
+    
+    execv_called = None
+    def mock_execv(shell, args):
+        nonlocal execv_called
+        execv_called = (shell, args)
+        raise SystemExit(0)
+    monkeypatch.setattr("os.execv", mock_execv)
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    assert chdir_called == "/path/root/saas-19.1-ai-preserve_list-bso"
+    captured = capsys.readouterr()
+    assert "Magic Fix applied to input:" in captured.out
+    assert "odoo-dev:saas-19.1-ai-preserve_list-bso" in captured.out
+    assert "saas-19.1-ai-preserve_list-bso" in captured.out
+
+def test_cli_magic_fix_open_success(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "open", "odoo-dev:saas-19.1-ai-preserve_list-bso"])
+    
+    config_path = tmp_path / "odoo-wt-magic-open.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock discover_system_data to return existing worktree matching the cleaned name
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["saas-19.1"], ["bso", "pian"], [{"name": "saas-19.1-ai-preserve_list-bso", "path": "/path/root/saas-19.1-ai-preserve_list-bso", "version": "saas-19.1"}]
+    ))
+    
+    chdir_called = None
+    def mock_chdir(path):
+        nonlocal chdir_called
+        chdir_called = path
+    monkeypatch.setattr("os.chdir", mock_chdir)
+    
+    execv_called = None
+    def mock_execv(shell, args):
+        nonlocal execv_called
+        execv_called = (shell, args)
+        raise SystemExit(0)
+    monkeypatch.setattr("os.execv", mock_execv)
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 0
+    assert chdir_called == "/path/root/saas-19.1-ai-preserve_list-bso"
+    captured = capsys.readouterr()
+    assert "Magic Fix applied to input:" in captured.out
+
+def test_cli_magic_fix_disabled_via_flag(monkeypatch, tmp_path, capsys):
+    from odoo_wt import cli_main
+    monkeypatch.setattr("sys.argv", ["odoo-wt", "odoo-dev:saas-19.1-ai-preserve_list-bso", "--no-magic"])
+    
+    config_path = tmp_path / "odoo-wt-no-magic.json"
+    config_path.write_text("{}")
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
+    monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
+        "wt_root": "/path/root",
+        "suffix": "pian"
+    })
+    
+    monkeypatch.setattr("odoo_wt.cli_main.check_dependencies", lambda: None)
+    
+    # Mock discover_system_data
+    monkeypatch.setattr("odoo_wt.cli_main.discover_system_data", lambda *_, **__: (
+        ["saas-19.1"], ["bso", "pian"], [{"name": "saas-19.1-ai-preserve_list-bso", "path": "/path/root/saas-19.1-ai-preserve_list-bso", "version": "saas-19.1"}]
+    ))
+    
+    # Mock builtins.input to return 'c' (create) to avoid blocking
+    monkeypatch.setattr("builtins.input", lambda _: "c")
+    
+    # Mock run_cli_deployment to do nothing and raise SystemExit to end early
+    async def mock_run_cli_deployment(*args, **kwargs):
+        raise SystemExit(0)
+    monkeypatch.setattr("odoo_wt.cli_main.run_cli_deployment", mock_run_cli_deployment)
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    captured = capsys.readouterr()
+    assert "Magic Fix applied to input:" not in captured.out
