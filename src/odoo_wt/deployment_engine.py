@@ -104,6 +104,9 @@ class DeployEngine:
                 yield DeployUpdate(category=category, log_line="Fetch successful. Creating worktree...")
                 async for update in run_cmd_stream_gen(["git", "worktree", "add", "--force", str(self.target_dir / dest_label), self.branch_name], repo_path, category):
                     yield update
+                # Configure upstream tracking to the dev remote branch when successfully fetched
+                async for update in run_cmd_stream_gen(["git", "branch", f"--set-upstream-to={self.dev_remote}/{self.branch_name}", self.branch_name], repo_path, category, allow_fail=True):
+                    yield update
             else:
                 if not is_base_branch:
                     yield DeployUpdate(category=category, log_line=f"Branch not found on '{self.dev_remote}'. Fetching '{self.base_v}' from '{remote}'...")
