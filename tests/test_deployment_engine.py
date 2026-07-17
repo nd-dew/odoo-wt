@@ -203,3 +203,34 @@ async def test_deployment_engine_upstream_tracking(monkeypatch):
 
     assert ["git", "branch", "--unset-upstream", "19.0"] not in commands_run
     assert ["git", "branch", "--set-upstream-to=odoo/19.0", "19.0"] in commands_run
+
+@pytest.mark.asyncio
+async def test_deployment_engine_dev_remote_upstream_tracking(monkeypatch):
+    from odoo_wt.deployment_engine import DeployEngine
+
+    commands_run = []
+    async def mock_run_cmd_stream_gen(cmd, *args, **kwargs):
+        commands_run.append(cmd)
+        # Symmetrically yield None without raising to simulate successful fetch from dev_remote
+        yield None
+
+    monkeypatch.setattr("odoo_wt.deployment_engine.run_cmd_stream_gen", mock_run_cmd_stream_gen)
+    monkeypatch.setattr("odoo_wt.deployment_engine.get_remote", lambda _: "odoo")
+
+    config = {
+        "wt_root": "/tmp",
+        "env_root": "/tmp/envs",
+        "remote_name": "odoo-dev",
+        "community_dir": "odoo",
+        "enterprise_dir": "enterprise"
+    }
+
+    engine = DeployEngine(config, {"version": "19.0", "desc": "fix-bug", "suffix": "test"})
+    commands_run.clear()
+    async for _ in engine.deploy_repo(Path("/tmp"), "odoo", "odoo"):
+        pass
+
+    # Ensure that it did NOT call --unset-upstream because fetch was successful
+    assert ["git", "branch", "--unset-upstream", "19.0-fix-bug-test"] not in commands_run
+    # Ensure that it correctly called --set-upstream-to targeting the dev_remote and branch
+    assert ["git", "branch", "--set-upstream-to=odoo-dev/19.0-fix-bug-test", "19.0-fix-bug-test"] in commands_run
