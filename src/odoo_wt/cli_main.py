@@ -516,6 +516,29 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
         config.get("known_suffixes", [])
     )
 
+    def apply_magic_fix_if_needed(branch_name):
+        if not branch_name:
+            return branch_name
+        remote, v, d, s = decompose_branch(branch_name, v_list, s_list)
+        parts = []
+        if v: parts.append(v)
+        if d: parts.append(d)
+        if s and s != "none": parts.append(s)
+        cleaned = "-".join(parts)
+        if cleaned and cleaned != branch_name:
+            from rich.console import Console
+            Console().print(f"🪄 [bold cyan]Magic Fix applied to input:[/bold cyan] [yellow]{branch_name}[/yellow] ➡️ [green]{cleaned}[/green]\n")
+            return cleaned
+        return branch_name
+
+    if not no_magic:
+        if open_branch:
+            open_branch = apply_magic_fix_if_needed(open_branch)
+        if code_branch:
+            code_branch = apply_magic_fix_if_needed(code_branch)
+        if delete_branch:
+            delete_branch = apply_magic_fix_if_needed(delete_branch)
+
     # Handle direct commands (open, code, delete)
     if open_branch:
         # Handle direct commands (open, code, delete)
@@ -616,6 +639,9 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
     elif len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
         branch_arg = sys.argv[1]
         sys.argv.pop(1)
+
+    if branch_arg and not no_magic:
+        branch_arg = apply_magic_fix_if_needed(branch_arg)
 
     if branch_arg:
         # Check if the query is a typo of a reserved subcommand (e.g., "lis" -> "list")
