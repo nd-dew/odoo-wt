@@ -595,10 +595,10 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
                 target_path = match["path"]
                 
                 # Resolve base directories dynamically
-                env_root = Path(config.get("env_root", "~/repos")).expanduser().absolute()
-                base_odoo = env_root / config.get("community_dir", "odoo")
-                base_ent = env_root / config.get("enterprise_dir", "enterprise")
-                base_upg = env_root / config.get("upgrade_dir", "upgrade")
+                wt_root = Path(config.get("wt_root", "~/repos/Odoo/wt")).expanduser().absolute()
+                base_odoo = wt_root / "master" / config.get("community_dir", "odoo")
+                base_ent = wt_root / "master" / config.get("enterprise_dir", "enterprise")
+                base_upg = wt_root / "master" / config.get("upgrade_dir", "upgrade")
                 
                 # Symmetrically remove community, enterprise, and upgrade worktrees from git metadata
                 if (Path(target_path) / "odoo").exists():
