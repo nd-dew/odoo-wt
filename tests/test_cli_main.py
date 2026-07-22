@@ -355,18 +355,18 @@ def test_cli_delete_command(monkeypatch, tmp_path, capsys):
     (target_dir / "odoo").mkdir()
     (target_dir / "enterprise").mkdir()
 
-    # Pre-setup base repositories on disk inside tmp_path to satisfy .exists() checks
-    base_odoo_dir = tmp_path / "odoo"
-    base_odoo_dir.mkdir()
-    base_ent_dir = tmp_path / "enterprise"
-    base_ent_dir.mkdir()
+    # Pre-setup base repositories on disk inside tmp_path / master to satisfy .exists() checks
+    base_odoo_dir = tmp_path / "master" / "odoo"
+    base_odoo_dir.mkdir(parents=True, exist_ok=True)
+    base_ent_dir = tmp_path / "master" / "enterprise"
+    base_ent_dir.mkdir(parents=True, exist_ok=True)
 
     config_path = tmp_path / "odoo-wt-history.json"
     config_path.write_text("{}")
     monkeypatch.setattr("odoo_wt.cli_main.config_mgr.config_file", config_path)
     monkeypatch.setattr("odoo_wt.cli_main.config_mgr.load", lambda: {
         "wt_root": str(tmp_path),
-        "env_root": str(tmp_path),
+        "env_root": str(tmp_path / "envs"),
         "suffix": "pian"
     })
     
