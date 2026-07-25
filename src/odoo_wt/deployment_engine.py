@@ -113,7 +113,7 @@ class DeployEngine:
                 else:
                     yield DeployUpdate(category=category, log_line=f"Fetching '{self.base_v}' from '{remote}'...")
                     
-                async for update in run_cmd_stream_gen(["git", "fetch", remote, self.base_v], repo_path, category):
+                async for update in run_cmd_stream_gen(["git", "fetch", remote, f"{self.base_v}:refs/remotes/{remote}/{self.base_v}", "--force"], repo_path, category):
                     yield update
                 
                 is_local = await asyncio.to_thread(check_local, repo_path, self.branch_name)
