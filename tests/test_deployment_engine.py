@@ -75,8 +75,8 @@ async def test_deployment_engine_base_branch(monkeypatch):
 
     # The dev remote fetch should NOT be in the commands
     assert ["git", "fetch", "odoo-dev", "19.0:19.0", "--force"] not in commands_run
-    # Instead, it should immediately fetch the base version from the official remote
-    assert ["git", "fetch", "odoo", "19.0"] in commands_run
+    # Instead, it should immediately fetch the base version from the official remote with the correct refspec mapping
+    assert ["git", "fetch", "odoo", "19.0:refs/remotes/odoo/19.0", "--force"] in commands_run
 
     # Test 3: Dynamic Fallback base version extraction
     # If version dropdown is "none" or empty, but description is "saas-19.3"
@@ -86,8 +86,8 @@ async def test_deployment_engine_base_branch(monkeypatch):
     commands_run.clear()
     async for _ in engine_fallback.deploy_repo(Path("/tmp"), "odoo", "odoo"):
         pass
-    # It should dynamically fetch saas-19.3
-    assert ["git", "fetch", "odoo", "saas-19.3"] in commands_run
+    # It should dynamically fetch saas-19.3 with the correct refspec mapping
+    assert ["git", "fetch", "odoo", "saas-19.3:refs/remotes/odoo/saas-19.3", "--force"] in commands_run
 
 @pytest.mark.asyncio
 async def test_vscode_launch_generation(tmp_path, monkeypatch):
