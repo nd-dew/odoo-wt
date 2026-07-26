@@ -165,10 +165,32 @@ class WizardApp(App):
             
         wt_root = expand_path(wt_root_str)
         
+        # Automatically create missing Worktree Root folder and notify
+        wt_root_path = Path(wt_root)
+        if not wt_root_path.exists():
+            self.notify(f"📁 Worktree Root '{wt_root_str}' does not exist. Creating it...", severity="information", timeout=6.0)
+            wt_root_path.mkdir(parents=True, exist_ok=True)
+
         env_path_raw = self.query_one("#env-path").value
         env_path = Path(expand_path(str(env_path_raw)))
         if not env_path.exists():
             env_path.mkdir(parents=True, exist_ok=True)
+
+        # Check if base master clones are missing under the newly created/existing root to provide warning guidance
+        base_odoo = wt_root_path / "master" / "odoo"
+        base_ent = wt_root_path / "master" / "enterprise"
+        missing = []
+        if not base_odoo.exists() or not (base_odoo / ".git").exists():
+            missing.append("Community (odoo)")
+        if not base_ent.exists() or not (base_ent / ".git").exists():
+            missing.append("Enterprise")
+
+        if missing:
+            self.notify(
+                f"⚠️ Base clones for {', '.join(missing)} are missing under master/. Remember to clone them!",
+                severity="warning",
+                timeout=8.0
+            )
 
         config = {
             "wt_root": wt_root,
