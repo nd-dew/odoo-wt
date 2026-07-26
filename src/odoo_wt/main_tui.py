@@ -122,6 +122,14 @@ class OdooWtApp(App):
         is_dark = self.config.get("dark_mode", True)
         self.theme = "textual-dark" if is_dark else "textual-light"
 
+    def run(self, *args, **kwargs):
+        debug_log("OdooWtApp.run() execution starting...")
+        try:
+            return super().run(*args, **kwargs)
+        except Exception as e:
+            debug_log(f"OdooWtApp.run() execution failed: {e}")
+            raise
+
     def get_footer_text(self) -> str:
         try:
             active_tab = self.query_one("#tabs").active

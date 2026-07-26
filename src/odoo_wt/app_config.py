@@ -28,7 +28,14 @@ def debug_log(msg: str):
             module_name = module_name.replace("odoo_wt.", "")
             
         caller_str = f"{module_name}.{class_name}{func_name}"
-        print(f"  {elapsed:7.2f}ms | {caller_str:<45} | {msg}")
+        sys.stderr.write(f"  {elapsed:7.2f}ms | {caller_str:<45} | {msg}\n")
+        sys.stderr.flush()
+        try:
+            if sys.__stderr__ and sys.__stderr__ != sys.stderr:
+                sys.__stderr__.write(f"  {elapsed:7.2f}ms | {caller_str:<45} | {msg}\n")
+                sys.__stderr__.flush()
+        except Exception:
+            pass
 
 DEFAULT_CONFIG_FILE = Path.home() / ".config" / "odoo-wt.json"
 DEFAULT_LOG_FILE = Path.home() / ".config" / "odoo-wt-logs.jsonl"
