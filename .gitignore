@@ -7,3 +7,4 @@ __pycache__/
 .vscode/
 odoo-wt.json
 odoo-wt-logs.jsonl
+scripts/
