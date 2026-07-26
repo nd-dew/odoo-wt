@@ -127,6 +127,25 @@ class OdooWtApp(App):
     def run(self, *args, **kwargs):
         debug_log("OdooWtApp.run() execution starting...")
         try:
+            import os
+            import sys
+            import shutil
+            tty_info = {
+                "stdin_isatty": sys.stdin.isatty(),
+                "stdout_isatty": sys.stdout.isatty(),
+                "stderr_isatty": sys.stderr.isatty(),
+                "fd0_isatty": os.isatty(0) if hasattr(os, "isatty") else "N/A",
+                "fd1_isatty": os.isatty(1) if hasattr(os, "isatty") else "N/A",
+                "fd2_isatty": os.isatty(2) if hasattr(os, "isatty") else "N/A",
+                "term_env": os.environ.get("TERM", "NOT SET"),
+                "term_size": str(shutil.get_terminal_size() if hasattr(shutil, "get_terminal_size") else "N/A"),
+                "is_test_mode": config_mgr.is_test_mode
+            }
+            debug_log(f"OdooWtApp.run() TTY diagnostics: {tty_info}")
+        except Exception as e:
+            debug_log(f"OdooWtApp.run() failed gathering TTY diagnostics: {e}")
+
+        try:
             return super().run(*args, **kwargs)
         except Exception as e:
             debug_log(f"OdooWtApp.run() execution failed: {e}")
@@ -1315,7 +1334,8 @@ class OdooWtApp(App):
 
     def action_quit(self) -> None:
         config_mgr.append_log("App Quit")
-        self.exit()
+        import os
+        os._exit(0)
 
     def action_toggle_sort(self) -> None:
         modes = ["recency", "version", "name", "runbot", "reviews"]
@@ -1623,7 +1643,8 @@ class OdooWtApp(App):
     @on(Button.Pressed, "#btn-close-app")
     def on_close_app_btn(self) -> None:
         config_mgr.append_log("Cancel Button Clicked")
-        self.exit()
+        import os
+        os._exit(0)
 
     def action_delete_wt(self) -> None:
         table = self.query_one("#wt-table")
