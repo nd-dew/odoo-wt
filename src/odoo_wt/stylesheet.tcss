@@ -452,3 +452,10 @@ LogDetailScreen {
     height: 3;
     align: left middle;
 }
+
+#root-status-label {
+    margin: 1 0;
+    height: auto;
+    text-align: left;
+    width: 100%;
+}

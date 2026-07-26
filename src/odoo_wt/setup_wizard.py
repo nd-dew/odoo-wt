@@ -64,6 +64,7 @@ class WizardApp(App):
                 yield ProgressBar(id="scanner-progress")
                 yield Select([], id="root-select", classes="hidden", prompt="Select discovered root")
                 yield Input(placeholder="Or enter path manually (~/ allowed)...", id="custom-root", classes="hidden")
+                yield Label(id="root-status-label", classes="hidden")
                 
                 with Vertical(id="final-steps", classes="hidden"):
                     yield Label("[bold]Step 2: UV Environments Path[/bold]", classes="step-title")
@@ -96,6 +97,41 @@ class WizardApp(App):
         config_mgr.append_log("Wizard Started")
         self.run_scanner()
 
+    def check_root_path(self, path_str: str) -> None:
+        try:
+            label = self.query_one("#root-status-label", Label)
+        except Exception:
+            return
+
+        path_str = path_str.strip()
+        if not path_str or "Select." in path_str:
+            label.add_class("hidden")
+            return
+
+        try:
+            expanded = expand_path(path_str)
+            root_path = Path(expanded)
+            
+            if not root_path.exists():
+                label.update("📁 [bold yellow]Path does not exist (will be created automatically)[/bold yellow]")
+                label.remove_class("hidden")
+            else:
+                base_odoo = root_path / "master" / "odoo"
+                base_ent = root_path / "master" / "enterprise"
+                missing = []
+                if not base_odoo.exists() or not (base_odoo / ".git").exists():
+                    missing.append("Community (odoo)")
+                if not base_ent.exists() or not (base_ent / ".git").exists():
+                    missing.append("Enterprise")
+                
+                if missing:
+                    label.update(f"⚠️ [bold yellow]Base master clones missing: {', '.join(missing)} under master/[/bold yellow]")
+                else:
+                    label.update("✅ [bold green]Found Odoo base clones under master/![/bold green]")
+                label.remove_class("hidden")
+        except Exception:
+            label.add_class("hidden")
+
     @work(exclusive=True)
     async def run_scanner(self):
         roots = await asyncio.to_thread(fast_scan)
@@ -115,10 +151,12 @@ class WizardApp(App):
                 sel.value = roots[0]
             sel.remove_class("hidden")
             sel.focus()
+            self.check_root_path(roots[0])
         else:
             self.query_one("#scanner-status").update("Step 1: No standard roots found. Please specify manually:")
             self.query_one("#custom-root").remove_class("hidden")
             self.query_one("#custom-root").focus()
+            self.check_root_path(self.query_one("#custom-root").value)
 
         self.query_one("#final-steps").remove_class("hidden")
 
@@ -129,9 +167,15 @@ class WizardApp(App):
         if event.value == "custom":
             custom.remove_class("hidden")
             custom.focus()
+            self.check_root_path(custom.value)
         else:
             custom.add_class("hidden")
             self.query_one("#env-path").focus()
+            self.check_root_path(str(event.value))
+
+    @on(Input.Changed, "#custom-root")
+    def on_custom_root_changed(self, event):
+        self.check_root_path(event.value)
 
     @on(Input.Submitted, "#custom-root")
     def on_custom_root_submit(self, event):
