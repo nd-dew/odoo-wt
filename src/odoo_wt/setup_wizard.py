@@ -127,7 +127,21 @@ class WizardApp(App):
                     missing.append("Enterprise")
                 
                 if missing:
-                    label.update(f"⚠️ [bold yellow]Base master clones missing: {', '.join(missing)} under master/[/bold yellow]")
+                    msg = []
+                    if "Community (odoo)" in missing and "Enterprise" in missing:
+                        msg.append("⚠️ [bold yellow]No Odoo base repositories found in this path under master/![/bold yellow]")
+                    elif "Community (odoo)" in missing:
+                        msg.append("⚠️ [bold yellow]No Community repository found in this path under 'master/odoo'![/bold yellow]")
+                    else:
+                        msg.append("⚠️ [bold yellow]No Enterprise repository found in this path under 'master/enterprise'![/bold yellow]")
+                    
+                    msg.append("\n👉 [bold]To resolve, please run in your terminal:[/bold]")
+                    if "Community (odoo)" in missing:
+                        msg.append(f"   [cyan]git clone --depth 1 https://github.com/odoo/odoo.git {expanded}/master/odoo[/cyan]")
+                    if "Enterprise" in missing:
+                        msg.append(f"   [cyan]git clone --depth 1 https://github.com/odoo/enterprise.git {expanded}/master/enterprise[/cyan]")
+                    
+                    label.update("\n".join(msg))
                 else:
                     label.update("✅ [bold green]Found Odoo base clones under master/![/bold green]")
                 label.remove_class("hidden")

@@ -350,7 +350,8 @@ async def test_wizard_live_path_feedback(monkeypatch, tmp_path):
         pilot.app.check_root_path(str(existing_folder))
         await pilot.pause()
         assert not status_label.has_class("hidden")
-        assert "Base master clones missing" in str(status_label.render())
+        assert "No Odoo base repositories found" in str(status_label.render())
+        assert "git clone" in str(status_label.render())
         
         # Test 3: Existing folder and valid clones
         (existing_folder / "master" / "odoo" / ".git").mkdir(parents=True, exist_ok=True)
