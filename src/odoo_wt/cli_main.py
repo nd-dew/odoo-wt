@@ -870,9 +870,13 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
             data = asyncio.run(run_cli_deployment(config, data, verbose=verbose))
     else:
         # Standard TUI App mode
+        debug_log("Preparing to launch standard TUI App mode...")
         from .main_tui import OdooWtApp
+        debug_log("Instantiating OdooWtApp...")
         app = OdooWtApp(config, v_list, s_list, worktrees, VERSION)
+        debug_log("Launching OdooWtApp.run()...")
         data = app.run()
+        debug_log("OdooWtApp.run() completed successfully.")
 
     # Handle post-deployment completion actions (vscode, terminal)
     if data and isinstance(data, dict):
