@@ -321,3 +321,41 @@ async def test_wizard_root_creation_and_clones_warning(monkeypatch, tmp_path):
         # Verify that correct notifications were raised
         assert any("does not exist. Creating it..." in msg and sev == "information" for msg, sev in notifications)
         assert any("are missing under master/. Remember to clone them!" in msg and sev == "warning" for msg, sev in notifications)
+
+@pytest.mark.asyncio
+async def test_wizard_live_path_feedback(monkeypatch, tmp_path):
+    from odoo_wt.setup_wizard import WizardApp
+    from odoo_wt.app_config import config_mgr
+    
+    config_file = tmp_path / "odoo-wt-wizard-live.json"
+    monkeypatch.setattr(config_mgr, "config_file", config_file)
+    monkeypatch.setattr(config_mgr, "is_test_mode", True)
+    
+    app = WizardApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        
+        status_label = pilot.app.query_one("#root-status-label")
+        
+        # Test 1: Non-existent directory live check
+        non_existent = tmp_path / "non_existent_folder_xyz"
+        pilot.app.check_root_path(str(non_existent))
+        await pilot.pause()
+        assert not status_label.has_class("hidden")
+        assert "Path does not exist" in str(status_label.render())
+        
+        # Test 2: Existing folder but missing clones
+        existing_folder = tmp_path / "existing_folder_xyz"
+        existing_folder.mkdir(parents=True, exist_ok=True)
+        pilot.app.check_root_path(str(existing_folder))
+        await pilot.pause()
+        assert not status_label.has_class("hidden")
+        assert "Base master clones missing" in str(status_label.render())
+        
+        # Test 3: Existing folder and valid clones
+        (existing_folder / "master" / "odoo" / ".git").mkdir(parents=True, exist_ok=True)
+        (existing_folder / "master" / "enterprise" / ".git").mkdir(parents=True, exist_ok=True)
+        pilot.app.check_root_path(str(existing_folder))
+        await pilot.pause()
+        assert not status_label.has_class("hidden")
+        assert "Found Odoo base clones" in str(status_label.render())
