@@ -1011,9 +1011,9 @@ def test_cli_switcher_debug_log_output(monkeypatch, tmp_path, capsys):
         
     assert excinfo.value.code == 0
     captured = capsys.readouterr()
-    assert "ms | " in captured.out
-    assert "cli_main._main_impl" in captured.out
-    assert "Smart Switcher active" in captured.out
+    assert "ms | " in captured.err
+    assert "cli_main._main_impl" in captured.err
+    assert "Smart Switcher active" in captured.err
 
 def test_cli_magic_fix_switcher_success(monkeypatch, tmp_path, capsys):
     from odoo_wt import cli_main
