@@ -118,6 +118,11 @@ def check_dependencies():
             console.print(f"    [dim]{r.advice}[/dim]")
         console.print()
 
+    has_error = any(r.status == "error" for r in results if r.key != "git")
+    if has_error:
+        console.print("[bold red]❌ CRITICAL ERRORS DETECTED. Please resolve the errors above or run 'odoo-wt wizard' to reconfigure.[/bold red]\n")
+        sys.exit(1)
+
 def get_edit_distance(s1: str, s2: str) -> int:
     if len(s1) > len(s2):
         s1, s2 = s2, s1
