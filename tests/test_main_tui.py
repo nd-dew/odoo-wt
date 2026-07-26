@@ -236,3 +236,39 @@ def test_tui_deleting_row_markup_safety(monkeypatch):
     assert "[strike]saas-19.4-my_feature[/strike]" in branch_name
     assert "search=saas-19.4-my_feature" in link
     assert "[strike]" not in link  # Symmetrical shield against nested markup crash!
+
+@pytest.mark.asyncio
+async def test_wizard_suffix_placeholder(monkeypatch, tmp_path):
+    from odoo_wt.setup_wizard import WizardApp
+    from odoo_wt.app_config import config_mgr
+    
+    config_file = tmp_path / "odoo-wt-wizard.json"
+    monkeypatch.setattr(config_mgr, "config_file", config_file)
+    monkeypatch.setattr(config_mgr, "is_test_mode", True)
+    
+    app = WizardApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        
+        # Suffix-input should be empty initially, but have placeholder set to "pian"
+        suffix_input = pilot.app.query_one("#suffix-input")
+        assert suffix_input.value == ""
+        assert suffix_input.placeholder == "pian"
+        
+        # Test submission with empty suffix - it should default to "pian"
+        # Mock other fields and save call to ensure it runs cleanly
+        monkeypatch.setattr(pilot.app, "query_one", lambda selector, *args, **kwargs: (
+            type("MockInput", (object,), {"value": "custom", "has_class": lambda *_: False})()
+            if selector in ("#root-select", "#custom-root", "#env-path")
+            else suffix_input
+        ))
+        
+        saved_config = None
+        def mock_save(config):
+            nonlocal saved_config
+            saved_config = config
+        monkeypatch.setattr(config_mgr, "save", mock_save)
+        
+        pilot.app.on_finish()
+        assert saved_config is not None
+        assert saved_config["suffix"] == "pian"

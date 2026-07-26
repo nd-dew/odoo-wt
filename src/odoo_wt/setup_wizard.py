@@ -80,7 +80,7 @@ class WizardApp(App):
                         "This gets automatically appended to the end of your new branch names.",
                         classes="step-desc"
                     )
-                    yield Input(value="pian", id="suffix-input")
+                    yield Input(placeholder="pian", id="suffix-input")
                     
                     yield Label("\nDon't worry, you can change all of these later in the Settings tab!", classes="step-desc")
 
@@ -173,7 +173,7 @@ class WizardApp(App):
         config = {
             "wt_root": wt_root,
             "env_root": str(env_path),
-            "suffix": self.query_one("#suffix-input").value,
+            "suffix": self.query_one("#suffix-input").value.strip() or "pian",
             "remote_name": "odoo-dev",
             "community_dir": "odoo",
             "enterprise_dir": "enterprise"
