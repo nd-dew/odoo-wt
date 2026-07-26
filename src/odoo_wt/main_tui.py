@@ -83,6 +83,8 @@ class OdooWtApp(App):
         self.config = config
         self.app_version = version_str
         
+        debug_log(f"OdooWtApp received: config_keys={list(config.keys())}, v_list={v_list}, s_list={s_list}, worktrees_count={len(worktrees)}")
+        
         # Track usage and auto-hide description at 18th launch
         use_count = self.config.get("use_count", 0) + 1
         self.config["use_count"] = use_count
@@ -409,8 +411,10 @@ class OdooWtApp(App):
         self.run_runbot_checker()
 
     def run_preflight_diagnostics(self) -> None:
+        debug_log("OdooWtApp.run_preflight_diagnostics starting...")
         from .preflight_checker import run_preflight_checks
         results = run_preflight_checks(self.config)
+        debug_log(f"OdooWtApp pre-flight diagnostics completed. Statuses: {[r.status for r in results]}")
         has_error = any(r.status == "error" for r in results)
         has_warn = any(r.status == "warn" for r in results)
         
@@ -437,6 +441,7 @@ class OdooWtApp(App):
                 pass
 
     def apply_visibility_settings(self):
+        debug_log("OdooWtApp.apply_visibility_settings starting...")
         prefix_col = self.query_one("#version-col")
         suffix_col = self.query_one("#suffix-col")
         app_desc = self.query_one("#app-desc")
@@ -943,6 +948,7 @@ class OdooWtApp(App):
             return (0, 0, 0)
 
     def populate_table(self):
+        debug_log("OdooWtApp.populate_table starting...")
         table = self.query_one("#wt-table", DataTable)
         table.clear()
         
