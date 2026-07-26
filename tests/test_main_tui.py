@@ -272,3 +272,52 @@ async def test_wizard_suffix_placeholder(monkeypatch, tmp_path):
         pilot.app.on_finish()
         assert saved_config is not None
         assert saved_config["suffix"] == "pian"
+
+@pytest.mark.asyncio
+async def test_wizard_root_creation_and_clones_warning(monkeypatch, tmp_path):
+    from odoo_wt.setup_wizard import WizardApp
+    from odoo_wt.app_config import config_mgr
+    
+    config_file = tmp_path / "odoo-wt-wizard-warn.json"
+    monkeypatch.setattr(config_mgr, "config_file", config_file)
+    monkeypatch.setattr(config_mgr, "is_test_mode", True)
+    
+    # We will target a non-existent directory within tmp_path
+    non_existent_root = tmp_path / "new_wt_root"
+    assert not non_existent_root.exists()
+    
+    app = WizardApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        
+        # Mock inputs and selectors to return our non-existent root path
+        suffix_input = pilot.app.query_one("#suffix-input")
+        monkeypatch.setattr(pilot.app, "query_one", lambda selector, *args, **kwargs: (
+            type("MockSelect", (object,), {"value": "custom", "has_class": lambda *_: False})()
+            if selector == "#root-select"
+            else type("MockCustomRoot", (object,), {"value": str(non_existent_root)})()
+            if selector == "#custom-root"
+            else type("MockEnvPath", (object,), {"value": str(tmp_path / "envs")})()
+            if selector == "#env-path"
+            else suffix_input
+        ))
+        
+        notifications = []
+        def mock_notify(message, severity="info", timeout=3.0):
+            notifications.append((message, severity))
+        monkeypatch.setattr(pilot.app, "notify", mock_notify)
+        
+        saved_config = None
+        def mock_save(config):
+            nonlocal saved_config
+            saved_config = config
+        monkeypatch.setattr(config_mgr, "save", mock_save)
+        
+        pilot.app.on_finish()
+        
+        # Verify that the directory was automatically created on disk!
+        assert non_existent_root.exists()
+        
+        # Verify that correct notifications were raised
+        assert any("does not exist. Creating it..." in msg and sev == "information" for msg, sev in notifications)
+        assert any("are missing under master/. Remember to clone them!" in msg and sev == "warning" for msg, sev in notifications)
