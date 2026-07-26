@@ -900,13 +900,16 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
             else:
                 print("❌ VS Code ('code' command) not found in PATH.")
                 print(f"Directory is ready at: {target}")
+            os._exit(0)
+
+    # Forcefully terminate to bypass any blocked background thread pools hanging on exit
+    os._exit(0)
 
 def main():
     try:
         _main_impl()
     except KeyboardInterrupt:
         print("\nAborted.")
-        import os
         os._exit(1)
 
 def print_cli_status(config, mode="combined", sort_mode="recency", verbose_level=0):
