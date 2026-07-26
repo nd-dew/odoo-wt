@@ -6,7 +6,7 @@ from textual.binding import Binding
 from textual.widgets import Select, Input, Label, Button, ProgressBar, Footer
 from textual.containers import Vertical, Horizontal, VerticalScroll
 
-from .app_config import config_mgr
+from .app_config import config_mgr, debug_log
 from .system_discovery import fast_scan, expand_path
 
 class WizardApp(App):
@@ -42,6 +42,7 @@ class WizardApp(App):
                 self.on_finish()
 
     def compose(self):
+        debug_log("WizardApp.compose starting...")
         with VerticalScroll(id="wizard-scroll"):
             with Vertical(id="wizard-dialog"):
                 yield Label("[bold]Welcome to Odoo WorkTree Tool[/bold]", classes="title")
@@ -94,6 +95,7 @@ class WizardApp(App):
         self.exit()
 
     def on_mount(self):
+        debug_log("WizardApp.on_mount starting...")
         config_mgr.append_log("Wizard Started")
         self.run_scanner()
 
@@ -134,7 +136,9 @@ class WizardApp(App):
 
     @work(exclusive=True)
     async def run_scanner(self):
+        debug_log("WizardApp.run_scanner background task starting...")
         roots = await asyncio.to_thread(fast_scan)
+        debug_log(f"WizardApp.run_scanner finished. Discovered roots: {roots}")
         try:
             self.query_one("#scanner-progress").remove()
         except Exception:
