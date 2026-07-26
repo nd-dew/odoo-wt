@@ -229,39 +229,40 @@ class OdooWtApp(App):
             yield Label("")
             with TabbedContent(id="tabs"):
                 with TabPane("Creation", id="tab-create"):
-                    yield Label("What branch do you need?", classes="tab-description")
-                    yield Label("", id="preflight-banner", classes="hidden")
+                    with VerticalScroll():
+                        yield Label("What branch do you need?", classes="tab-description")
+                        yield Label("", id="preflight-banner", classes="hidden")
 
-                    with Horizontal(classes="main-row"):
-                        with Vertical(id="version-col"):
-                            yield Select(((v, v) for v in self.v_list), value=self.v_list[0] if self.v_list else None, id="version", allow_blank=False)
-                            yield Input(id="custom_version", classes="custom-field")
+                        with Horizontal(classes="main-row"):
+                            with Vertical(id="version-col"):
+                                yield Select(((v, v) for v in self.v_list), value=self.v_list[0] if self.v_list else None, id="version", allow_blank=False)
+                                yield Input(id="custom_version", classes="custom-field")
 
-                        yield Label("-", classes="dash")
+                            yield Label("-", classes="dash")
 
-                        with Vertical(id="desc-col"):
-                            yield Input(placeholder="fix_bug", id="desc")
+                            with Vertical(id="desc-col"):
+                                yield Input(placeholder="fix_bug", id="desc")
 
-                        yield Label("-", classes="dash")
+                            yield Label("-", classes="dash")
 
-                        with Vertical(id="suffix-col"):
-                            yield Select(((s, s) for s in self.s_list), value=self.s_list[0] if self.s_list else None, id="suffix", allow_blank=False)
-                            yield Input(id="custom_suffix", classes="custom-field")
+                            with Vertical(id="suffix-col"):
+                                yield Select(((s, s) for s in self.s_list), value=self.s_list[0] if self.s_list else None, id="suffix", allow_blank=False)
+                                yield Input(id="custom_suffix", classes="custom-field")
 
-                    with Center():
-                        yield Button("✨ Magic Fix", id="magic-btn", classes="mini-btn hidden")
+                        with Center():
+                            yield Button("✨ Magic Fix", id="magic-btn", classes="mini-btn hidden")
 
-                    yield Label(
-                        "Deployment Strategy (Surgical Safety):\n"
-                        "1. Remote Check: Tries to pull the exact branch from your remote (e.g., odoo-dev).\n"
-                        "2. Local Check: If it's not on your remote, it checks your local .git folder.\n"
-                        "3. Fresh Start: If neither exist, creates a new branch from the official base version.",
-                        classes="strategy-desc",
-                        id="strategy-label"
-                    )
-                    yield Label("", id="dynamic-summary", classes="summary-box")
-                    with Horizontal(classes="btn-row"):
-                        yield Button("Create ⏎", variant="success", id="submit-btn")
+                        yield Label(
+                            "Deployment Strategy (Surgical Safety):\n"
+                            "1. Remote Check: Tries to pull the exact branch from your remote (e.g., odoo-dev).\n"
+                            "2. Local Check: If it's not on your remote, it checks your local .git folder.\n"
+                            "3. Fresh Start: If neither exist, creates a new branch from the official base version.",
+                            classes="strategy-desc",
+                            id="strategy-label"
+                        )
+                        yield Label("", id="dynamic-summary", classes="summary-box")
+                        with Horizontal(classes="btn-row"):
+                            yield Button("Create ⏎", variant="success", id="submit-btn")
                 with TabPane("Manage", id="tab-manage"):
                     yield Label("Discovery: Scans 'Worktree Root Path' (in Settings)\nfor 'odoo/.git' folders. [bold cyan]Hint: Double-click or press Enter on a row to open in terminal.[/bold cyan]", classes="tab-description")
                     with Horizontal(classes="manage-top-row"):
