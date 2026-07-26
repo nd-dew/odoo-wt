@@ -15,7 +15,7 @@ from rich.style import Style
 spell = SpellChecker()
 spell.word_frequency.load_words(['odoo', 'saas', 'erp', 'mrp', 'pos', 'crm', 'wt', 'api', 'ui', 'ux', 'db', 'sql', 'backend', 'frontend', 'js', 'py', 'xml', 'owl', 'mac', 'linux', 'windows', 'repo'])
 
-from .app_config import config_mgr
+from .app_config import config_mgr, debug_log
 from .system_discovery import discover_system_data, get_remote, run_git, decompose_branch, get_remote_url, is_base_branch
 from .custom_screens import DeleteConfirmScreen, DeployScreen, LogDetailScreen
 
@@ -79,6 +79,7 @@ class OdooWtApp(App):
 
     def __init__(self, config, v_list, s_list, worktrees, version_str="dev"):
         super().__init__()
+        debug_log("OdooWtApp.__init__ starting...")
         self.config = config
         self.app_version = version_str
         
@@ -218,6 +219,7 @@ class OdooWtApp(App):
             config_mgr.append_log("Non-crashing UI error", {"error": str(e), "trace": traceback.format_exc()})
 
     def compose(self) -> ComposeResult:
+        debug_log("OdooWtApp.compose starting...")
         with Vertical(id="dialog"):
             with Horizontal(id="top-bar"):
                 with Vertical(id="title-container"):
@@ -360,6 +362,7 @@ class OdooWtApp(App):
         yield Static("^S Create  ^X Delete  ^R Refresh  ^B Runbot  ^T Tab  ^Q Quit", id="global-help-bar", classes="help-bar")
 
     def on_mount(self) -> None:
+        debug_log("OdooWtApp.on_mount starting...")
         config_mgr.append_log("App Started")
         
         # Initialize Manage Table Columns
@@ -393,6 +396,7 @@ class OdooWtApp(App):
         self.run_preflight_diagnostics()
 
     def on_ready(self) -> None:
+        debug_log("OdooWtApp.on_ready starting...")
         self.run_runbot_checker()
 
     def run_preflight_diagnostics(self) -> None:
@@ -1169,6 +1173,7 @@ class OdooWtApp(App):
 
     @work(exclusive=True, thread=True)
     def run_runbot_checker(self) -> None:
+        debug_log("OdooWtApp.run_runbot_checker starting...")
         from .runbot_client import check_branch_status_and_comments
         import traceback
         import datetime
