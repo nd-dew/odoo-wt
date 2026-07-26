@@ -1012,7 +1012,7 @@ def test_cli_switcher_debug_log_output(monkeypatch, tmp_path, capsys):
     assert excinfo.value.code == 0
     captured = capsys.readouterr()
     assert "ms | " in captured.out
-    assert "cli_main.main" in captured.out
+    assert "cli_main._main_impl" in captured.out
     assert "Smart Switcher active" in captured.out
 
 def test_cli_magic_fix_switcher_success(monkeypatch, tmp_path, capsys):
@@ -1131,3 +1131,24 @@ def test_cli_magic_fix_disabled_via_flag(monkeypatch, tmp_path, capsys):
         
     captured = capsys.readouterr()
     assert "Magic Fix applied to input:" not in captured.out
+
+def test_cli_main_keyboard_interrupt(monkeypatch, capsys):
+    from odoo_wt import cli_main
+    
+    # Mock _main_impl to raise KeyboardInterrupt
+    def mock_main_impl():
+        raise KeyboardInterrupt()
+    monkeypatch.setattr(cli_main, "_main_impl", mock_main_impl)
+    
+    # Mock os._exit to raise a unique SystemExit (since os._exit kills the process immediately,
+    # raising SystemExit allows us to assert its exit code safely within pytest)
+    def mock_exit(code):
+        raise SystemExit(code)
+    monkeypatch.setattr("os._exit", mock_exit)
+    
+    with pytest.raises(SystemExit) as excinfo:
+        cli_main.main()
+        
+    assert excinfo.value.code == 1
+    captured = capsys.readouterr()
+    assert "Aborted." in captured.out
