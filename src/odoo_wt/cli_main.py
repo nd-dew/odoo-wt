@@ -184,7 +184,7 @@ async def run_cli_deployment(config, data, verbose=False):
     # In CLI mode, we can default to Terminal (os.execv), unless they explicitly configure vscode or pass a flag.
     return {"action": action, "path": str(engine.target_dir)}
 
-def main():
+def _main_impl():
     try:
         original_cwd = os.getcwd()
     except FileNotFoundError:
@@ -891,6 +891,14 @@ compdef _odoo_wt_zsh_autocomplete odoo-wt""")
             else:
                 print("❌ VS Code ('code' command) not found in PATH.")
                 print(f"Directory is ready at: {target}")
+
+def main():
+    try:
+        _main_impl()
+    except KeyboardInterrupt:
+        print("\nAborted.")
+        import os
+        os._exit(1)
 
 def print_cli_status(config, mode="combined", sort_mode="recency", verbose_level=0):
     from rich.console import Console
