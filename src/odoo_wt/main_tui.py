@@ -1334,8 +1334,7 @@ class OdooWtApp(App):
 
     def action_quit(self) -> None:
         config_mgr.append_log("App Quit")
-        import os
-        os._exit(0)
+        self.exit()
 
     def action_toggle_sort(self) -> None:
         modes = ["recency", "version", "name", "runbot", "reviews"]
@@ -1643,8 +1642,7 @@ class OdooWtApp(App):
     @on(Button.Pressed, "#btn-close-app")
     def on_close_app_btn(self) -> None:
         config_mgr.append_log("Cancel Button Clicked")
-        import os
-        os._exit(0)
+        self.exit()
 
     def action_delete_wt(self) -> None:
         table = self.query_one("#wt-table")
