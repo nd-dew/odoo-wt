@@ -245,7 +245,7 @@ def is_gh_authenticated() -> bool:
         
     import subprocess
     try:
-        subprocess.run(["gh", "auth", "status"], capture_output=True, check=True)
+        subprocess.run(["gh", "auth", "status"], capture_output=True, check=True, timeout=15)
         _gh_auth_status = True
         return True
     except Exception:
@@ -263,7 +263,7 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
     cmd = ["gh", "pr", "view", pr_number, "-R", repo_name, "--json", "comments,reviews"]
     debug_log(f"Fetching GitHub PR comments for repo '{repo_name}' PR #{pr_number} using 'gh pr view'...")
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=15)
         if res.stdout.strip():
             data = json.loads(res.stdout)
             if isinstance(data, dict):
@@ -314,7 +314,7 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
     try:
         cmd_inline = ["gh", "api", f"repos/{repo_name}/pulls/{pr_number}/comments"]
         debug_log(f"Fetching inline files-changed review comments via standard: 'gh api repos/{repo_name}/pulls/{pr_number}/comments'")
-        res_inline = subprocess.run(cmd_inline, capture_output=True, text=True, check=True)
+        res_inline = subprocess.run(cmd_inline, capture_output=True, text=True, check=True, timeout=15)
         if res_inline.stdout.strip():
             raw_inline = json.loads(res_inline.stdout)
             if isinstance(raw_inline, list):

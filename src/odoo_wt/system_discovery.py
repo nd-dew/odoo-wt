@@ -161,12 +161,20 @@ def discover_system_data(wt_root, default_suffix, known_versions=None, known_suf
     debug_log(f"Finished worktree scan. Discovered {len(worktrees)} items, {len(v_list)} versions, {len(s_list)} suffixes")
     return v_list, s_list, worktrees
 
-def run_git(args, cwd=None, capture=False):
+def run_git(args, cwd=None, capture=False, timeout=30):
     cmd = ["git"] + args
-    if capture:
-        res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
-        return res.returncode == 0, res.stdout
-    return subprocess.run(cmd, cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    # Never let git block forever waiting on a credential prompt or a stalled
+    # network call: background worker threads can't be interrupted, and a hung
+    # one blocks the whole app on quit (asyncio.run() waits for it to return).
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    try:
+        if capture:
+            res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, env=env, timeout=timeout)
+            return res.returncode == 0, res.stdout
+        return subprocess.run(cmd, cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env, timeout=timeout).returncode == 0
+    except subprocess.TimeoutExpired:
+        debug_log(f"run_git timed out after {timeout}s: {' '.join(cmd)} (cwd={cwd})")
+        return (False, "") if capture else False
 
 def check_remote(repo, branch, dev_remote):
     success, out = run_git(["ls-remote", "--heads", dev_remote, branch], cwd=repo, capture=True)

@@ -72,7 +72,7 @@ wheels = [
 
 [[package]]
 name = "odoo-wt"
-version = "2.59.20"
+version = "2.59.21"
 source = { editable = "." }
 dependencies = [
     { name = "pyspellchecker" },

@@ -59,7 +59,7 @@ def run_preflight_checks(config: dict) -> list[DiagnosticResult]:
         ))
     else:
         try:
-            status_proc = subprocess.run(["gh", "auth", "status"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="ignore")
+            status_proc = subprocess.run(["gh", "auth", "status"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="ignore", timeout=15)
             is_authed = status_proc.returncode == 0
         except Exception:
             is_authed = False
