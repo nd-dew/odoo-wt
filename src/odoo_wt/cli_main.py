@@ -278,6 +278,8 @@ def _main_impl():
         app = WizardApp()
         config = app.run()
         if not config:
+            from rich.console import Console
+            Console().print("\n[bold red]❌ Setup was cancelled before it finished, so odoo-wt has no configuration yet.[/bold red]\n[dim]Run 'odoo-wt' again to restart the setup wizard.[/dim]\n")
             sys.exit(1)
     else:
         config = config_mgr.load()
