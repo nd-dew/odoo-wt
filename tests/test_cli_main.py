@@ -1005,15 +1005,19 @@ def test_cli_switcher_debug_log_output(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr("os.chdir", lambda path: None)
     import sys
     monkeypatch.setattr("os.execv", lambda shell, args: sys.exit(0))
-    
+
+    # debug_log() now routes through config_mgr.append_log() (into odoo-wt-logs.jsonl)
+    # instead of stderr, so spy on that instead of capturing stderr text.
+    logged_calls = []
+    monkeypatch.setattr(config_mgr, "append_log", lambda action, details=None: logged_calls.append((action, details or {})))
+
     with pytest.raises(SystemExit) as excinfo:
         cli_main.main()
-        
+
     assert excinfo.value.code == 0
-    captured = capsys.readouterr()
-    assert "ms | " in captured.err
-    assert "cli_main._main_impl" in captured.err
-    assert "Smart Switcher active" in captured.err
+    actions = [action for action, _ in logged_calls]
+    assert any("cli_main._main_impl" in action for action in actions)
+    assert any("Smart Switcher active" in details.get("msg", "") for _, details in logged_calls)
 
 def test_cli_magic_fix_switcher_success(monkeypatch, tmp_path, capsys):
     from odoo_wt import cli_main
