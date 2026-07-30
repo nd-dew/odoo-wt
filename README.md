@@ -127,6 +127,7 @@ uv tool install . --force
 ## TODO
 
 - [x] **Config Reset Bug:** Resolved (caused by a hijacked local virtualenv paths during testing).
+- [ ] **Fix Ctrl+C Hang on Exit:** Textual UI closes gracefully on quit, but the underlying Python process hangs due to `concurrent.futures.ThreadPoolExecutor` blocking the main thread while waiting for `urllib.request` network calls in `runbot_client.py` to finish or timeout. Add a global `APP_IS_QUITTING` flag to actively abort and drain these blocking network requests instantly when the user initiates a quit.
 - [ ] **Action Selection:** Add flags to directly trigger 'terminal' or 'vscode' actions from the command line after deployment.
 - [ ] **Smart Deployment Diagnostics & Auto-Cleanup (Low Priority):** Detect common Git errors (like `already exists` or `cannot lock ref`) during worktree creation and print plain-English advice (e.g., suggesting `rm -rf <path>` or `git fetch --prune`), or prompt for automatic stale directory removal.
 - [x] **Pre-flight Checker:** Automatically verify Git, Astral UV, GitHub CLI dependencies, and Odoo base repository clones on startup to fail faster and guide new hires. (Completed in `v2.58.0`)
