@@ -137,7 +137,6 @@ uv tool install . --force
 - [ ] opening the directory in terminal is very slow (like 10s)
 - [ ] check on the runbot's PRs (Resolved: fetched and displayed direct Com/Ent PR links on CLI/TUI; todo: log their last comments and by who).
 - [x] the runbot/PR checks should work in cli, what would be super cool (Completed: integrated parallel concurrent polling into 'odoo-wt status').
-- [ ] **Runbot Timestamp Mismatch:** Fix timestamp discrepancies where `odoo-wt status` reports a runbot batch is e.g. "6m ago" but the actual runbot build page shows "28m ago" (possibly due to timezone or build status age parsing mismatches).
 - [ ] the top space on the app could be tighter, we dont need such big header
 - [ ] **Community-Only Worktrees:** Add support for running in a purely open-source community-only mode (without requiring the Enterprise clone) to empower the Odoo open-source developer ecosystem.
 - [ ] we could inform users that to select text they need to hold Shift

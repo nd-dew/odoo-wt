@@ -155,6 +155,16 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             # If the batch exists but has no completed or spinning builds yet, it is preparing/pending
             if success == 0 and failed == 0 and warning == 0 and running == 0:
                 running = 1
+                
+            # If the batch is running, extract the absolute creation/triggered timestamp
+            if running > 0 and batch_html:
+                create_date_match = re.search(r'<td>Create date</td>\s*<td>([^<]+)</td>', batch_html)
+                if create_date_match:
+                    create_date = create_date_match.group(1).strip()
+                    if "." in create_date:
+                        create_date = create_date.split(".")[0]
+                    ts_str = create_date
+                    debug_log(f"Running batch detected! Overriding timestamp with Create date: {ts_str}")
             
             # Parse linked Pull Requests from the matched block/tile only
             odoo_pr = None
@@ -178,6 +188,7 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             batch_id = match_id.group(1)
             batch_url = f"https://runbot.odoo.com/runbot/batch/{batch_id}"
             debug_log(f"Matched batch on index (fallback no title)! ID: {batch_id}, URL: {batch_url}")
+            ts_str = ""
             
             # Symmetrically search backward to capture the entire bundle_row including its column 1 GitHub dropdown links!
             tile_start = html.find(f'href="/runbot/batch/{batch_id}"')
@@ -211,6 +222,16 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
             # If the batch exists but has no completed or spinning builds yet, it is preparing/pending
             if success == 0 and failed == 0 and warning == 0 and running == 0:
                 running = 1
+                
+            # If the batch is running, extract the absolute creation/triggered timestamp
+            if running > 0 and batch_html:
+                create_date_match = re.search(r'<td>Create date</td>\s*<td>([^<]+)</td>', batch_html)
+                if create_date_match:
+                    create_date = create_date_match.group(1).strip()
+                    if "." in create_date:
+                        create_date = create_date.split(".")[0]
+                    ts_str = create_date
+                    debug_log(f"Running batch detected! Overriding timestamp with Create date: {ts_str}")
             
             # Parse linked Pull Requests from the matched block/tile only
             odoo_pr = None
@@ -226,7 +247,7 @@ def query_branch_status(branch_name: str) -> Optional[Tuple[str, str, int, int, 
                     upgrade_pr = url
             debug_log(f"Extracted PR links (fallback) -> Odoo: {odoo_pr}, Enterprise: {enterprise_pr}, Upgrade: {upgrade_pr}")
             
-            return batch_url, "", success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr
+            return batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr
     except Exception:
         pass
     return None

@@ -517,6 +517,7 @@ def test_real_runbot_batch_2615870_running_and_green(monkeypatch):
     batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr = res
     
     assert "2615870" in batch_url
+    assert ts_str == "2026-06-30 18:05:15"
     assert success == 12
     assert failed == 0
     assert warning == 0
