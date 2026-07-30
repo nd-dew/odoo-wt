@@ -128,22 +128,13 @@ uv tool install . --force
 
 - [x] **Config Reset Bug:** Resolved (caused by a hijacked local virtualenv paths during testing).
 - [ ] **Fix Ctrl+C Hang on Exit:** Textual UI closes gracefully on quit, but the underlying Python process hangs due to `concurrent.futures.ThreadPoolExecutor` blocking the main thread while waiting for `urllib.request` network calls in `runbot_client.py` to finish or timeout. Add a global `APP_IS_QUITTING` flag to actively abort and drain these blocking network requests instantly when the user initiates a quit.
-- [ ] **Action Selection:** Add flags to directly trigger 'terminal' or 'vscode' actions from the command line after deployment.
-- [ ] **Smart Deployment Diagnostics & Auto-Cleanup (Low Priority):** Detect common Git errors (like `already exists` or `cannot lock ref`) during worktree creation and print plain-English advice (e.g., suggesting `rm -rf <path>` or `git fetch --prune`), or prompt for automatic stale directory removal.
 - [x] **Pre-flight Checker:** Automatically verify Git, Astral UV, GitHub CLI dependencies, and Odoo base repository clones on startup to fail faster and guide new hires. (Completed in `v2.58.0`)
-- [ ] **Onboarding Wizard Upgrades:** Dynamically prompt and guide developers through automated Git, GitHub CLI installation, and cloning Odoo/Enterprise base master repositories directly within the welcome wizard.
 - [x] **Improved Logging:** Add more granular log levels for troubleshooting. (Completed: added comprehensive multi-stage diagnostic and event logging).
 - [x] add cli option to --list existing wt (Completed: integrated into 'odoo-wt status' command-line table).
-- [ ] opening the directory in terminal is very slow (like 10s)
 - [ ] check on the runbot's PRs (Resolved: fetched and displayed direct Com/Ent PR links on CLI/TUI; todo: log their last comments and by who).
 - [x] the runbot/PR checks should work in cli, what would be super cool (Completed: integrated parallel concurrent polling into 'odoo-wt status').
 - [ ] the top space on the app could be tighter, we dont need such big header
-- [ ] **Community-Only Worktrees:** Add support for running in a purely open-source community-only mode (without requiring the Enterprise clone) to empower the Odoo open-source developer ecosystem.
-- [ ] we could inform users that to select text they need to hold Shift
-- [ ] would be cool to have like an `odoo-wt links` option that way I could very quickly get links to like runbts PRs, or maybe tickets in the future
 - [ ] that should use magic no? "odoo-wt odoo-dev:saas-19.4-backport-timeline_media_synchronization-pian"
-- [ ] fix: searching for distance shouldn't create new wt just because it didn't find anything REF "auit" below
-- [ ] alternative usage? I gave the tool to my college, and he just had odoo and enterpise folders on his Destop, he had to copy them in ~/Desktop/master for it to work... How could we solve cases like that? should we allow users to have master in a different dir than wt? I'm not sure cause like that would make it less "opinionated" and make it easier to have some dev bugs, and we'd have to test things for two configs... meh. Maybe if we detect such setup we could simply copy the git again... ? could we have it copied in two places on the pc ? or maybe faster... just make a new one ?
 
 
 ### REF "auit"
