@@ -226,6 +226,7 @@ Tab {
 
 .setting-label {
     width: 25;
+    height: 3;
     content-align: right middle;
     margin-right: 2;
     color: $text;
