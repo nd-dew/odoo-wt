@@ -29,3 +29,9 @@ jobs:
 
     - name: Run tests
       run: uv run pytest
+
+    - name: Upload Visual Screenshots
+      uses: actions/upload-artifact@v4
+      with:
+        name: visual-screenshots-python-${{ matrix.python-version }}
+        path: screenshots/

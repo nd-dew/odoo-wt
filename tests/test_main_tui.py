@@ -360,3 +360,18 @@ async def test_wizard_live_path_feedback(monkeypatch, tmp_path):
         await pilot.pause()
         assert not status_label.has_class("hidden")
         assert "Found Odoo base clones" in str(status_label.render())
+
+@pytest.mark.asyncio
+async def test_generate_settings_screenshot():
+    config = {
+        "wt_root": "/tmp/non_existent_folder_abc",
+        "env_root": "/tmp/non_existent_envs_abc",
+        "suffix": "pian",
+        "default_tab": "tab-settings"
+    }
+    app = OdooWtApp(config, ["master"], ["pian"], [])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screenshot_dir = Path("screenshots")
+        screenshot_dir.mkdir(exist_ok=True)
+        app.save_screenshot(str(screenshot_dir / "settings_tab.svg"))
