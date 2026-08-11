@@ -375,3 +375,70 @@ async def test_generate_settings_screenshot():
         screenshot_dir = Path("screenshots")
         screenshot_dir.mkdir(exist_ok=True)
         app.save_screenshot(str(screenshot_dir / "settings_tab.svg"))
+
+
+@pytest.mark.asyncio
+async def test_manual_save_and_discard_buttons(monkeypatch):
+    config = {
+        "wt_root": "/tmp",
+        "env_root": "/tmp/envs",
+        "suffix": "pian",
+        "default_tab": "tab-settings"
+    }
+    app = OdooWtApp(config, ["master"], ["pian"], [])
+    
+    saved_called = False
+    def mock_save(self_config):
+        nonlocal saved_called
+        saved_called = True
+    monkeypatch.setattr(config_mgr, "save", mock_save)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        
+        # Find save and discard buttons, verify they start as disabled
+        save_btn = pilot.app.query_one("#save-settings-btn")
+        discard_btn = pilot.app.query_one("#reset-settings-btn")
+        assert save_btn.disabled is True
+        assert discard_btn.disabled is True
+
+        # Modify a setting (like changing default suffix input value)
+        suffix_input = pilot.app.query_one("#set-suffix")
+        suffix_input.value = "test"
+        await pilot.pause()
+
+        # Verify buttons are now enabled
+        assert save_btn.disabled is False
+        assert discard_btn.disabled is False
+
+        # Click save and verify save is called and buttons are disabled again
+        await pilot.click("#save-settings-btn")
+        await pilot.pause()
+        assert saved_called is True
+        assert save_btn.disabled is True
+        assert discard_btn.disabled is True
+
+        # Now test Discard/Reset button flow
+        suffix_input.value = "test-discard"
+        await pilot.pause()
+
+        # Buttons should become active again
+        assert save_btn.disabled is False
+        assert discard_btn.disabled is False
+
+        # Click Discard and wait for the async events to complete
+        await pilot.click("#reset-settings-btn")
+        await pilot.pause()
+
+        # Value should be restored to original "pian", and buttons must stay disabled!
+        assert suffix_input.value == "pian"
+        assert save_btn.disabled is True
+        assert discard_btn.disabled is True
+
+        # Now verify that a genuine edit made immediately after is NOT ignored (no 200ms gap!)
+        suffix_input.value = "changed-again"
+        await pilot.pause()
+
+        assert save_btn.disabled is False
+        assert discard_btn.disabled is False
+
