@@ -40,11 +40,19 @@ class DeployEngine:
     def __init__(self, config: dict, data: dict):
         self.config = config
         self.data = data
-        self.wt_root = Path(config["wt_root"]).expanduser().absolute()
+        
+        wt_val = config.get("wt_root", "").strip()
+        env_val = config.get("env_root", "").strip()
+        if not wt_val:
+            raise ValueError("Configuration Error: Worktree Root ('wt_root') is empty!")
+        if not env_val:
+            raise ValueError("Configuration Error: UV Envs Path ('env_root') is empty!")
+
+        self.wt_root = Path(wt_val).expanduser().absolute()
         self.dev_remote = config.get("remote_name", "odoo-dev")
         self.comm_dir = config.get("community_dir", "odoo")
         self.ent_dir = config.get("enterprise_dir", "enterprise")
-        self.env_root = Path(config["env_root"]).expanduser().absolute()
+        self.env_root = Path(env_val).expanduser().absolute()
         self.has_errors = False
         
         clean_desc = data["desc"].strip().replace(" ", "_")

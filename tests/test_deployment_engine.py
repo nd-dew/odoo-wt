@@ -234,3 +234,24 @@ async def test_deployment_engine_dev_remote_upstream_tracking(monkeypatch):
     assert ["git", "branch", "--unset-upstream", "19.0-fix-bug-test"] not in commands_run
     # Ensure that it correctly called --set-upstream-to targeting the dev_remote and branch
     assert ["git", "branch", "--set-upstream-to=odoo-dev/19.0-fix-bug-test", "19.0-fix-bug-test"] in commands_run
+
+
+def test_deployment_engine_empty_config_raise_error():
+    from odoo_wt.deployment_engine import DeployEngine
+
+    # Test empty wt_root raises ValueError
+    config_empty_wt = {
+        "wt_root": "",
+        "env_root": "/tmp/envs",
+    }
+    with pytest.raises(ValueError, match="Worktree Root.*is empty"):
+        DeployEngine(config_empty_wt, {"version": "19.0", "desc": "fix-bug", "suffix": "test"})
+
+    # Test empty env_root raises ValueError
+    config_empty_env = {
+        "wt_root": "/tmp",
+        "env_root": "",
+    }
+    with pytest.raises(ValueError, match="UV Envs Path.*is empty"):
+        DeployEngine(config_empty_env, {"version": "19.0", "desc": "fix-bug", "suffix": "test"})
+
