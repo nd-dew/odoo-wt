@@ -105,6 +105,7 @@ class OdooWtApp(App):
         self.deleting_paths = set()
         self.branch_status = ""
         self.check_results_str = ""
+        self.save_timer = None
         self.resolved_comm_remote = ""
         self.resolved_comm_url = ""
         self.resolved_ent_remote = ""
@@ -248,151 +249,134 @@ class OdooWtApp(App):
 
     def compose(self) -> ComposeResult:
         debug_log("OdooWtApp.compose starting...")
-        with Vertical(id="dialog"):
-            with Horizontal(id="top-bar"):
-                with Vertical(id="title-container"):
-                    yield Label(f"Odoo WorkTree Tool v{self.app_version}", classes="title")
-                    yield Label("Opinionated tool for Odoo development. Creates/removes WorkTrees\nreusing UV environments per Odoo version.", id="app-desc", classes="description")
-                yield Button("X", id="btn-close-app", classes="close-btn")
-            yield Label("")
-            with TabbedContent(id="tabs"):
-                with TabPane("Creation", id="tab-create"):
-                    with VerticalScroll():
-                        yield Label("What branch do you need?", classes="tab-description")
-                        yield Label("", id="preflight-banner", classes="hidden")
-
-                        with Horizontal(classes="main-row"):
-                            with Vertical(id="version-col"):
-                                yield Select(((v, v) for v in self.v_list), value=self.v_list[0] if self.v_list else None, id="version", allow_blank=False)
-                                yield Input(id="custom_version", classes="custom-field")
-
-                            yield Label("-", classes="dash")
-
-                            with Vertical(id="desc-col"):
-                                yield Input(placeholder="fix_bug", id="desc")
-
-                            yield Label("-", classes="dash")
-
-                            with Vertical(id="suffix-col"):
-                                yield Select(((s, s) for s in self.s_list), value=self.s_list[0] if self.s_list else None, id="suffix", allow_blank=False)
-                                yield Input(id="custom_suffix", classes="custom-field")
-
-                        with Center():
-                            yield Button("✨ Magic Fix", id="magic-btn", classes="mini-btn hidden")
-
-                        yield Label(
-                            "Deployment Strategy (Surgical Safety):\n"
-                            "1. Remote Check: Tries to pull the exact branch from your remote (e.g., odoo-dev).\n"
-                            "2. Local Check: If it's not on your remote, it checks your local .git folder.\n"
-                            "3. Fresh Start: If neither exist, creates a new branch from the official base version.",
-                            classes="strategy-desc",
-                            id="strategy-label"
-                        )
-                        yield Label("", id="dynamic-summary", classes="summary-box")
-                        with Horizontal(classes="btn-row"):
-                            yield Button("Create ⏎", variant="success", id="submit-btn")
-                with TabPane("Manage", id="tab-manage"):
-                    yield Label("Discovery: Scans 'Worktree Root Path' (in Settings)\nfor 'odoo/.git' folders. [bold cyan]Hint: Double-click or press Enter on a row to open in terminal.[/bold cyan]", classes="tab-description")
-                    with Horizontal(classes="manage-top-row"):
-                        yield Input(placeholder="Fuzzy search...", id="wt-search", classes="search-input")
-                        yield Button("Open", variant="success", id="open-btn", classes="mini-btn")
-                        yield Button("Refresh", id="refresh-btn", classes="mini-btn")
-                        yield Button("Delete ^X", variant="error", id="delete-btn", classes="mini-btn")
-                    yield RunbotDataTable(id="wt-table", cursor_type="row")
-                with TabPane("Settings", id="tab-settings"):
-                    with Horizontal(classes="settings-top-row"):
-                        yield Input(placeholder="Fuzzy search settings... (e.g. 'log', 'dark', 'path')", id="settings-search", classes="search-input")
-                        yield Button("Save", variant="success", id="save-settings-btn", classes="mini-btn", disabled=True)
-                        yield Button("Discard", id="reset-settings-btn", classes="mini-btn", disabled=True)
-                    with VerticalScroll(classes="settings-container"):
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Worktree Root:", classes="setting-label")
-                            yield Input(value=self.config.get("wt_root", ""), id="set-wt", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("UV Envs Path:", classes="setting-label")
-                            yield Input(value=self.config.get("env_root", ""), id="set-env", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Default Suffix:", classes="setting-label")
-                            yield Input(value=self.config.get("suffix", ""), id="set-suffix", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Dev Remote (Fork):", classes="setting-label")
-                            yield Input(value=self.config.get("remote_name", "odoo-dev"), id="set-remote", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Python Version:", classes="setting-label")
-                            yield Input(value=self.config.get("python_version", "3.12"), id="set-py-v", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Community Dir:", classes="setting-label")
-                            yield Input(value=self.config.get("community_dir", "odoo"), id="set-comm", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Enterprise Dir:", classes="setting-label")
-                            yield Input(value=self.config.get("enterprise_dir", "enterprise"), id="set-ent", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Comm Main Remote:", classes="setting-label")
-                            yield Input(value=self.config.get("community_remote", ""), placeholder="Blank = auto-detect", id="set-comm-remote", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Ent Main Remote:", classes="setting-label")
-                            yield Input(value=self.config.get("enterprise_remote", ""), placeholder="Blank = auto-detect", id="set-ent-remote", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Start in Manage Tab:", classes="setting-label")
-                            yield Switch(value=(self.config.get("default_tab", "tab-create") == "tab-manage"), id="set-default-tab", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Removed Versions:", classes="setting-label")
-                            yield Input(value=",".join(self.config.get("ignored_versions", [])), id="set-ig-v", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Removed Suffixes:", classes="setting-label")
-                            yield Input(value=",".join(self.config.get("ignored_suffixes", [])), id="set-ig-s", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Typos Whitelist:", classes="setting-label")
-                            yield Input(value=",".join(self.config.get("ignored_typos", [])), id="set-whitelist", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Pinned Versions:", classes="setting-label")
-                            yield Input(value=",".join(self.config.get("known_versions", [])), id="set-known-versions", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Pinned Suffixes:", classes="setting-label")
-                            yield Input(value=",".join(self.config.get("known_suffixes", [])), id="set-known-suffixes", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Technical Jargon:", classes="setting-label")
-                            yield Input(value=",".join(self.config.get("technical_terms", [])), id="set-tech-terms", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Next Debug Port:", classes="setting-label")
-                            yield Input(value=str(self.config.get("next_debug_port", 8069)), id="set-next-port", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("CLI Status Max Width:", classes="setting-label")
-                            yield Input(value=str(self.config.get("status_max_width", 150)), id="set-status-max-width", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Enable Spell Check:", classes="setting-label")
-                            yield Switch(value=self.config.get("enable_spell_check", True), id="set-spell-check", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Show Prefix (Version):", classes="setting-label")
-                            yield Switch(value=self.config.get("show_prefix", True), id="set-show-prefix", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Show Suffix:", classes="setting-label")
-                            yield Switch(value=self.config.get("show_suffix", True), id="set-show-suffix", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Show Description:", classes="setting-label")
-                            yield Switch(value=self.config.get("show_desc", True), id="set-show-desc", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Auto Magic Fix:", classes="setting-label")
-                            yield Switch(value=self.config.get("auto_magic_fix", True), id="set-auto-magic", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Dark Mode:", classes="setting-label")
-                            yield Switch(value=self.config.get("dark_mode", True), id="set-dark-mode", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Config Path:", classes="setting-label")
-                            yield Input(value=self.config.get("config_path", ""), id="set-config-path", classes="setting-input")
-                        with Horizontal(classes="setting-item"):
-                            yield Label("Log Path:", classes="setting-label")
-                            yield Input(value=self.config.get("log_path", ""), id="set-log-path", classes="setting-input")
-                with TabPane("Logs", id="tab-logs"):
-                    yield Label("System Logs (Newest first)", classes="tab-description")
-                    yield DataTable(id="logs-table", cursor_type="row")
-                    with Horizontal(classes="btn-row"):
-                        yield Button("Refresh", id="refresh-logs-btn")
-                        yield Button("Clear Logs", variant="error", id="clear-logs-btn")
         
-        # Replace Footer with our custom global help bar
+        with Vertical(id="dialog"):
+            yield from self._compose_header()
+            yield Label("")
+            
+            with TabbedContent(id="tabs"):
+                yield from self._compose_tab_creation()
+                yield from self._compose_tab_manage()
+                yield from self._compose_tab_settings()
+                yield from self._compose_tab_logs()
+                
         yield Static("^S Create  ^X Delete  ^R Refresh  ^B Runbot  ^T Tab  ^Q Quit", id="global-help-bar", classes="help-bar")
 
+    def _compose_header(self) -> ComposeResult:
+        """Renders the top bar and title."""
+        with Horizontal(id="top-bar"):
+            with Vertical(id="title-container"):
+                yield Label(f"Odoo WorkTree Tool v{self.app_version}", classes="title")
+                yield Label(
+                    "Opinionated tool for Odoo development. Creates/removes WorkTrees\nreusing UV environments per Odoo version.", 
+                    id="app-desc", classes="description"
+                )
+            yield Button("X", id="btn-close-app", classes="close-btn")
+
+    def _compose_tab_creation(self) -> ComposeResult:
+        """Renders the Creation tab."""
+        with TabPane("Creation", id="tab-create"):
+            with VerticalScroll():
+                yield Label("What branch do you need?", classes="tab-description")
+                yield Label("", id="preflight-banner", classes="hidden")
+
+                with Horizontal(classes="main-row"):
+                    with Vertical(id="version-col"):
+                        yield Select(((v, v) for v in self.v_list), value=self.v_list[0] if self.v_list else None, id="version", allow_blank=False)
+                        yield Input(id="custom_version", classes="custom-field")
+
+                    yield Label("-", classes="dash")
+
+                    with Vertical(id="desc-col"):
+                        yield Input(placeholder="fix_bug", id="desc")
+
+                    yield Label("-", classes="dash")
+
+                    with Vertical(id="suffix-col"):
+                        yield Select(((s, s) for s in self.s_list), value=self.s_list[0] if self.s_list else None, id="suffix", allow_blank=False)
+                        yield Input(id="custom_suffix", classes="custom-field")
+
+                with Center():
+                    yield Button("✨ Magic Fix", id="magic-btn", classes="mini-btn hidden")
+
+                yield Label(
+                    "Deployment Strategy (Surgical Safety):\n"
+                    "1. Remote Check: Tries to pull the exact branch from your remote (e.g., odoo-dev).\n"
+                    "2. Local Check: If it's not on your remote, it checks your local .git folder.\n"
+                    "3. Fresh Start: If neither exist, creates a new branch from the official base version.",
+                    classes="strategy-desc",
+                    id="strategy-label"
+                )
+                yield Label("", id="dynamic-summary", classes="summary-box")
+                
+                with Horizontal(classes="btn-row"):
+                    yield Button("Create ⏎", variant="success", id="submit-btn")
+
+    def _compose_tab_manage(self) -> ComposeResult:
+        """Renders the Manage tab."""
+        with TabPane("Manage", id="tab-manage"):
+            yield Label(
+                "Discovery: Scans 'Worktree Root Path' (in Settings)\nfor 'odoo/.git' folders. [bold cyan]Hint: Double-click or press Enter on a row to open in terminal.[/bold cyan]", 
+                classes="tab-description"
+            )
+            with Horizontal(classes="manage-top-row"):
+                yield Input(placeholder="Fuzzy search...", id="wt-search", classes="search-input")
+                yield Button("Open", variant="success", id="open-btn", classes="mini-btn")
+                yield Button("Refresh", id="refresh-btn", classes="mini-btn")
+                yield Button("Delete ^X", variant="error", id="delete-btn", classes="mini-btn")
+            
+            yield RunbotDataTable(id="wt-table", cursor_type="row")
+
+    def _compose_tab_settings(self) -> ComposeResult:
+        """Renders the Settings tab using a data-driven approach."""
+        with TabPane("Settings", id="tab-settings"):
+            yield Input(placeholder="Fuzzy search settings... (e.g. 'log', 'dark', 'path')", id="settings-search", classes="search-input")
+            
+            with VerticalScroll(classes="settings-container"):
+                # Configuration map: (Label text, Widget Class, widget_id, kwargs_dict)
+                settings_fields = [
+                    ("Worktree Root:", Input, "set-wt", {"value": self.config.get("wt_root", "")}),
+                    ("UV Envs Path:", Input, "set-env", {"value": self.config.get("env_root", "")}),
+                    ("Default Suffix:", Input, "set-suffix", {"value": self.config.get("suffix", "")}),
+                    ("Dev Remote (Fork):", Input, "set-remote", {"value": self.config.get("remote_name", "odoo-dev")}),
+                    ("Python Version:", Input, "set-py-v", {"value": self.config.get("python_version", "3.12")}),
+                    ("Community Dir:", Input, "set-comm", {"value": self.config.get("community_dir", "odoo")}),
+                    ("Enterprise Dir:", Input, "set-ent", {"value": self.config.get("enterprise_dir", "enterprise")}),
+                    ("Comm Main Remote:", Input, "set-comm-remote", {"value": self.config.get("community_remote", ""), "placeholder": "Blank = auto-detect"}),
+                    ("Ent Main Remote:", Input, "set-ent-remote", {"value": self.config.get("enterprise_remote", ""), "placeholder": "Blank = auto-detect"}),
+                    ("Start in Manage Tab:", Switch, "set-default-tab", {"value": self.config.get("default_tab", "tab-create") == "tab-manage"}),
+                    ("Removed Versions:", Input, "set-ig-v", {"value": ",".join(self.config.get("ignored_versions", []))}),
+                    ("Removed Suffixes:", Input, "set-ig-s", {"value": ",".join(self.config.get("ignored_suffixes", []))}),
+                    ("Typos Whitelist:", Input, "set-whitelist", {"value": ",".join(self.config.get("ignored_typos", []))}),
+                    ("Pinned Versions:", Input, "set-known-versions", {"value": ",".join(self.config.get("known_versions", []))}),
+                    ("Pinned Suffixes:", Input, "set-known-suffixes", {"value": ",".join(self.config.get("known_suffixes", []))}),
+                    ("Technical Jargon:", Input, "set-tech-terms", {"value": ",".join(self.config.get("technical_terms", []))}),
+                    ("Next Debug Port:", Input, "set-next-port", {"value": str(self.config.get("next_debug_port", 8069))}),
+                    ("CLI Status Max Width:", Input, "set-status-max-width", {"value": str(self.config.get("status_max_width", 150))}),
+                    ("Enable Spell Check:", Switch, "set-spell-check", {"value": self.config.get("enable_spell_check", True)}),
+                    ("Show Prefix (Version):", Switch, "set-show-prefix", {"value": self.config.get("show_prefix", True)}),
+                    ("Show Suffix:", Switch, "set-show-suffix", {"value": self.config.get("show_suffix", True)}),
+                    ("Show Description:", Switch, "set-show-desc", {"value": self.config.get("show_desc", True)}),
+                    ("Auto Magic Fix:", Switch, "set-auto-magic", {"value": self.config.get("auto_magic_fix", True)}),
+                    ("Dark Mode:", Switch, "set-dark-mode", {"value": self.config.get("dark_mode", True)}),
+                    ("Config Path:", Input, "set-config-path", {"value": self.config.get("config_path", "")}),
+                    ("Log Path:", Input, "set-log-path", {"value": self.config.get("log_path", "")}),
+                ]
+
+                for label, WidgetClass, widget_id, kwargs in settings_fields:
+                    with Horizontal(classes="setting-item"):
+                        yield Label(label, classes="setting-label")
+                        yield WidgetClass(id=widget_id, classes="setting-input", **kwargs)
+
+    def _compose_tab_logs(self) -> ComposeResult:
+        """Renders the Logs tab."""
+        with TabPane("Logs", id="tab-logs"):
+            yield Label("System Logs (Newest first)", classes="tab-description")
+            yield DataTable(id="logs-table", cursor_type="row")
+            with Horizontal(classes="btn-row"):
+                yield Button("Refresh", id="refresh-logs-btn")
+                yield Button("Clear Logs", variant="error", id="clear-logs-btn")
+                
     def on_mount(self) -> None:
         debug_log("OdooWtApp.on_mount starting...")
         config_mgr.append_log("App Started")
@@ -1162,11 +1146,6 @@ class OdooWtApp(App):
         self.theme = "textual-dark" if is_dark else "textual-light"
         
         self.apply_visibility_settings()
-        try:
-            self.query_one("#save-settings-btn", Button).disabled = True
-            self.query_one("#reset-settings-btn", Button).disabled = True
-        except Exception:
-            pass
         self.notify("Settings reset to last saved state.")
 
     def action_refresh(self) -> None:
@@ -1548,102 +1527,24 @@ class OdooWtApp(App):
             if hasattr(event, "switch") and event.switch.id == "set-dark-mode":
                 self.theme = "textual-dark" if event.value else "textual-light"
 
-            is_dirty = self.is_settings_dirty()
-            try:
-                self.query_one("#save-settings-btn", Button).disabled = not is_dirty
-                self.query_one("#reset-settings-btn", Button).disabled = not is_dirty
-            except Exception:
-                pass
+            if self.save_timer:
+                self.save_timer.stop()
+            self.save_timer = self.set_timer(0.5, self.save_settings_auto)
 
-    def is_settings_dirty(self) -> bool:
-        try:
-            def clean_list(val: str):
-                return [v.strip() for v in val.split(",") if v.strip()]
-
-            # Strings
-            if self.query_one("#set-wt", Input).value.strip() != self.config.get("wt_root", ""): return True
-            if self.query_one("#set-env", Input).value.strip() != self.config.get("env_root", ""): return True
-            if self.query_one("#set-suffix", Input).value.strip() != self.config.get("suffix", ""): return True
-            if self.query_one("#set-remote", Input).value.strip() != self.config.get("remote_name", "odoo-dev"): return True
-            if self.query_one("#set-py-v", Input).value.strip() != self.config.get("python_version", "3.12"): return True
-            if self.query_one("#set-comm", Input).value.strip() != self.config.get("community_dir", "odoo"): return True
-            if self.query_one("#set-ent", Input).value.strip() != self.config.get("enterprise_dir", "enterprise"): return True
-            if self.query_one("#set-comm-remote", Input).value.strip() != self.config.get("community_remote", ""): return True
-            if self.query_one("#set-ent-remote", Input).value.strip() != self.config.get("enterprise_remote", ""): return True
-            if self.query_one("#set-config-path", Input).value.strip() != self.config.get("config_path", ""): return True
-            if self.query_one("#set-log-path", Input).value.strip() != self.config.get("log_path", ""): return True
-
-            # Switches / Checkboxes
-            default_tab_val = "tab-manage" if self.query_one("#set-default-tab", Switch).value else "tab-create"
-            config_tab_val = "tab-manage" if self.config.get("default_tab", "tab-create") == "tab-manage" else "tab-create"
-            if default_tab_val != config_tab_val: return True
-
-            if self.query_one("#set-show-prefix", Switch).value != self.config.get("show_prefix", True): return True
-            if self.query_one("#set-show-suffix", Switch).value != self.config.get("show_suffix", True): return True
-            if self.query_one("#set-show-desc", Switch).value != self.config.get("show_desc", True): return True
-            if self.query_one("#set-auto-magic", Switch).value != self.config.get("auto_magic_fix", True): return True
-            if self.query_one("#set-dark-mode", Switch).value != self.config.get("dark_mode", True): return True
-            if self.query_one("#set-spell-check", Switch).value != self.config.get("enable_spell_check", True): return True
-
-            # Lists
-            if clean_list(self.query_one("#set-ig-v", Input).value) != self.config.get("ignored_versions", []): return True
-            if clean_list(self.query_one("#set-ig-s", Input).value) != self.config.get("ignored_suffixes", []): return True
-            if clean_list(self.query_one("#set-whitelist", Input).value) != self.config.get("ignored_typos", []): return True
-            if clean_list(self.query_one("#set-known-versions", Input).value) != self.config.get("known_versions", []): return True
-            if clean_list(self.query_one("#set-known-suffixes", Input).value) != self.config.get("known_suffixes", []): return True
-            if clean_list(self.query_one("#set-tech-terms", Input).value) != self.config.get("technical_terms", []): return True
-
-            # Numeric fields
-            try:
-                if int(self.query_one("#set-next-port", Input).value.strip()) != self.config.get("next_debug_port", 8069): return True
-            except ValueError:
-                pass
-
-            try:
-                if int(self.query_one("#set-status-max-width", Input).value.strip()) != self.config.get("status_max_width", 150): return True
-            except ValueError:
-                pass
-
-        except Exception:
-            return False
-
-        return False
-
-    @on(Button.Pressed, "#save-settings-btn")
-    def on_save_settings_btn_pressed(self) -> None:
-        self.save_settings()
-
-    @on(Button.Pressed, "#reset-settings-btn")
-    def on_reset_settings_btn_pressed(self) -> None:
-        self.action_reset_settings()
-
-    def save_settings(self) -> None:
-        wt_val = self.query_one("#set-wt", Input).value.strip()
-        env_val = self.query_one("#set-env", Input).value.strip()
-        py_val = self.query_one("#set-py-v", Input).value.strip()
-        comm_val = self.query_one("#set-comm", Input).value.strip()
-        ent_val = self.query_one("#set-ent", Input).value.strip()
-
-        # Validation
-        if not wt_val or not env_val:
-            self.notify("Error: Worktree Root and UV Envs Path cannot be blank!", severity="error")
-            return
-
-        self.config["wt_root"] = wt_val
-        self.config["env_root"] = env_val
-        self.config["suffix"] = self.query_one("#set-suffix", Input).value.strip()
-        self.config["remote_name"] = self.query_one("#set-remote", Input).value.strip()
-        self.config["python_version"] = py_val if py_val else "3.12"
-        self.config["community_dir"] = comm_val if comm_val else "odoo"
-        self.config["enterprise_dir"] = ent_val if ent_val else "enterprise"
-        self.config["community_remote"] = self.query_one("#set-comm-remote", Input).value.strip()
-        self.config["enterprise_remote"] = self.query_one("#set-ent-remote", Input).value.strip()
-
+    def save_settings_auto(self) -> None:
+        self.config["wt_root"] = self.query_one("#set-wt", Input).value
+        self.config["env_root"] = self.query_one("#set-env", Input).value
+        self.config["suffix"] = self.query_one("#set-suffix", Input).value
+        self.config["remote_name"] = self.query_one("#set-remote", Input).value
+        self.config["python_version"] = self.query_one("#set-py-v", Input).value
+        self.config["community_dir"] = self.query_one("#set-comm", Input).value
+        self.config["enterprise_dir"] = self.query_one("#set-ent", Input).value
+        
         is_manage_tab = self.query_one("#set-default-tab", Switch).value
         self.config["default_tab"] = "tab-manage" if is_manage_tab else "tab-create"
-
-        self.config["config_path"] = self.query_one("#set-config-path", Input).value.strip()
-        self.config["log_path"] = self.query_one("#set-log-path", Input).value.strip()
+        
+        self.config["config_path"] = self.query_one("#set-config-path", Input).value
+        self.config["log_path"] = self.query_one("#set-log-path", Input).value
         self.config["show_prefix"] = self.query_one("#set-show-prefix", Switch).value
         self.config["show_suffix"] = self.query_one("#set-show-suffix", Switch).value
         self.config["show_desc"] = self.query_one("#set-show-desc", Switch).value
@@ -1657,37 +1558,32 @@ class OdooWtApp(App):
         self.config["ignored_suffixes"] = ig_s
         self.config["ignored_typos"] = ig_t
 
+        # New fields saving
         self.config["known_versions"] = [v.strip() for v in self.query_one("#set-known-versions", Input).value.split(",") if v.strip()]
         self.config["known_suffixes"] = [s.strip() for s in self.query_one("#set-known-suffixes", Input).value.split(",") if s.strip()]
         self.config["technical_terms"] = [t.strip() for t in self.query_one("#set-tech-terms", Input).value.split(",") if t.strip()]
-
+        
         try:
             self.config["next_debug_port"] = int(self.query_one("#set-next-port", Input).value.strip())
         except ValueError:
             pass
-
+            
         try:
             self.config["status_max_width"] = int(self.query_one("#set-status-max-width", Input).value.strip())
         except ValueError:
             pass
-
+            
         self.config["enable_spell_check"] = self.query_one("#set-spell-check", Switch).value
 
         config_mgr.save(self.config)
-        config_mgr.append_log("Settings Saved Manually", self.config)
-        self.notify("Settings saved successfully!")
-
-        try:
-            self.query_one("#save-settings-btn", Button).disabled = True
-            self.query_one("#reset-settings-btn", Button).disabled = True
-        except Exception:
-            pass
-
+        config_mgr.append_log("Settings Auto-Saved", self.config)
+        self.notify("Settings saved automatically", timeout=2)
+        
         self.apply_visibility_settings()
         self.update_summary()
-
+        
         v_list, s_list, _ = discover_system_data(
-            self.config["wt_root"],
+            self.config["wt_root"], 
             self.config["suffix"],
             known_versions=self.config.get("known_versions", []),
             known_suffixes=self.config.get("known_suffixes", [])
@@ -1696,12 +1592,12 @@ class OdooWtApp(App):
         if not self.v_list: self.v_list = ["custom..."]
         self.s_list = [s for s in s_list if s not in ig_s or s in ("none", "custom...")]
         if not self.s_list: self.s_list = ["custom..."]
-
+        
         v_sel = self.query_one("#version", Select)
         curr_v = v_sel.value
         v_sel.set_options((v, v) for v in self.v_list)
         v_sel.value = curr_v if curr_v in self.v_list else (self.v_list[0] if self.v_list else None)
-
+        
         s_sel = self.query_one("#suffix", Select)
         curr_s = s_sel.value
         s_sel.set_options((s, s) for s in self.s_list)

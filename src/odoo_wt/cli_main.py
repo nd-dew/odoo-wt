@@ -1,9 +1,9 @@
-import sys
 import os
 import shutil
 import subprocess
+import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from importlib.metadata import version, PackageNotFoundError
 
 try:
     VERSION = version("odoo-wt")
@@ -11,73 +11,14 @@ except PackageNotFoundError:
     VERSION = "dev"
 
 from .app_config import config_mgr, debug_log
-from .system_discovery import discover_system_data, decompose_branch, is_base_branch
+from .constants.help_text import SUBCOMMAND_HELP
+from .system_discovery import decompose_branch, discover_system_data, is_base_branch
+
 
 def show_help():
     from rich.console import Console
     console = Console()
-    
-    console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) [cyan]v{VERSION}[/cyan]\n")
-    console.print("A premium terminal tool to manage, deploy, and monitor Odoo developer worktrees.\n")
-    
-    console.print("[bold yellow]Usage:[/bold yellow]")
-    console.print("  [bold green]odoo-wt[/bold green] [cyan]\\[subcommand][/cyan] [cyan]\\[options][/cyan]\n")
-    console.print("  (If no subcommand is passed, launches the full-screen interactive TUI)\n")
-    
-    console.print("[bold yellow]Subcommands:[/bold yellow]")
-    console.print("  [bold green]status[/bold green] [cyan]\\[all/-a/branch][/cyan]    Show Runbot build status & GitHub PR reviews [dim](Combined)[/dim]")
-    console.print("  [bold green]runbot[/bold green] [cyan]\\[all/-a/branch][/cyan]    Show Runbot build details & failing tests [dim](CI-focused)[/dim]")
-    console.print("  [bold green]reviews[/bold green] [cyan]\\[all/-a/branch][/cyan]   Show linked Pull Requests & latest peer comments [dim](PR-focused)[/dim]")
-    console.print("  [bold green]list[/bold green]                         Simply list all local worktree branch names")
-    console.print("  [bold green]create[/bold green] [cyan]<branch>[/cyan]          Open the TUI pre-filled in the 'Creation' tab")
-    console.print("  [bold green]open[/bold green] [cyan]<branch>[/cyan]            Directly change your shell directory into a worktree")
-    console.print("  [bold green]code[/bold green] [cyan]<branch>[/cyan]            Directly open VS Code in a worktree")
-    console.print("  [bold green]delete/rm[/bold green] [cyan]<branch>[/cyan]       Directly delete a worktree with a safety prompt")
-    console.print("  [bold green]<branch>[/bold green]                  [bold cyan]The Smart Switcher:[/bold cyan] opens shell if existing, TUI if new")
-    
-    console.print("\n[bold yellow]Options & Flags:[/bold yellow]")
-    console.print("  [bold cyan]-o, --open[/bold cyan] [cyan]<branch>[/cyan]          Alias for 'open <branch>'")
-    console.print("  [bold cyan]-c, --code[/bold cyan] [cyan]<branch>[/cyan]          Alias for 'code <branch>'")
-    console.print("  [bold cyan]-d, --delete[/bold cyan] [cyan]<branch>[/cyan]        Alias for 'delete <branch>'")
-    console.print("  [bold cyan]-s, --sort[/bold cyan] [cyan]<mode>[/cyan]           Sort status tables by: recency, version, name, runbot, reviews")
-    console.print("  [bold cyan]-v, --verbose[/bold cyan]                 Show all failing tests (grouped by module) / verbose deployment logs")
-    console.print("  [bold cyan]-vv, --verbose --verbose[/bold cyan]     Verboser Verbose: Shows actual failed test traceback/error messages")
-    console.print("  [bold cyan]--no-magic[/bold cyan]                    Disable automatic 'Magic Fix' branch decomposition")
-    console.print("  [bold cyan]--config-path[/bold cyan]                 Print the active odoo-wt.json configuration path")
-    console.print("  [bold cyan]--log-path[/bold cyan]                    Print the active odoo-wt-logs.jsonl path")
-    console.print("  [bold cyan]-h, --help[/bold cyan]                    Show this help message")
-    console.print("  [bold cyan]-V, --version[/bold cyan]                 Show the current version")
-    
-    console.print("\n[bold yellow]Detailed Explanations:[/bold yellow]")
-    console.print("\n  [bold cyan]1. The Smart Switcher: odoo-wt <branch>[/bold cyan]")
-    console.print("     If you run odoo-wt with just a branch name (no subcommand):")
-    console.print("     - [bold]If it exists:[/bold] Instantly changes your terminal directory ('cd') into it,")
-    console.print("       launches your target shell, and displays its live Runbot & GitHub reviews.")
-    console.print("     - [bold]If new:[/bold] Opens the TUI Creation tab pre-filled with that branch name.")
-    
-    console.print("\n  [bold cyan]2. Context-Aware status: odoo-wt status/runbot/reviews[/bold cyan]")
-    console.print("     These status commands dynamically adapt to where your terminal is standing:")
-    console.print("     - [bold]Inside a worktree folder:[/bold] Displays a deeply detailed diagnostic card")
-    console.print("       specifically for your active branch (failed tests, PR reviewers, last human feedback).")
-    console.print("     - [bold]Outside any worktree:[/bold] Displays a high-level summary table of ALL your branches.")
-    console.print("     - You can force the full table inside a worktree by running 'status -a', or query")
-    console.print("       any specific branch from anywhere by running 'status <branch>'.")
-    
-    console.print("\n  [bold cyan]3. Symmetrical Diagnostics:[/bold cyan]")
-    console.print("     - [bold]status[/bold]: Combined CI build stats + Latest GitHub Reviews/Comments.")
-    console.print("     - [bold]runbot[/bold]: CI-only (build counts + failing tests). [bold green]Skips GitHub PR calls for speed![/bold green]")
-    console.print("     - [bold]reviews[/bold]: Reviews-only (Pull Requests + latest peer comments). Skips Runbot counts.")
-    
-    console.print("\n[bold yellow]Recency Sorting:[/bold yellow]")
-    console.print("  Worktrees are sorted by default by recency. Any action that deploys, opens,")
-    console.print("  or accesses a worktree (e.g. create, open, code, selecting in TUI) updates")
-    console.print("  its local access timestamp and makes it most recent.")
-    
-    console.print("\n[bold yellow]Environment Variables:[/bold yellow]")
-    console.print("  [bold cyan]SHELL[/bold cyan]                         Target shell when opening terminal [dim](default: /bin/bash)[/dim]")
-    
-    console.print("\n[bold yellow]Documentation:[/bold yellow]")
-    console.print("  [underline blue]https://github.com/nd-dew/odoo-wt[/underline blue]\n")
+    console.print(SUBCOMMAND_HELP["menu"].format(version=VERSION))
 
 def check_dependencies():
     from rich.console import Console
@@ -138,9 +79,9 @@ def get_edit_distance(s1: str, s2: str) -> int:
     return distances[-1]
 
 async def run_cli_deployment(config, data, verbose=False):
-    from .deployment_engine import DeployEngine
-    from rich.console import Console
     import asyncio
+    from rich.console import Console
+    from .deployment_engine import DeployEngine
     
     console = Console()
     console.print(f"🚀 [bold cyan]Starting Direct CLI Deployment for '{data['version']}-{data['desc']}-{data['suffix']}'...[/bold cyan]\n")
@@ -1477,148 +1418,11 @@ def show_subcommand_help(subcommand):
     from rich.console import Console
     console = Console()
     
-    subcommand = subcommand.lower()
-    
-    if subcommand == "status":
-        console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'status'[/cyan]\n")
-        console.print("The [bold green]status[/bold green] command displays the live Runbot CI build status and peer reviews [bold cyan](Combined View)[/bold cyan].\n")
-        
-        console.print("[bold yellow]Usage:[/bold yellow]")
-        console.print("  [bold green]odoo-wt status[/bold green]                       Show combined status of the active branch (if inside a worktree)")
-        console.print("  [bold green]odoo-wt status[/bold green] [cyan]<branch_name>[/cyan]          Show combined status of a specific branch from anywhere")
-        console.print("  [bold green]odoo-wt status[/bold green] [cyan]\\[all/-a][/cyan]             Show combined overview table of all local branches\n")
-        
-        console.print("[bold yellow]Description:[/bold yellow]")
-        console.print("  Fetches both the Runbot CI build status (including failed/warned build counts)")
-        console.print("  and the latest GitHub PR comments/reviews in a single, comprehensive diagnostic view.")
-        console.print("  ")
-        console.print("  By default, if run inside any worktree directory, it displays a detailed single-branch card.")
-        console.print("  To bypass this and force-display the global table of all branches, use the [bold cyan]'all'[/bold cyan] or [bold cyan]'-a'[/bold cyan] parameter.\n")
-        
-        console.print("[bold yellow]Context-Aware Directory Sensing:[/bold yellow]")
-        console.print("  If you run this command inside any subdirectory of an active worktree folder (including 'odoo' or 'enterprise'),")
-        console.print("  it automatically detects your path, resolves the full branch name, and prints its dedicated detailed diagnostic card.")
-        console.print("  This saves you from constantly viewing the full global table or typing out long branch names!\n")
-        
-        console.print("[bold yellow]⚠️  GitHub CLI Authentication Required:[/bold yellow]")
-        console.print("  This command relies on the GitHub CLI ('gh' tool) being installed, alive, and")
-        console.print("  authenticated ('gh auth status') to fetch Pull Request links and human review comments.")
-        console.print("  If you are not logged in, reviews and comments will be skipped gracefully.\n")
-        
-        console.print("[bold yellow]Examples:[/bold yellow]")
-        console.print("  [bold green]odoo-wt status[/bold green]                    [dim]# Show combined card of current worktree branch[/dim]")
-        console.print("  [bold green]odoo-wt status[/bold green] [cyan]-a[/cyan]                 [dim]# Force display the high-level combined table of all branches[/dim]")
-        
-    elif subcommand == "runbot":
-        console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'runbot'[/cyan]\n")
-        console.print("The [bold green]runbot[/bold green] command displays the live Runbot CI build status and failing tests [bold cyan](CI-Focused View)[/bold cyan].\n")
-        
-        console.print("[bold yellow]Usage:[/bold yellow]")
-        console.print("  [bold green]odoo-wt runbot[/bold green]                       Show CI status of the active branch (if inside a worktree)")
-        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]<branch_name>[/cyan]          Show CI status of a specific branch from anywhere")
-        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]\\[all/-a][/cyan]             Show CI overview table of all local branches\n")
-        
-        console.print("[bold yellow]Description:[/bold yellow]")
-        console.print("  A high-performance diagnostic command that focuses exclusively on Runbot CI build counts,")
-        console.print("  batch URLs, and failing test lists.")
-        console.print("  ")
-        console.print("  By default, if run inside any worktree directory, it displays a detailed single-branch CI card.")
-        console.print("  To bypass this and force-display the global table of all branches, use the [bold cyan]'all'[/bold cyan] or [bold cyan]'-a'[/bold cyan] parameter.")
-        console.print("  ")
-        console.print("  This command skips all GitHub PR reviews and comments lookups to maximize performance.\n")
-        
-        console.print("[bold yellow]Context-Aware Directory Sensing:[/bold yellow]")
-        console.print("  If you run this command inside any subdirectory of an active worktree folder (including 'odoo' or 'enterprise'),")
-        console.print("  it automatically detects your path, resolves the full branch name, and prints its dedicated detailed CI diagnostic card.\n")
-        
-        console.print("[bold yellow]Failing Tests & Linter Scraper:[/bold yellow]")
-        console.print("  If there are failing builds on the branch, odoo-wt automatically downloads the batch pages and detailed static logs,")
-        console.print("  extracting the exact names of failing unittests or linter checks (like 'check_semgrep_security') and listing them.")
-        console.print("  - Default: Shows the top 5 failing tests on clean, hyphen-free lines for [bold cyan]easy double-click copying[/bold cyan].")
-        console.print("  - `--verbose` or `-v`: Displays all failing tests [bold cyan]grouped by their Odoo module/addon[/bold cyan] under bold headers.")
-        console.print("  - `-vv` (Verboser Verbose): Displays failing test names [bold cyan]alongside their actual error messages or traceback summaries[/bold cyan] extracted from the logs!\n")
-        
-        console.print("[bold yellow]Examples:[/bold yellow]")
-        console.print("  [bold green]odoo-wt runbot[/bold green]                    [dim]# Show CI card of current worktree branch[/dim]")
-        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]-a[/cyan]                 [dim]# Force display the high-level CI table of all branches[/dim]")
-        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]fix-paymob --verbose[/cyan]  [dim]# Show all failing tests of 'fix-paymob' grouped by module[/dim]")
-        console.print("  [bold green]odoo-wt runbot[/bold green] [cyan]fix-paymob -vv[/cyan]        [dim]# Show all failing tests with their real traceback errors![/dim]\n")
-        
-    elif subcommand == "reviews":
-        console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'reviews'[/cyan]\n")
-        console.print("The [bold green]reviews[/bold green] command displays the linked Pull Requests and latest peer comments [bold cyan](PR-Focused View)[/bold cyan].\n")
-        
-        console.print("[bold yellow]Usage:[/bold yellow]")
-        console.print("  [bold green]odoo-wt reviews[/bold green]                      Show PR reviews of the active branch (if inside a worktree)")
-        console.print("  [bold green]odoo-wt reviews[/bold green] [cyan]<branch_name>[/cyan]         Show PR reviews of a specific branch from anywhere")
-        console.print("  [bold green]odoo-wt reviews[/bold green] [cyan]\\[all/-a][/cyan]            Show PR reviews table of all local branches\n")
-        
-        console.print("[bold yellow]Description:[/bold yellow]")
-        console.print("  A focused PR diagnostic command that displays linked community, enterprise, and upgrade")
-        console.print("  Pull Requests on GitHub, alongside the last human review comment/approvals.")
-        console.print("  ")
-        console.print("  By default, if run inside any worktree directory, it displays a detailed single-branch reviews card.")
-        console.print("  To bypass this and force-display the global table of all branches, use the [bold cyan]'all'[/bold cyan] or [bold cyan]'-a'[/bold cyan] parameter.")
-        console.print("  ")
-        console.print("  This command [bold cyan]skips any Runbot CI build checks[/bold cyan] and focuses exclusively on human peer feedback,")
-        console.print("  allowing you to quickly see what adjustments are needed before your PR is approved.\n")
-        
-        console.print("[bold yellow]Context-Aware Directory Sensing:[/bold yellow]")
-        console.print("  If you run this command inside any subdirectory of an active worktree folder (including 'odoo' or 'enterprise'),")
-        console.print("  it automatically detects your path, resolves the full branch name, and prints its dedicated detailed PR reviews card.\n")
-        
-        console.print("[bold yellow]⚠️  GitHub CLI Authentication Required:[/bold yellow]")
-        console.print("  This command relies on the GitHub CLI ('gh' tool) being installed, alive, and")
-        console.print("  authenticated ('gh auth status') to fetch Pull Request links and human review comments.")
-        console.print("  If you are not logged in, reviews and comments will be skipped gracefully.\n")
-        
-        console.print("[bold yellow]Examples:[/bold yellow]")
-        console.print("  [bold green]odoo-wt reviews[/bold green]                   [dim]# Show PR reviews card of current worktree branch[/dim]")
-        console.print("  [bold green]odoo-wt reviews[/bold green] [cyan]-a[/cyan]               [dim]# Force display the PR reviews table of all branches[/dim]\n")
-        
-    elif subcommand in ("create", "open", "code", "delete", "rm"):
-        console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'{subcommand}'[/cyan]\n")
-        
-        if subcommand == "create":
-            console.print("The [bold green]create[/bold green] subcommand explicitly opens the TUI pre-filled in the 'Creation' tab to deploy a new worktree.\n")
-            console.print("[bold yellow]Usage:[/bold yellow]")
-            console.print("  [bold green]odoo-wt create[/bold green] [cyan]<branch_name>[/cyan]\n")
-            console.print("[bold yellow]Description:[/bold yellow]")
-            console.print("  Analyzes the requested branch name using [bold cyan]Magic Fix branch decomposition[/bold cyan] to automatically detect the target Odoo version,")
-            console.print("  description, developer suffix, and base remote. Then, launches the TUI Creator pre-filled and ready to scaffold.")
-        elif subcommand == "open":
-            console.print("The [bold green]open[/bold green] subcommand directly changes your shell directory into an existing worktree.\n")
-            console.print("[bold yellow]Usage:[/bold yellow]")
-            console.print("  [bold green]odoo-wt open[/bold green] [cyan]<branch_name>[/cyan]\n")
-            console.print("[bold yellow]Description:[/bold yellow]")
-            console.print("  Searches your local worktrees for the best matching branch name. If found, unsets its core tracking branch,")
-            console.print("  configures PWD and OLDPWD environment variables to keep your shell history in line, and directly swaps your shell directory.")
-        elif subcommand == "code":
-            console.print("The [bold green]code[/bold green] subcommand directly opens VS Code inside an existing worktree.\n")
-            console.print("[bold yellow]Usage:[/bold yellow]")
-            console.print("  [bold green]odoo-wt code[/bold green] [cyan]<branch_name>[/cyan]\n")
-            console.print("[bold yellow]Description:[/bold yellow]")
-            console.print("  Locates the matching worktree directory and invokes the VS Code 'code' binary on that path. It automatically")
-            console.print("  ensures Odoo core and Enterprise folders are correctly mapped inside your launch configuration.")
-        elif subcommand in ("delete", "rm"):
-            console.print(f"The [bold green]{subcommand}[/bold green] subcommand directly deletes a local worktree directory.\n")
-            console.print(f"[bold yellow]Usage:[/bold yellow]")
-            console.print(f"  [bold green]odoo-wt {subcommand}[/bold green] [cyan]<branch_name>[/cyan]\n")
-            console.print("[bold yellow]Description:[/bold yellow]")
-            console.print("  Locates the matching worktree directory, cleanly unregisters the worktree from Git's metadata database,")
-            console.print("  and deletes the physical folder from your disk. A safety confirmation prompt is shown before taking any action.")
-            
-        console.print("\n[bold yellow]Examples:[/bold yellow]")
-        console.print(f"  [bold green]odoo-wt {subcommand}[/bold green] [cyan]master-crm_lead-pian[/cyan]\n")
-        
-    elif subcommand == "list":
-        console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'list'[/cyan]\n")
-        console.print("The [bold green]list[/bold green] subcommand simply lists all registered local worktree branch names.\n")
-        console.print("[bold yellow]Usage:[/bold yellow]")
-        console.print("  [bold green]odoo-wt list[/bold green]\n")
-        console.print("[bold yellow]Description:[/bold yellow]")
-        console.print("  Prints a bare, unformatted list of all local worktree names, sorted by recency, one branch per line.")
-        console.print("  This command is highly optimized for scripting, auto-completions, and pipeline utilities.\n")
+    if (subcmd:=subcommand.lower()) in SUBCOMMAND_HELP:
+        console.print(f"[bold cyan]Odoo Worktree Assistant[/bold cyan] ([bold green]odoo-wt[/bold green]) - Subcommand Help: [cyan]'{subcmd}'[/cyan]\n")
+        console.print(SUBCOMMAND_HELP[subcmd].format(subcommand=subcmd))
+    else:
+        console.print(f"[bold red]Error:[/bold red] Unknown subcommand '{subcmd}'. Run [bold green]odoo-wt --help[/bold green] for a list of valid commands.")
 
 if __name__ == "__main__":
     main()
