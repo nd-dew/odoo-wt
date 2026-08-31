@@ -12,11 +12,12 @@ from .app_config import config_mgr
 from .system_discovery import get_remote, check_local
 from .deployment_engine import DeployEngine, DeployUpdate
 
-class DeleteConfirmScreen(ModalScreen[bool]):
-    def __init__(self, wt_name: str):
+class BaseDeleteConfirmScreen(ModalScreen[bool]):
+    def __init__(self, target_label_prefix: str, yes_btn_label: str):
         super().__init__()
-        self.wt_name = wt_name
         self.step = 1
+        self.target_label_prefix = target_label_prefix
+        self.yes_btn_label = yes_btn_label
 
     def on_key(self, event) -> None:
         if event.key == "left":
@@ -24,36 +25,90 @@ class DeleteConfirmScreen(ModalScreen[bool]):
         elif event.key == "right":
             self.focus_next()
 
-    def compose(self):
-        with Vertical(id="delete-dialog"):
-            yield Label(f"Delete worktree '{self.wt_name}'? (1/3)", id="del-msg")
-            with Horizontal(classes="del-btn-row", id="btn-container"):
-                yield Button("Yes, delete", variant="error", id="btn-yes")
-                yield Button("Cancel", variant="primary", id="btn-cancel")
-
-    @on(Button.Pressed, "#btn-yes")
-    async def on_yes(self):
-        config_mgr.append_log("Delete Confirm Step", {"step": self.step, "worktree": self.wt_name})
+    async def rotate_buttons(self, step2_msg: str, step3_msg: str, log_name: str, log_meta: dict):
+        config_mgr.append_log(log_name, {"step": self.step, **log_meta})
         self.step += 1
         if self.step > 3:
             self.dismiss(True)
             return
+        
         msg = self.query_one("#del-msg", Label)
         container = self.query_one("#btn-container", Horizontal)
         await container.query_children().remove()
+        
         if self.step == 2:
-            msg.update(f"Are you SURE? (2/3)")
+            msg.update(step2_msg)
             await container.mount(Button("Cancel", variant="primary", id="btn-cancel"))
-            await container.mount(Button("Yes, delete", variant="error", id="btn-yes"))
+            await container.mount(Button(self.yes_btn_label, variant="error", id="btn-yes"))
         elif self.step == 3:
-            msg.update(f"Final warning: NUKE '{self.wt_name}'? (3/3)")
-            await container.mount(Button("Yes, delete", variant="error", id="btn-yes"))
+            msg.update(step3_msg)
+            await container.mount(Button(self.yes_btn_label, variant="error", id="btn-yes"))
             await container.mount(Button("Cancel", variant="primary", id="btn-cancel"))
         self.query_one("#btn-cancel").focus()
+
+
+class DeleteConfirmScreen(BaseDeleteConfirmScreen):
+    def __init__(self, wt_name: str):
+        super().__init__(
+            target_label_prefix=f"Delete worktree '{wt_name}'?",
+            yes_btn_label="Yes, delete"
+        )
+        self.wt_name = wt_name
+
+    def compose(self):
+        with Vertical(id="delete-dialog"):
+            yield Label(f"{self.target_label_prefix} (1/3)", id="del-msg")
+            with Horizontal(classes="del-btn-row", id="btn-container"):
+                yield Button(self.yes_btn_label, variant="error", id="btn-yes")
+                yield Button("Cancel", variant="primary", id="btn-cancel")
+
+    @on(Button.Pressed, "#btn-yes")
+    async def on_yes(self):
+        await self.rotate_buttons(
+            step2_msg="Are you SURE? (2/3)",
+            step3_msg=f"Final warning: NUKE '{self.wt_name}'? (3/3)",
+            log_name="Delete Confirm Step",
+            log_meta={"worktree": self.wt_name}
+        )
 
     @on(Button.Pressed, "#btn-cancel")
     def on_cancel(self):
         config_mgr.append_log("Delete Cancelled", {"worktree": self.wt_name})
+        self.dismiss(False)
+
+
+class BulkDeleteConfirmScreen(BaseDeleteConfirmScreen):
+    def __init__(self, wt_names: list[str]):
+        super().__init__(
+            target_label_prefix=f"Delete {len(wt_names)} worktrees?",
+            yes_btn_label="Yes, delete all"
+        )
+        self.wt_names = wt_names
+
+    def compose(self):
+        with Vertical(id="delete-dialog", classes="bulk-delete-dialog"):
+            yield Label(f"{self.target_label_prefix} (1/3)", id="del-msg")
+            
+            with VerticalScroll(classes="bulk-list-container"):
+                for name in self.wt_names:
+                    yield Label(f" • [bold red]{name}[/bold red]", classes="bulk-item")
+                    
+            with Horizontal(classes="del-btn-row", id="btn-container"):
+                yield Button(self.yes_btn_label, variant="error", id="btn-yes")
+                yield Button("Cancel", variant="primary", id="btn-cancel")
+
+    @on(Button.Pressed, "#btn-yes")
+    async def on_yes(self):
+        await self.rotate_buttons(
+            step2_msg="Are you ABSOLUTELY SURE? (2/3)",
+            step3_msg=f"Final warning: NUKE {len(self.wt_names)} worktrees? (3/3)",
+            log_name="Bulk Delete Confirm Step",
+            log_meta={"count": len(self.wt_names)}
+        )
+
+    @on(Button.Pressed, "#btn-cancel")
+    def on_cancel(self):
+        config_mgr.append_log("Bulk Delete Cancelled", {"count": len(self.wt_names)})
         self.dismiss(False)
 
 

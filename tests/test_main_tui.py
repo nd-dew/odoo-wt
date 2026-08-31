@@ -193,7 +193,7 @@ def test_tui_base_branch_minimal_status(monkeypatch):
     
     # Verify that base branches get minimal symbols
     assert len(rows_added) == 1
-    branch_name, status, link, comment = rows_added[0]
+    select_cell, branch_name, status, link, comment = rows_added[0]
     assert branch_name == "master"
     assert status == "⚪"
     assert "Board" in link
@@ -230,7 +230,7 @@ def test_tui_deleting_row_markup_safety(monkeypatch):
     app.populate_table()
     
     assert len(rows_added) == 1
-    branch_name, status, link, comment = rows_added[0]
+    select_cell, branch_name, status, link, comment = rows_added[0]
     
     # Assert display_name has the strike-through, but raw name in link does NOT have nested strike!
     assert "[strike]saas-19.4-my_feature[/strike]" in branch_name
@@ -441,4 +441,348 @@ async def test_manual_save_and_discard_buttons(monkeypatch):
 
         assert save_btn.disabled is False
         assert discard_btn.disabled is False
+
+
+@pytest.mark.asyncio
+async def test_tui_bulk_selection_toggle(monkeypatch):
+    from odoo_wt.main_tui import OdooWtApp
+    from textual.widgets import DataTable
+
+    app = OdooWtApp(
+        config={"wt_root": "/path/root", "suffix": "pian", "default_tab": "tab-manage"},
+        v_list=["17.0"], s_list=["pian"],
+        worktrees=[
+            {"name": "master", "path": "/path/root/master", "version": "master"},
+            {"name": "17.0-feature-pian", "path": "/path/root/17.0-feature-pian", "version": "17.0"}
+        ],
+        version_str="dev"
+    )
+
+    monkeypatch.setattr("odoo_wt.main_tui.OdooWtApp.run_runbot_checker", lambda self: None)
+
+    async with app.run_test() as pilot:
+        # Initially empty selection
+        assert len(pilot.app.selected_wts) == 0
+
+        table = pilot.app.query_one("#wt-table", DataTable)
+        
+        # Select the feature row (which is at coordinate 1, since master is row 0)
+        table.cursor_coordinate = (1, 0)
+        
+        # Trigger toggle select
+        pilot.app.action_toggle_select()
+        assert "/path/root/17.0-feature-pian" in pilot.app.selected_wts
+
+        # Toggle again to deselect
+        pilot.app.action_toggle_select()
+        assert "/path/root/17.0-feature-pian" not in pilot.app.selected_wts
+
+        # Try to select master (row 0)
+        table.cursor_coordinate = (0, 0)
+        pilot.app.action_toggle_select()
+        # Should remain empty because master is protected
+        assert "/path/root/master" not in pilot.app.selected_wts
+
+
+@pytest.mark.asyncio
+async def test_tui_select_all_deselect_all(monkeypatch):
+    from odoo_wt.main_tui import OdooWtApp
+
+    app = OdooWtApp(
+        config={"wt_root": "/path/root", "suffix": "pian", "default_tab": "tab-manage"},
+        v_list=["17.0"], s_list=["pian"],
+        worktrees=[
+            {"name": "master", "path": "/path/root/master", "version": "master"},
+            {"name": "17.0-feat1-pian", "path": "/path/root/17.0-feat1-pian", "version": "17.0"},
+            {"name": "17.0-feat2-pian", "path": "/path/root/17.0-feat2-pian", "version": "17.0"}
+        ],
+        version_str="dev"
+    )
+
+    monkeypatch.setattr("odoo_wt.main_tui.OdooWtApp.run_runbot_checker", lambda self: None)
+
+    async with app.run_test() as pilot:
+        # Select All
+        pilot.app.action_select_all()
+        assert "/path/root/17.0-feat1-pian" in pilot.app.selected_wts
+        assert "/path/root/17.0-feat2-pian" in pilot.app.selected_wts
+        assert "/path/root/master" not in pilot.app.selected_wts  # protected
+
+        # Deselect All
+        pilot.app.action_deselect_all()
+        assert len(pilot.app.selected_wts) == 0
+
+
+@pytest.mark.asyncio
+async def test_tui_bulk_delete_routing(monkeypatch):
+    from odoo_wt.main_tui import OdooWtApp
+    from odoo_wt.custom_screens import DeleteConfirmScreen, BulkDeleteConfirmScreen
+
+    app = OdooWtApp(
+        config={"wt_root": "/path/root", "suffix": "pian", "default_tab": "tab-manage"},
+        v_list=["17.0"], s_list=["pian"],
+        worktrees=[
+            {"name": "master", "path": "/path/root/master", "version": "master"},
+            {"name": "17.0-feat-pian", "path": "/path/root/17.0-feat-pian", "version": "17.0"}
+        ],
+        version_str="dev"
+    )
+
+    monkeypatch.setattr("odoo_wt.main_tui.OdooWtApp.run_runbot_checker", lambda self: None)
+
+    screens_pushed = []
+    def mock_push_screen(screen, callback=None):
+        screens_pushed.append(screen)
+
+    async with app.run_test() as pilot:
+        pilot.app.push_screen = mock_push_screen
+
+        # Scenario 1: selected_wts is empty -> pushes regular DeleteConfirmScreen
+        pilot.app.query_one("#wt-table").cursor_coordinate = (1, 0)
+        pilot.app.action_delete_wt()
+        assert len(screens_pushed) == 1
+        assert isinstance(screens_pushed[0], DeleteConfirmScreen)
+
+        # Scenario 2: selected_wts is populated -> pushes BulkDeleteConfirmScreen
+        pilot.app.selected_wts.add("/path/root/17.0-feat-pian")
+        pilot.app.action_delete_wt()
+        assert len(screens_pushed) == 2
+        assert isinstance(screens_pushed[1], BulkDeleteConfirmScreen)
+        assert screens_pushed[1].wt_names == ["17.0-feat-pian"]
+
+
+class MockProcess:
+    def __init__(self, code=0, stderr=b""):
+        self.returncode = code
+        self.stderr = stderr
+    async def communicate(self):
+        return b"", self.stderr
+
+
+@pytest.mark.asyncio
+async def test_do_single_deletion_success(monkeypatch, tmp_path):
+    from odoo_wt.main_tui import OdooWtApp
+
+    # Setup directories
+    wt_root = tmp_path / "root"
+    wt_root.mkdir()
+    master_dir = wt_root / "master"
+    master_dir.mkdir()
+    (master_dir / "odoo").mkdir()
+    (master_dir / "enterprise").mkdir()
+
+    feat_dir = wt_root / "17.0-feat-pian"
+    feat_dir.mkdir()
+    (feat_dir / "odoo").mkdir()
+    (feat_dir / "enterprise").mkdir()
+
+    app = OdooWtApp(
+        config={"wt_root": str(wt_root), "suffix": "pian"},
+        v_list=["17.0"], s_list=["pian"],
+        worktrees=[],
+        version_str="dev"
+    )
+
+    subprocess_calls = []
+    async def mock_subprocess_exec(*args, **kwargs):
+        subprocess_calls.append((args, kwargs))
+        return MockProcess(0)
+
+    shutil_calls = []
+    def mock_rmtree(path, *args, **kwargs):
+        shutil_calls.append(path)
+
+    monkeypatch.setattr("asyncio.create_subprocess_exec", mock_subprocess_exec)
+    monkeypatch.setattr("shutil.rmtree", mock_rmtree)
+
+    # Call _do_single_deletion directly
+    await app._do_single_deletion(str(feat_dir), "17.0-feat-pian")
+
+    # Verify git worktree removes were executed with correct cwd
+    git_remove_calls = [c for c in subprocess_calls if "remove" in c[0]]
+    assert len(git_remove_calls) == 2
+    
+    cwds = {c[1]["cwd"] for c in git_remove_calls}
+    assert cwds == {master_dir / "odoo", master_dir / "enterprise"}
+
+    # Verify git worktree prunes were executed
+    git_prune_calls = [c for c in subprocess_calls if "prune" in c[0]]
+    assert len(git_prune_calls) == 2
+
+    # Verify shutil.rmtree was called with the correct target directory
+    assert len(shutil_calls) == 1
+    assert shutil_calls[0] == feat_dir
+
+
+@pytest.mark.asyncio
+async def test_do_single_deletion_subprocess_failure(monkeypatch, tmp_path):
+    from odoo_wt.main_tui import OdooWtApp
+
+    wt_root = tmp_path / "root"
+    wt_root.mkdir()
+    feat_dir = wt_root / "17.0-feat-pian"
+    feat_dir.mkdir()
+    (feat_dir / "odoo").mkdir()
+
+    app = OdooWtApp(
+        config={"wt_root": str(wt_root), "suffix": "pian"},
+        v_list=["17.0"], s_list=["pian"],
+        worktrees=[],
+        version_str="dev"
+    )
+
+    # Subprocess fails with code 1 and some stderr
+    async def mock_subprocess_exec(*args, **kwargs):
+        return MockProcess(1, stderr=b"dirty working tree")
+
+    monkeypatch.setattr("asyncio.create_subprocess_exec", mock_subprocess_exec)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await app._do_single_deletion(str(feat_dir), "17.0-feat-pian")
+    assert "git worktree remove failed" in str(exc_info.value)
+    assert "dirty working tree" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_do_single_deletion_success_even_on_prune_failure(monkeypatch, tmp_path):
+    from odoo_wt.main_tui import OdooWtApp
+
+    # Setup directories
+    wt_root = tmp_path / "root"
+    wt_root.mkdir()
+    master_dir = wt_root / "master"
+    master_dir.mkdir()
+    (master_dir / "odoo").mkdir()
+    (master_dir / "enterprise").mkdir()
+
+    feat_dir = wt_root / "17.0-feat-pian"
+    feat_dir.mkdir()
+    (feat_dir / "odoo").mkdir()
+    (feat_dir / "enterprise").mkdir()
+
+    app = OdooWtApp(
+        config={"wt_root": str(wt_root), "suffix": "pian"},
+        v_list=["17.0"], s_list=["pian"],
+        worktrees=[],
+        version_str="dev"
+    )
+
+    subprocess_calls = []
+    async def mock_subprocess_exec(*args, **kwargs):
+        subprocess_calls.append((args, kwargs))
+        if "prune" in args:
+            return MockProcess(1, stderr=b"lock error")
+        return MockProcess(0)
+
+    shutil_calls = []
+    def mock_rmtree(path, *args, **kwargs):
+        shutil_calls.append(path)
+
+    monkeypatch.setattr("asyncio.create_subprocess_exec", mock_subprocess_exec)
+    monkeypatch.setattr("shutil.rmtree", mock_rmtree)
+
+    # Call _do_single_deletion directly — it must NOT raise an exception on prune failure!
+    await app._do_single_deletion(str(feat_dir), "17.0-feat-pian")
+
+    # Verify prune was indeed called and failed
+    git_prune_calls = [c for c in subprocess_calls if "prune" in c[0]]
+    assert len(git_prune_calls) == 2
+
+    # Verify shutil.rmtree was still successfully executed to physically delete the folder!
+    assert len(shutil_calls) == 1
+    assert shutil_calls[0] == feat_dir
+
+
+@pytest.mark.asyncio
+async def test_execute_deletion_single_failure_keeps_worktree(monkeypatch, tmp_path):
+    from odoo_wt.main_tui import OdooWtApp
+
+    wt_root = tmp_path / "root"
+    wt_root.mkdir()
+    feat_dir = wt_root / "17.0-feat-pian"
+
+    app = OdooWtApp(
+        config={"wt_root": str(wt_root), "suffix": "pian"},
+        v_list=["17.0"], s_list=["pian"],
+        worktrees=[{"name": "17.0-feat-pian", "path": str(feat_dir), "version": "17.0"}],
+        version_str="dev"
+    )
+
+    monkeypatch.setattr("odoo_wt.main_tui.OdooWtApp.run_runbot_checker", lambda self: None)
+
+    # Force failure
+    async def mock_do_single_deletion(target_path_str, name):
+        raise PermissionError("Files in use")
+
+    monkeypatch.setattr(app, "_do_single_deletion", mock_do_single_deletion)
+
+    notifications = []
+    def mock_notify(message, severity="info", timeout=None):
+        notifications.append((message, severity))
+    monkeypatch.setattr(app, "notify", mock_notify)
+
+    async with app.run_test() as pilot:
+        worker = pilot.app.execute_deletion(str(feat_dir), "17.0-feat-pian")
+        await worker.wait()
+        await pilot.pause()
+
+        # Check notification reports error
+        assert any("Files in use" in msg and sev == "error" for msg, sev in notifications)
+        # Verify the worktree path remains in the worktrees list!
+        assert any(wt["path"] == str(feat_dir) for wt in pilot.app.worktrees)
+
+
+@pytest.mark.asyncio
+async def test_execute_bulk_deletion_partial_failure(monkeypatch, tmp_path):
+    from odoo_wt.main_tui import OdooWtApp
+
+    wt_root = tmp_path / "root"
+    wt_root.mkdir()
+    feat1 = wt_root / "17.0-feat1-pian"
+    feat2 = wt_root / "17.0-feat2-pian"
+
+    app = OdooWtApp(
+        config={"wt_root": str(wt_root), "suffix": "pian"},
+        v_list=["17.0"], s_list=["pian"],
+        worktrees=[
+            {"name": "17.0-feat1-pian", "path": str(feat1), "version": "17.0"},
+            {"name": "17.0-feat2-pian", "path": str(feat2), "version": "17.0"}
+        ],
+        version_str="dev"
+    )
+
+    monkeypatch.setattr("odoo_wt.main_tui.OdooWtApp.run_runbot_checker", lambda self: None)
+
+    # Force success for feat1, but failure for feat2
+    async def mock_do_single_deletion(target_path_str, name):
+        if name == "17.0-feat2-pian":
+            raise RuntimeError("disk read failure")
+
+    monkeypatch.setattr(app, "_do_single_deletion", mock_do_single_deletion)
+
+    notifications = []
+    def mock_notify(message, severity="info", timeout=None):
+        notifications.append((message, severity))
+    monkeypatch.setattr(app, "notify", mock_notify)
+
+    async with app.run_test() as pilot:
+        # Populate selections
+        pilot.app.selected_wts.add(str(feat1))
+        pilot.app.selected_wts.add(str(feat2))
+
+        worker = pilot.app.execute_bulk_deletion([str(feat1), str(feat2)], ["17.0-feat1-pian", "17.0-feat2-pian"])
+        await worker.wait()
+        await pilot.pause()
+
+        # Notifications should report successful deletions AND failures
+        assert any("Successfully deleted" in msg and sev == "success" for msg, sev in notifications)
+        assert any("Failed to delete" in msg and "disk read failure" in msg and sev == "error" for msg, sev in notifications)
+
+        # Selections must be cleared
+        assert len(pilot.app.selected_wts) == 0
+
+        # Successful one is removed, failed one remains in self.worktrees
+        assert not any(wt["path"] == str(feat1) for wt in pilot.app.worktrees)
+        assert any(wt["path"] == str(feat2) for wt in pilot.app.worktrees)
+
 

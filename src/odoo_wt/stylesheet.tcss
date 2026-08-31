@@ -253,7 +253,7 @@ Switch.setting-input, Checkbox.setting-input {
 }
 
 /* Screens */
-DeleteConfirmScreen {
+DeleteConfirmScreen, BulkDeleteConfirmScreen {
     align: center middle;
     background: rgba(0, 0, 0, 0.7);
 }
@@ -264,6 +264,25 @@ DeleteConfirmScreen {
     padding: 2 4;
     border: thick $error;
     background: $surface;
+}
+
+#delete-dialog.bulk-delete-dialog {
+    width: 60;
+    height: auto;
+    max-height: 25;
+}
+
+.bulk-list-container {
+    height: auto;
+    max-height: 12;
+    border: tall $surface;
+    background: $surface-darken-1;
+    margin: 1 0;
+    padding: 0 1;
+}
+
+.bulk-item {
+    color: $error-lighten-1;
 }
 
 .del-btn-row {

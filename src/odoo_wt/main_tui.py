@@ -17,7 +17,7 @@ spell.word_frequency.load_words(['odoo', 'saas', 'erp', 'mrp', 'pos', 'crm', 'wt
 
 from .app_config import config_mgr, debug_log
 from .system_discovery import discover_system_data, get_remote, run_git, decompose_branch, get_remote_url, is_base_branch
-from .custom_screens import DeleteConfirmScreen, DeployScreen, LogDetailScreen
+from .custom_screens import DeleteConfirmScreen, BulkDeleteConfirmScreen, DeployScreen, LogDetailScreen
 
 SETTINGS_HELP = {
     "set-wt": "The base directory where all your WorkTrees will be created.",
@@ -72,6 +72,10 @@ class OdooWtApp(App):
         Binding("c", "copy_text", "Copy", key_display="C"),
         Binding("ctrl+b", "open_runbot", "Runbot", key_display="^B"),
         Binding("ctrl+y", "toggle_sort", "Sort: Cycle", key_display="^Y"),
+        Binding("s", "toggle_select", "Toggle", show=True, key_display="S"),
+        Binding("S", "toggle_select", "Toggle", show=False),
+        Binding("ctrl+a", "select_all", "Select All", show=False),
+        Binding("ctrl+d", "deselect_all", "Clear", show=False),
         Binding("escape", "quit", "", show=False),
         Binding("ctrl+q", "quit", "Quit", show=True, key_display="^Q"),
         Binding("ctrl+c", "quit", "Quit", show=False),
@@ -103,6 +107,7 @@ class OdooWtApp(App):
         self.worktrees = worktrees
         self.fetched_versions = set()
         self.deleting_paths = set()
+        self.selected_wts = set()
         self.branch_status = ""
         self.check_results_str = ""
         self.save_timer = None
@@ -386,6 +391,7 @@ class OdooWtApp(App):
         
         # Initialize Manage Table Columns
         table = self.query_one("#wt-table", DataTable)
+        table.add_column("[dim]✔[/dim]", key="col-select")
         table.add_column("Branch Name", key="col-branch")
         table.add_column("Runbot Status", key="col-runbot")
         table.add_column("Link", key="col-link")
@@ -1042,7 +1048,11 @@ class OdooWtApp(App):
             else:
                 comment_cell = ""
 
-            table.add_row(display_name, status, link, comment_cell, key=path)
+            # Selection cell logic
+            is_selected = path in self.selected_wts
+            select_cell = "" if is_base_branch(name) else ("[b green]✔[/b green]" if is_selected else "[dim]☐[/dim]")
+
+            table.add_row(select_cell, display_name, status, link, comment_cell, key=path)
             
         self.adjust_column_widths()
 
@@ -1054,15 +1064,20 @@ class OdooWtApp(App):
                 return
                 
             # Symmetrical dynamic grid calculation:
+            # - Selection column takes 4 cells.
             # - Runbot Status takes 14 cells.
             # - Link takes 15 cells.
             # - Branch Name gets up to 35% of W, minimum 25, maximum 45.
             # - Last Comment gets the absolute remaining width to prevent truncation and overflow!
+            select_w = 4
             runbot_w = 14
             link_w = 15
             branch_w = max(25, min(45, int(W * 0.35)))
-            comment_w = max(20, W - branch_w - runbot_w - link_w - 6)
+            comment_w = max(20, W - select_w - branch_w - runbot_w - link_w - 6)
             
+            if "col-select" in table.columns:
+                table.columns["col-select"].auto_width = False
+                table.columns["col-select"].width = select_w
             if "col-branch" in table.columns:
                 table.columns["col-branch"].auto_width = False
                 table.columns["col-branch"].width = branch_w
@@ -1484,6 +1499,59 @@ class OdooWtApp(App):
             else:
                 self.notify("No branch name to copy.", severity="warning")
 
+    def action_toggle_select(self) -> None:
+        try:
+            if self.query_one("#tabs").active != "tab-manage":
+                return
+        except Exception:
+            return
+
+        table = self.query_one("#wt-table", DataTable)
+        try:
+            row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+            path = str(row_key.value)
+            wt_name = Path(path).name
+            if is_base_branch(wt_name):
+                self.notify(f"The '{wt_name}' branch is a base branch and is protected.", severity="warning")
+                return
+            
+            if path in self.selected_wts:
+                self.selected_wts.remove(path)
+            else:
+                self.selected_wts.add(path)
+                
+            is_selected = path in self.selected_wts
+            cell_value = "[b green]✔[/b green]" if is_selected else "[dim]☐[/dim]"
+            table.update_cell(row_key, "col-select", cell_value)
+        except Exception:
+            self.notify("Focus on a row first!", severity="error")
+
+    def action_select_all(self) -> None:
+        try:
+            if self.query_one("#tabs").active != "tab-manage":
+                return
+        except Exception:
+            return
+
+        table = self.query_one("#wt-table", DataTable)
+        for row_key in table.rows:
+            path = str(row_key.value)
+            if not is_base_branch(Path(path).name):
+                self.selected_wts.add(path)
+        self.populate_table()
+        self.notify("Selected all visible worktrees.")
+
+    def action_deselect_all(self) -> None:
+        try:
+            if self.query_one("#tabs").active != "tab-manage":
+                return
+        except Exception:
+            return
+
+        self.selected_wts.clear()
+        self.populate_table()
+        self.notify("Cleared selections.")
+
     @on(Select.Changed, "#version")
     def version_changed(self, event: Select.Changed) -> None:
         config_mgr.append_log("Version Dropdown Changed", {"value": str(event.value)})
@@ -1725,16 +1793,85 @@ class OdooWtApp(App):
 
     def action_delete_wt(self) -> None:
         table = self.query_one("#wt-table")
+        
+        # 1. Bulk Deletion Action
+        if self.selected_wts:
+            valid_paths = [p for p in self.selected_wts if not is_base_branch(Path(p).name)]
+            if not valid_paths:
+                self.notify("No deletable worktrees selected.", severity="error")
+                return
+            
+            wt_names = [Path(p).name for p in valid_paths]
+            
+            def check_bulk_delete(confirm: bool):
+                if confirm:
+                    self.execute_bulk_deletion(valid_paths, wt_names)
+                    
+            self.app.push_screen(BulkDeleteConfirmScreen(wt_names), check_bulk_delete)
+            return
+
+        # 2. Single Deletion Fallback (Muscle Memory)
         try:
             row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value
             wt_name = Path(row_key).name
-            if wt_name == "master":
-                self.notify("The 'master' worktree is protected and cannot be deleted.", severity="error")
+            if is_base_branch(wt_name):
+                self.notify(f"The '{wt_name}' base branch is protected and cannot be deleted.", severity="error")
                 return
             def check_delete(confirm: bool):
                 if confirm: self.execute_deletion(row_key, wt_name)
             self.app.push_screen(DeleteConfirmScreen(wt_name), check_delete)
-        except Exception: self.notify("Select a worktree first!", severity="error")
+        except Exception:
+            self.notify("Select a worktree first!", severity="error")
+
+    async def _do_single_deletion(self, target_path_str: str, name: str) -> None:
+        target_path = Path(target_path_str)
+        base_odoo = target_path.parent / "master" / "odoo"
+        base_ent = target_path.parent / "master" / "enterprise"
+
+        # 1. Parallel Git operations
+        async def remove_wt(sub_dir, base_dir):
+            wt_path = target_path / sub_dir
+            if wt_path.exists():
+                process = await asyncio.create_subprocess_exec(
+                    "git", "worktree", "remove", "-f", str(wt_path),
+                    cwd=base_dir,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                _, stderr = await process.communicate()
+                code = process.returncode
+                if code != 0:
+                    err_text = stderr.decode(errors="replace").strip() if stderr else "unknown git error"
+                    raise RuntimeError(f"git worktree remove failed for '{sub_dir}': {err_text}")
+
+        await asyncio.gather(
+            remove_wt("odoo", base_odoo),
+            remove_wt("enterprise", base_ent)
+        )
+
+        # 2. Clean up orphaned git references (Prune)
+        async def prune_wt(base_dir):
+            process = await asyncio.create_subprocess_exec(
+                "git", "worktree", "prune",
+                cwd=base_dir,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE
+            )
+            _, stderr = await process.communicate()
+            code = process.returncode
+            if code != 0:
+                err_text = stderr.decode(errors="replace").strip() if stderr else "unknown git error"
+                config_mgr.append_log("Prune error (non-fatal)", {"dir": str(base_dir), "error": err_text})
+
+        await asyncio.gather(
+            prune_wt(base_odoo),
+            prune_wt(base_ent)
+        )
+
+        # 3. Background folder deletion (with proper locking check)
+        import shutil
+        await asyncio.to_thread(shutil.rmtree, target_path)
+        config_mgr.append_log("Deleted Worktree", {"name": name, "path": target_path_str})
 
     @work(exclusive=False)
     async def execute_deletion(self, target_path_str, name):
@@ -1743,59 +1880,59 @@ class OdooWtApp(App):
         self.populate_table()
         self.notify(f"Queued deletion for '{name}'...", timeout=2)
 
+        success = False
         try:
-            target_path = Path(target_path_str)
-            base_odoo = target_path.parent / "master" / "odoo"
-            base_ent = target_path.parent / "master" / "enterprise"
-
-            # 2. Parallel Git operations
-            async def remove_wt(sub_dir, base_dir):
-                wt_path = target_path / sub_dir
-                if wt_path.exists():
-                    process = await asyncio.create_subprocess_exec(
-                        "git", "worktree", "remove", "-f", str(wt_path),
-                        cwd=base_dir,
-                        stdout=asyncio.subprocess.DEVNULL,
-                        stderr=asyncio.subprocess.DEVNULL
-                    )
-                    await process.wait()
-
-            await asyncio.gather(
-                remove_wt("odoo", base_odoo),
-                remove_wt("enterprise", base_ent)
-            )
-
-            # 3. Clean up orphaned git references (Prune)
-            async def prune_wt(base_dir):
-                process = await asyncio.create_subprocess_exec(
-                    "git", "worktree", "prune",
-                    cwd=base_dir,
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL
-                )
-                await process.wait()
-
-            await asyncio.gather(
-                prune_wt(base_odoo),
-                prune_wt(base_ent)
-            )
-
-            # 4. Background folder deletion (with proper locking check)
-            import shutil
-            try:
-                await asyncio.to_thread(shutil.rmtree, target_path)
-            except PermissionError:
-                self.notify(f"Cannot delete '{name}': Files in use. Stop the Odoo server first!", severity="error")
-                return
-            except Exception as e:
-                config_mgr.append_log("Folder deletion error", {"error": str(e)})
-
-            config_mgr.append_log("Deleted Worktree", {"name": name, "path": target_path_str})
+            await self._do_single_deletion(target_path_str, name)
             self.notify(f"Successfully deleted '{name}'!", severity="success")
+            success = True
+        except PermissionError as e:
+            self.notify(f"Cannot delete '{name}': Files in use. Stop the Odoo server first!", severity="error")
+            config_mgr.append_log("Folder deletion error", {"name": name, "path": target_path_str, "error": str(e)})
+        except Exception as e:
+            self.notify(f"Failed to delete '{name}': {str(e)}", severity="error")
+            config_mgr.append_log("Folder deletion error", {"name": name, "path": target_path_str, "error": str(e)})
         finally:
             self.deleting_paths.remove(target_path_str)
-            self.worktrees = [w for w in self.worktrees if w["path"] != target_path_str]
+            if success:
+                self.worktrees = [w for w in self.worktrees if w["path"] != target_path_str]
             self.populate_table()
+
+    @work(exclusive=False)
+    async def execute_bulk_deletion(self, target_paths: list[str], names: list[str]) -> None:
+        for p in target_paths:
+            self.deleting_paths.add(p)
+        self.selected_wts.clear()
+        self.populate_table()
+        self.notify(f"Queued bulk deletion for {len(names)} worktrees...", timeout=3)
+
+        successful_paths = []
+        failures = []
+
+        async def safe_delete(path, name):
+            try:
+                await self._do_single_deletion(path, name)
+                successful_paths.append(path)
+            except PermissionError as e:
+                failures.append(f"{name} (Files in use)")
+                config_mgr.append_log("Folder deletion error", {"name": name, "path": path, "error": str(e)})
+            except Exception as e:
+                failures.append(f"{name} ({str(e)})")
+                config_mgr.append_log("Folder deletion error", {"name": name, "path": path, "error": str(e)})
+
+        tasks = [safe_delete(p, n) for p, n in zip(target_paths, names)]
+        await asyncio.gather(*tasks)
+
+        if successful_paths:
+            self.notify(f"Successfully deleted {len(successful_paths)} worktrees!", severity="success")
+        if failures:
+            self.notify(f"Failed to delete: {', '.join(failures)}", severity="error")
+
+        for p in target_paths:
+            if p in self.deleting_paths:
+                self.deleting_paths.remove(p)
+        if successful_paths:
+            self.worktrees = [w for w in self.worktrees if w["path"] not in successful_paths]
+        self.populate_table()
 
     def action_submit(self) -> None:
         if self.query_one("#tabs").active != "tab-create": return
@@ -1832,6 +1969,24 @@ class OdooWtApp(App):
                 row_index = meta["row"]
                 col_key = list(table.columns.keys())[col_index].value
                 
+                if col_key == "col-select":
+                    from textual.coordinate import Coordinate
+                    coord = Coordinate(row_index, col_index)
+                    row_key = table.coordinate_to_cell_key(coord).row_key
+                    path = str(row_key.value)
+                    if is_base_branch(Path(path).name):
+                        return
+                    
+                    if path in self.selected_wts:
+                        self.selected_wts.remove(path)
+                    else:
+                        self.selected_wts.add(path)
+                    
+                    is_selected = path in self.selected_wts
+                    cell_value = "[b green]✔[/b green]" if is_selected else "[dim]☐[/dim]"
+                    table.update_cell(row_key, "col-select", cell_value)
+                    return
+
                 if col_key == "col-link":
                     from textual.coordinate import Coordinate
                     coord = Coordinate(row_index, col_index)
