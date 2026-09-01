@@ -161,7 +161,11 @@ class OdooWtApp(App):
         except Exception:
             active_tab = "tab-create"
             
-        parts = ["^S Create", "^X Delete", "^R Refresh", "^T Tab", "^Q Quit"]
+        parts = []
+        if active_tab == "tab-create":
+            parts.append("^S Create")
+            
+        parts.extend(["^X Delete", "^R Refresh", "^T Tab", "^Q Quit"])
         if active_tab == "tab-manage":
             parts.append("^B Runbot")
             parts.append("^W Select")
