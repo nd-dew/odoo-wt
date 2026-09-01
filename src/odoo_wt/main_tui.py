@@ -164,8 +164,10 @@ class OdooWtApp(App):
         parts = []
         if active_tab == "tab-create":
             parts.append("^S Create")
+        elif active_tab == "tab-manage":
+            parts.append("^X Delete")
             
-        parts.extend(["^X Delete", "^R Refresh", "^T Tab", "^Q Quit"])
+        parts.extend(["^R Refresh", "^T Tab", "^Q Quit"])
         if active_tab == "tab-manage":
             parts.append("^B Runbot")
             parts.append("^W ^A ^D Select")
