@@ -170,7 +170,7 @@ class OdooWtApp(App):
         parts.extend(["^R Refresh", "^T Tab", "^Q Quit"])
         if active_tab == "tab-manage":
             parts.append("^B Runbot")
-            parts.append("^W ^A ^D Select")
+            parts.append("^W,^A,^D Select")
             sort_labels = {
                 "recency": "Rec",
                 "version": "Ver",
