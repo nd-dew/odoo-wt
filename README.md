@@ -73,6 +73,24 @@ uv tool install . --force
 
 *(Tip: For active development, use `uv tool install --editable . --force` to see code changes instantly without re-installing.)*
 
+### Running Your Local Changes Without Installing Anything
+
+`uv tool install` (with or without `--editable`) affects your **global** `odoo-wt` command — the one on your `PATH`, used everywhere on your system. If you just want to try out an uncommitted change in this checkout without touching that global command at all, run it straight from the repo instead:
+
+```bash
+cd odoo-wt   # wherever you cloned it
+uv run odoo-wt
+```
+
+`uv run` always uses the project's own local `.venv`, which `uv` keeps editable-installed against the source in this repo automatically — so it reflects whatever is on disk right now, uncommitted changes included, with zero install step. It's completely separate from whatever `uv tool install` put on your `PATH`, so the two can drift out of sync:
+
+| Command | What it runs |
+|---|---|
+| `uv run odoo-wt` (from inside the repo) | This exact checkout, live, always up to date |
+| `odoo-wt` (global, on `PATH`) | Whatever `uv tool install` last installed — a frozen snapshot unless you installed with `--editable` |
+
+If your global `odoo-wt` ever seems to be running stale code, that's why — re-run `uv tool install --editable . --force` from the repo to link it live, or just use `uv run odoo-wt` for one-off testing.
+
 ## Configuration
 
 The tool saves its configuration to `~/.config/odoo-wt.json`. You can edit paths directly in the Settings tab within the application.

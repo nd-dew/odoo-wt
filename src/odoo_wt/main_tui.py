@@ -72,8 +72,7 @@ class OdooWtApp(App):
         Binding("c", "copy_text", "Copy", key_display="C"),
         Binding("ctrl+b", "open_runbot", "Runbot", key_display="^B"),
         Binding("ctrl+y", "toggle_sort", "Sort: Cycle", key_display="^Y"),
-        Binding("s", "toggle_select", "Toggle", show=True, key_display="S"),
-        Binding("S", "toggle_select", "Toggle", show=False),
+        Binding("ctrl+w", "toggle_select", "Toggle Select", show=True, key_display="^W"),
         Binding("ctrl+a", "select_all", "Select All", show=False),
         Binding("ctrl+d", "deselect_all", "Clear", show=False),
         Binding("escape", "quit", "", show=False),
@@ -165,6 +164,9 @@ class OdooWtApp(App):
         parts = ["^S Create", "^X Delete", "^R Refresh", "^T Tab", "^Q Quit"]
         if active_tab == "tab-manage":
             parts.append("^B Runbot")
+            parts.append("^W Select")
+            parts.append("^A All")
+            parts.append("^D Clear")
             sort_labels = {
                 "recency": "Rec",
                 "version": "Ver",
@@ -210,9 +212,17 @@ class OdooWtApp(App):
             active_tab = self.query_one("#tabs").active
             focused = self.focused
             
-            # Priority Shortcut: Always delete on Manage tab with Ctrl+X, even if search is focused
-            if active_tab == "tab-manage" and event.key == "ctrl+x":
-                self.action_delete_wt()
+            # Priority Shortcuts: Always available on Manage tab, even if search is focused
+            # (bypasses Input's own built-in ctrl+w/ctrl+a/ctrl+d/ctrl+x bindings)
+            if active_tab == "tab-manage" and event.key in ("ctrl+x", "ctrl+w", "ctrl+a", "ctrl+d"):
+                if event.key == "ctrl+x":
+                    self.action_delete_wt()
+                elif event.key == "ctrl+w":
+                    self.action_toggle_select()
+                elif event.key == "ctrl+a":
+                    self.action_select_all()
+                elif event.key == "ctrl+d":
+                    self.action_deselect_all()
                 event.stop()
                 event.prevent_default()
                 return
@@ -1128,6 +1138,9 @@ class OdooWtApp(App):
 
     @on(DataTable.RowSelected, "#wt-table")
     def on_wt_row_selected(self, event: DataTable.RowSelected) -> None:
+        import time
+        if time.time() - getattr(self, "_last_table_click_time", 0) < 0.2:
+            return
         path = str(event.row_key.value)
         self.touch_worktree(path)
         config_mgr.append_log("Worktree Selected (Action)", {"path": path})
@@ -1963,12 +1976,26 @@ class OdooWtApp(App):
         meta = event.style.meta
         config_mgr.append_log("App received table click", {"meta": str(meta)})
         
+        import time
+        self._last_table_click_time = time.time()
+        
         if "row" in meta and "column" in meta:
             try:
                 col_index = meta["column"]
                 row_index = meta["row"]
                 col_key = list(table.columns.keys())[col_index].value
                 
+                # Double click opens the worktree (except on checkbox column)
+                if event.chain == 2:
+                    if col_key != "col-select":
+                        from textual.coordinate import Coordinate
+                        row_key = table.coordinate_to_cell_key(Coordinate(row_index, 0)).row_key
+                        path = str(row_key.value)
+                        self.touch_worktree(path)
+                        config_mgr.append_log("Worktree Selected (Double-Click)", {"path": path})
+                        self.exit({"action": "terminal", "path": path})
+                    return
+
                 if col_key == "col-select":
                     from textual.coordinate import Coordinate
                     coord = Coordinate(row_index, col_index)
