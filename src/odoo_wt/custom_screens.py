@@ -25,6 +25,9 @@ class BaseDeleteConfirmScreen(ModalScreen[bool]):
         elif event.key == "right":
             self.focus_next()
 
+    def on_mount(self) -> None:
+        self.query_one("#btn-cancel").focus()
+
     async def rotate_buttons(self, step2_msg: str, step3_msg: str, log_name: str, log_meta: dict):
         config_mgr.append_log(log_name, {"step": self.step, **log_meta})
         self.step += 1
