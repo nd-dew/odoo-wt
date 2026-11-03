@@ -938,3 +938,139 @@ def test_real_runbot_batch_2621224_level_less_inline_error(monkeypatch):
     # Verify that both level-less inline errors are parsed and HTML-tag stripped beautifully!
     assert "minimal_check  ➔  This bundle contains some pull requests but no corresponding pr was found for branch odoo-dev/odoo:master-browse_audit-pian. Did you forget to create it? If not, please delete the branch" in tests
     assert "minimal_check  ➔  Branch odoo-dev/odoo:master-browse_audit-pian has the same commit as the base and is not needed, please delete it." in tests
+
+def test_pr_links_with_extra_bundle_row_classes(monkeypatch):
+    """Runbot renders '<div class="row bundle_row border-bottom">' with the PR dropdown before the batch link."""
+    from odoo_wt.runbot_client import query_branch_status
+
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def read(self, *args):
+            return self.content.encode("utf-8")
+
+    index_html = (
+        '<div class="row bundle_row border-bottom">\n'
+        '  <a class="dropdown-item" href="https://github.com/odoo-dev/enterprise/tree/my-branch">tree</a>\n'
+        '  <a class="dropdown-item" href="https://github.com/odoo/enterprise/pull/120248" title="View PR">PR</a>\n'
+        + ' ' * 2000 +
+        '  <a href="/runbot/batch/2860321" title="2026-11-02 15:46:26">Batch</a>\n'
+        '</div>'
+    )
+
+    def mock_urlopen(request, *args, **kwargs):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        return MockResponse("" if "/batch/" in url else index_html)
+
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+
+    res = query_branch_status("my-branch")
+    assert res is not None
+    assert res[0] == "https://runbot.odoo.com/runbot/batch/2860321"
+    assert res[6] is None
+    assert res[7] == "https://github.com/odoo/enterprise/pull/120248"
+
+
+_TILE_SEARCH_HTML = '''
+<div class="row bundle_row border-bottom">
+  <a class="dropdown-item" href="https://github.com/odoo/enterprise/pull/120248">PR</a>
+  <div class="batch_tile">
+    <div class="card border-danger">
+      <a class="card-header" href="/runbot/batch/2860419" title="2026-11-02 16:19:55">38 minutes ago</a>
+      <div class="card-body"><div class="batch_slots">
+        <div class="slot_container">
+          <div class="input-group input-group-ssm slot_button_group slot_link_matched">
+            <span class="input-group-text text-bg-success border-success"><i class="fa fa-check fa-fw"></i></span>
+            <a href="/runbot/batch/2860419/build/131029638" class="btn btn-default slot_name"><span>Enterprise Run</span></a>
+            <build-options-dropdown data-id="131029638" data-global_result="ok" data-global_state="running" data-host="runbot255.odoo.com" data-dest="131029638-master" data-log_list="[&#34;install_run&#34;, &#34;run&#34;]"></build-options-dropdown>
+          </div>
+        </div>
+        <div class="slot_container">
+          <div class="input-group input-group-ssm slot_button_group slot_link_created">
+            <span class="input-group-text text-bg-danger border-danger"><i class="fa fa-times fa-fw"></i></span>
+            <a href="/runbot/batch/2860419/build/131032320" class="btn btn-default slot_name"><span>Check Style</span></a>
+            <build-options-dropdown data-id="131032320" data-global_result="ko" data-global_state="done" data-host="runbot354.odoo.com" data-dest="131032320-master" data-log_list="[&#34;check_style_ruff&#34;]"></build-options-dropdown>
+          </div>
+        </div>
+        <div class="slot_container">
+          <div class="input-group input-group-ssm slot_button_group slot_link_created">
+            <a href="/runbot/batch/2860419/build/131032322" class="btn btn-default slot_name"><span>Code Owner</span></a>
+            <build-options-dropdown data-id="131032322" data-global_result="warn" data-global_state="done" data-host="runbot293.odoo.com" data-dest="131032322-master" data-log_list="[]"></build-options-dropdown>
+          </div>
+        </div>
+        <div class="slot_container">
+          <div class="input-group input-group-ssm slot_button_group slot_link_created">
+            <a href="/runbot/batch/2860419/build/131032399" class="btn btn-default slot_name"><span>Enterprise Tests</span></a>
+            <build-options-dropdown data-id="131032399" data-global_result="ok" data-global_state="testing" data-host="runbot293.odoo.com" data-dest="131032399-master" data-log_list="[]"></build-options-dropdown>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+'''
+
+
+def _mock_tile_urlopen(monkeypatch, requested):
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def read(self, *args):
+            return self.content.encode("utf-8")
+
+    def mock_urlopen(request, *args, **kwargs):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        requested.append(url)
+        if "runbot?search=" in url:
+            return MockResponse(_TILE_SEARCH_HTML)
+        if url == "http://runbot354.odoo.com/runbot/static/build/131032320-master/logs/check_style_ruff.txt":
+            return MockResponse("ruff check\nFound 1 error.\nexit code 1\n")
+        if url.endswith("check_style_ruff-ruff-output.json"):
+            return MockResponse('[{"code": "W291", "message": "Trailing whitespace", '
+                                '"filename": "/data/build/enterprise/ai/models/ai_tool.py", '
+                                '"location": {"row": 320, "column": 26}}]')
+        raise urllib.error.HTTPError(url, 403, "Forbidden", {}, None)
+
+    import urllib.error
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+
+
+def test_query_branch_status_from_search_tile(monkeypatch):
+    """Batch pages are behind a bot challenge (403): counts must come from the search page tile."""
+    from odoo_wt.runbot_client import query_branch_status
+    requested = []
+    _mock_tile_urlopen(monkeypatch, requested)
+
+    res = query_branch_status("master-browse_audit-pian")
+    batch_url, ts_str, success, failed, warning, running, odoo_pr, enterprise_pr, upgrade_pr = res
+    assert batch_url == "https://runbot.odoo.com/runbot/batch/2860419"
+    assert ts_str == "2026-11-02 16:19:55"
+    # "running" state on an ok build is a live instance (done), "testing" is still in progress
+    assert (success, failed, warning, running) == (1, 1, 1, 1)
+    assert enterprise_pr == "https://github.com/odoo/enterprise/pull/120248"
+    assert not any("/runbot/batch/" in u for u in requested)
+
+
+def test_failing_tests_from_search_tile_logs(monkeypatch):
+    from odoo_wt.runbot_client import check_branch_status_and_comments
+    requested = []
+    _mock_tile_urlopen(monkeypatch, requested)
+
+    res = check_branch_status_and_comments("master-browse_audit-pian", skip_comments=True, verbose_level=0)
+    assert res["failing_tests"] == [
+        "check_style_ruff",
+        "Code Owner  ➔  warning (details on the batch page)",
+    ]
+
+    res = check_branch_status_and_comments("master-browse_audit-pian", skip_comments=True, verbose_level=2)
+    assert res["failing_tests"][0] == (
+        "check_style_ruff  ➔  enterprise/ai/models/ai_tool.py:320:26  ➔  [W291] Trailing whitespace"
+    )
