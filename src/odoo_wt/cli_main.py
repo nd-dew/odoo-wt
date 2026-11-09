@@ -276,7 +276,15 @@ complete -F _odoo_wt_autocomplete odoo-wt""")
         esac
     fi
 }
-compdef _odoo_wt_zsh_autocomplete odoo-wt""")
+# Register at the first prompt, after the whole ~/.zshrc ran: a compinit called after
+# this script is sourced would otherwise wipe the registration.
+_odoo_wt_register_completion() {
+    (( $+functions[compdef] )) || { autoload -Uz compinit && compinit }
+    compdef _odoo_wt_zsh_autocomplete odoo-wt
+    add-zsh-hook -d precmd _odoo_wt_register_completion
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _odoo_wt_register_completion""")
             sys.exit(0)
             
         else:
