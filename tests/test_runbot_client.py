@@ -1074,3 +1074,68 @@ def test_failing_tests_from_search_tile_logs(monkeypatch):
     assert res["failing_tests"][0] == (
         "check_style_ruff  ➔  enterprise/ai/models/ai_tool.py:320:26  ➔  [W291] Trailing whitespace"
     )
+
+
+# ---------------- PR reviews data path ----------------
+
+def _fake_gh(pr_json, inline_json):
+    import subprocess
+    def fake_run(cmd, **kw):
+        out = json.dumps(inline_json if cmd[1] == "api" else pr_json)
+        return subprocess.CompletedProcess(cmd, 0, stdout=out, stderr="")
+    return fake_run
+
+_PR_JSON = {
+    "state": "OPEN", "isDraft": True, "title": "[IMP] foo", "reviewDecision": "APPROVED",
+    "comments": [{"author": {"login": "alice"}, "createdAt": "2026-06-18T08:00:00Z", "url": "u1", "body": "hello"},
+                 {"author": {"login": "robodoo"}, "createdAt": "2026-06-18T08:30:00Z", "url": "ubot", "body": "bot"}],
+    "reviews": [{"author": {"login": "bob"}, "submittedAt": "2026-06-18T09:00:00Z", "state": "APPROVED", "body": ""},
+                {"author": {"login": "carl"}, "submittedAt": "2026-06-18T09:30:00Z", "state": "COMMENTED", "body": ""}],
+}
+_INLINE = [{"user": {"login": "dave"}, "created_at": "2026-06-18T10:00:00Z", "html_url": "u2",
+            "body": "inline", "path": "addons/mail/foo.py"}]
+
+def test_fetch_repo_pr_data_meta_and_verdicts(monkeypatch):
+    from odoo_wt import runbot_client as rc
+    monkeypatch.setattr("subprocess.run", _fake_gh(_PR_JSON, _INLINE))
+    data = rc.fetch_repo_pr_data("odoo/odoo", "1", include_verdicts=True)
+    assert data["meta"]["state"] == "OPEN" and data["meta"]["is_draft"] is True
+    assert data["meta"]["title"] == "[IMP] foo" and data["meta"]["review_decision"] == "APPROVED"
+    users = [c["user"] for c in data["comments"]]
+    assert "bob" in users and "carl" not in users
+    assert [c for c in data["comments"] if c["user"] == "dave"][0]["path"] == "addons/mail/foo.py"
+    # old callers keep the plain list shape and drop empty-body approvals
+    plain = rc.fetch_repo_comments("odoo/odoo", "1")
+    assert isinstance(plain, list) and "bob" not in [c["user"] for c in plain]
+
+def test_get_pr_reviews_order_limit_total(monkeypatch):
+    from odoo_wt import runbot_client as rc
+    monkeypatch.setattr(rc, "is_gh_authenticated", lambda: True)
+    monkeypatch.setattr("subprocess.run", _fake_gh(_PR_JSON, _INLINE))
+    res = rc.get_pr_reviews("https://github.com/odoo/odoo/pull/1", None, None, limit=2)
+    assert res["total"] == 3  # alice, bob (approval), dave; bot and empty COMMENTED excluded
+    assert [i["user"] for i in res["items"]] == ["bob", "dave"]  # last 2, oldest first
+    assert res["items"][0]["state"] == "APPROVED"
+    assert res["prs"][0]["repo"] == "odoo/odoo"
+    full = rc.get_pr_reviews("https://github.com/odoo/odoo/pull/1", None, None, limit=None)
+    assert [i["user"] for i in full["items"]] == ["alice", "bob", "dave"]
+
+def test_get_pr_reviews_unauthenticated(monkeypatch):
+    from odoo_wt import runbot_client as rc
+    monkeypatch.setattr(rc, "is_gh_authenticated", lambda: False)
+    assert rc.get_pr_reviews("https://github.com/odoo/odoo/pull/1", None) is None
+
+def test_latest_comment_ignores_empty_approval(monkeypatch):
+    from odoo_wt import runbot_client as rc
+    monkeypatch.setattr(rc, "is_gh_authenticated", lambda: True)
+    monkeypatch.setattr("subprocess.run", _fake_gh(_PR_JSON, []))
+    latest = rc.get_latest_pr_comment("https://github.com/odoo/odoo/pull/1", None)
+    assert latest["user"] == "alice"
+    assert "bob" not in [h["user"] for h in latest["history"]]
+
+def test_wrap_review_body():
+    from odoo_wt.cli_main import _wrap_review_body
+    body = "\n".join(f"line {i}" for i in range(10))
+    short = _wrap_review_body(body, verbose=False)
+    assert len(short) == 4 and short[-1].endswith("…")
+    assert _wrap_review_body(body, verbose=True) == [f"line {i}" for i in range(10)]

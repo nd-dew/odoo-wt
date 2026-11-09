@@ -1236,6 +1236,88 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose_level
     }
     console.print(f"[dim]Sorted by: {sort_labels.get(sort_mode, sort_mode)}[/dim]")
 
+def _wrap_review_body(body, verbose, width=80, max_lines=4):
+    """Wraps a review body at `width` columns. Default caps at max_lines (adds an ellipsis when cut)."""
+    import textwrap
+    lines = []
+    for raw in body.splitlines():
+        if not raw.strip():
+            if verbose and lines:
+                lines.append("")
+            continue
+        lines.extend(textwrap.wrap(raw.rstrip(), width=width) or [""])
+    while lines and not lines[-1]:
+        lines.pop()
+    if not verbose and len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1].rstrip() + " …"
+    return lines
+
+def _print_pr_reviews_section(console, res, verbose, limit=10):
+    from rich.markup import escape
+    from .runbot_client import get_pr_reviews
+
+    odoo_pr, ent_pr, upg_pr = res["odoo_pr"], res["enterprise_pr"], res["upgrade_pr"]
+    console.print("\n  [bold yellow]Pull Requests:[/bold yellow]")
+    if not odoo_pr and not ent_pr and not upg_pr:
+        console.print("    [dim]No linked pull requests found on Runbot.[/dim]")
+        console.print("\n  [bold yellow]PR Reviews:[/bold yellow]")
+        console.print("    [dim]No review comments found or GitHub authentication not active.[/dim]\n")
+        return
+
+    with console.status("[cyan]Fetching PR reviews from GitHub..."):
+        data = get_pr_reviews(odoo_pr, ent_pr, upg_pr, limit=None if verbose else limit)
+
+    metas = {m["repo"]: m for m in (data or {}).get("prs", [])}
+    state_colors = {"OPEN": "green", "DRAFT": "yellow", "MERGED": "magenta", "CLOSED": "red"}
+    decision_colors = {"APPROVED": "green", "CHANGES_REQUESTED": "red", "REVIEW_REQUIRED": "yellow"}
+    for label, repo, url in (("Community: ", "odoo/odoo", odoo_pr), ("Enterprise:", "odoo/enterprise", ent_pr), ("Upgrade:   ", "odoo/upgrade", upg_pr)):
+        if not url:
+            continue
+        line = f"    - {label} [link={url}]{url}[/link]"
+        meta = metas.get(repo)
+        if meta:
+            state = "DRAFT" if (meta["is_draft"] and meta["state"] == "OPEN") else (meta["state"] or "?")
+            line += f"  [bold {state_colors.get(state, 'white')}]{state}[/bold {state_colors.get(state, 'white')}]"
+            decision = meta["review_decision"]
+            if decision:
+                color = decision_colors.get(decision, "white")
+                line += f"  [bold {color}]{decision}[/bold {color}]"
+            console.print(line)
+            if meta["title"]:
+                console.print(f"        [dim]{escape(meta['title'])}[/dim]")
+        else:
+            console.print(line)
+
+    console.print()
+    items = (data or {}).get("items", [])
+    if not items:
+        console.print("  [bold yellow]PR Reviews:[/bold yellow]")
+        console.print("    [dim]No review comments found or GitHub authentication not active.[/dim]\n")
+        return
+
+    total = data["total"]
+    if len(items) < total:
+        console.print(f"  [bold yellow]PR Reviews (last {len(items)} of {total}):[/bold yellow]")
+    else:
+        console.print(f"  [bold yellow]PR Reviews ({total}):[/bold yellow]")
+    for c in items:
+        prefix = "[bold green]\\[Ent][/bold green]" if c["is_ent"] else ("[bold yellow]\\[Upg][/bold yellow]" if c["is_upg"] else "[bold cyan]\\[Comm][/bold cyan]")
+        head = f"    👤 {prefix} [bold cyan]@{escape(c['user'])}[/bold cyan]"
+        if c.get("path"):
+            head += f" [dim]on {escape(c['path'])}[/dim]"
+        head += f" [dim]({c['relative']})[/dim]"
+        state = c.get("state")
+        if state == "APPROVED":
+            head += " [bold green]✅ approved[/bold green]"
+        elif state == "CHANGES_REQUESTED":
+            head += " [bold red]❌ changes requested[/bold red]"
+        console.print(head + ":", soft_wrap=True)
+        for line in _wrap_review_body(c.get("body", ""), verbose):
+            console.print(f"      [italic]{escape(line)}[/italic]" if line else "", soft_wrap=True)
+        console.print(f"    🔗 [underline blue]{escape(c['html_url'])}[/underline blue]\n", soft_wrap=True)
+    print()
+
 def print_single_branch_detailed_status(config, branch_name, verbose_level=0, mode="combined"):
     from rich.console import Console
     from .runbot_client import check_branch_status_and_comments
@@ -1378,7 +1460,9 @@ def print_single_branch_detailed_status(config, branch_name, verbose_level=0, mo
                     if len(failing_tests) > 5:
                         console.print(f"    - [dim]... and {len(failing_tests) - 5} more (Check the Batch URL or run with --verbose)[/dim]")
     
-    if mode != "runbot" and not is_base:
+    if mode == "reviews" and not is_base:
+        _print_pr_reviews_section(console, res, verbose)
+    elif mode != "runbot" and not is_base:
         odoo_pr = res["odoo_pr"]
         ent_pr = res["enterprise_pr"]
         upg_pr = res["upgrade_pr"]

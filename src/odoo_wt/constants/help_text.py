@@ -13,7 +13,7 @@ A premium terminal tool to manage, deploy, and monitor Odoo developer worktrees.
 [bold yellow]Subcommands:[/bold yellow]
   [bold green]status[/bold green] [cyan]\\[all/-a/branch][/cyan]    Show Runbot build status & GitHub PR reviews [dim](Combined)[/dim]
   [bold green]runbot[/bold green] [cyan]\\[all/-a/branch][/cyan]    Show Runbot build details & failing tests [dim](CI-focused)[/dim]
-  [bold green]reviews[/bold green] [cyan]\\[all/-a/branch][/cyan]   Show linked Pull Requests & latest peer comments [dim](PR-focused)[/dim]
+  [bold green]reviews[/bold green] [cyan]\\[all/-a/branch][/cyan]   Show linked PRs & last 10 peer reviews [dim](-v: all)[/dim] [dim](PR-focused)[/dim]
   [bold green]list[/bold green]                         Simply list all local worktree branch names
   [bold green]create[/bold green] [cyan]<branch>[/cyan]          Open the TUI pre-filled in the 'Creation' tab
   [bold green]open[/bold green] [cyan]<branch>[/cyan]            Directly change your shell directory into a worktree
@@ -53,7 +53,7 @@ A premium terminal tool to manage, deploy, and monitor Odoo developer worktrees.
   [bold cyan]3. Symmetrical Diagnostics:[/bold cyan]
      - [bold]status[/bold]: Combined CI build stats + Latest GitHub Reviews/Comments.
      - [bold]runbot[/bold]: CI-only (build counts + failing tests). [bold green]Skips GitHub PR calls for speed![/bold green]
-     - [bold]reviews[/bold]: Reviews-only (Pull Requests + latest peer comments). Skips Runbot counts.
+     - [bold]reviews[/bold]: Reviews-only (PR overview + last 10 peer reviews, -v for all). Skips Runbot counts.
 
 [bold yellow]Recency Sorting:[/bold yellow]
   Worktrees are sorted by default by recency. Any action that deploys, opens,
@@ -141,7 +141,9 @@ The [bold green]reviews[/bold green] command displays the linked Pull Requests a
 
 [bold yellow]Description:[/bold yellow]
   A focused PR diagnostic command that displays linked community, enterprise, and upgrade
-  Pull Requests on GitHub, alongside the last human review comment/approvals.
+  Pull Requests on GitHub (state, title and review decision of each), alongside the human
+  review history: comments, reviews (including text-less approvals / change requests) and inline comments.
+  By default the [bold cyan]last 10 items[/bold cyan] are shown (oldest first); use [bold cyan]-v[/bold cyan] to show [bold cyan]all[/bold cyan] items with full bodies.
   
   By default, if run inside any worktree directory, it displays a detailed single-branch reviews card.
   To bypass this and force-display the global table of all branches, use the [bold cyan]'all'[/bold cyan] or [bold cyan]'-a'[/bold cyan] parameter.

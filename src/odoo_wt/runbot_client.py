@@ -269,65 +269,117 @@ def is_gh_authenticated() -> bool:
         _gh_auth_status = False
         return False
 
-def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
+BOT_LOGINS = {
+    "robodoo", "fw-bot", "runbot", "github-actions[bot]",
+    "runbot-odoo", "runbot-enterprise", "mergebot"
+}
+
+PR_REPOS = (("odoo/odoo", "odoo_pr"), ("odoo/enterprise", "enterprise_pr"), ("odoo/upgrade", "upgrade_pr"))
+
+
+def _is_bot_login(login: str) -> bool:
+    user_lower = login.lower()
+    return any(bot in user_lower for bot in BOT_LOGINS)
+
+
+def _parse_iso_time(iso_str: str):
+    import datetime
+    iso_str = (iso_str or "").replace("Z", "")
+    if "." in iso_str:
+        iso_str = iso_str.split(".")[0]
+    try:
+        return datetime.datetime.fromisoformat(iso_str)
+    except Exception:
+        return datetime.datetime.min
+
+
+def _relative_age(dt, now=None) -> str:
+    import datetime
+    now = now or datetime.datetime.utcnow()
+    total_seconds = max(0, int((now - dt).total_seconds()))
+    if total_seconds < 60:
+        return "just now"
+    if total_seconds < 3600:
+        return f"{total_seconds // 60}m ago"
+    if total_seconds < 86400:
+        return f"{total_seconds // 3600}h ago"
+    days = total_seconds // 86400
+    return "yesterday" if days == 1 else f"{days}d ago"
+
+
+def _pr_number_from_url(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    match = re.search(r'/pull/(\d+)', url)
+    return match.group(1) if match else None
+
+
+def fetch_repo_pr_data(repo_name: str, pr_number: str, include_verdicts: bool = False) -> dict:
     """
-    Fetches latest review comments and issue comments for a PR using high-speed GraphQL.
+    Fetches PR metadata plus comments/reviews/inline comments for one PR.
+    Returns {"meta": {...}, "comments": [...]}.
+    With include_verdicts, APPROVED / CHANGES_REQUESTED reviews are kept even with an empty body
+    (they carry a "state" key). Otherwise only items with a non-empty body are returned.
     """
     import subprocess
-    import json
-    
+
     comments = []
-    cmd = ["gh", "pr", "view", pr_number, "-R", repo_name, "--json", "comments,reviews"]
-    debug_log(f"Fetching GitHub PR comments for repo '{repo_name}' PR #{pr_number} using 'gh pr view'...")
+    meta = {}
+    is_ent = "enterprise" in repo_name
+    is_upg = "upgrade" in repo_name
+    cmd = ["gh", "pr", "view", pr_number, "-R", repo_name, "--json",
+           "comments,reviews,state,isDraft,title,reviewDecision"]
+    debug_log(f"Fetching GitHub PR data for repo '{repo_name}' PR #{pr_number} using 'gh pr view'...")
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=15)
         if res.stdout.strip():
             data = json.loads(res.stdout)
             if isinstance(data, dict):
-                # 1. Parse global comments
-                raw_comments = data.get("comments", [])
-                if isinstance(raw_comments, list):
-                    for item in raw_comments:
-                        if isinstance(item, dict):
-                            author_obj = item.get("author")
-                            if author_obj and isinstance(author_obj, dict):
-                                login = author_obj.get("login")
-                                if login:
-                                    body_text = item.get("body", "")
-                                    if body_text.strip():
-                                        comments.append({
-                                            "user": login,
-                                            "created_at": item.get("createdAt", ""),
-                                            "html_url": item.get("url", ""),
-                                            "body": body_text,
-                                            "is_ent": "enterprise" in repo_name,
-                                            "is_upg": "upgrade" in repo_name
-                                        })
-                # 2. Parse reviews
-                raw_reviews = data.get("reviews", [])
-                if isinstance(raw_reviews, list):
-                    for item in raw_reviews:
-                        if isinstance(item, dict):
-                            author_obj = item.get("author")
-                            if author_obj and isinstance(author_obj, dict):
-                                login = author_obj.get("login")
-                                if login:
-                                    body_text = item.get("body", "")
-                                    if body_text.strip():
-                                        comments.append({
-                                            "user": login,
-                                            "created_at": item.get("submittedAt", ""),
-                                            "html_url": f"https://github.com/{repo_name}/pull/{pr_number}",
-                                            "body": body_text,
-                                            "is_ent": "enterprise" in repo_name,
-                                            "is_upg": "upgrade" in repo_name
-                                        })
+                meta = {
+                    "repo": repo_name,
+                    "number": pr_number,
+                    "url": f"https://github.com/{repo_name}/pull/{pr_number}",
+                    "state": data.get("state") or "",
+                    "is_draft": bool(data.get("isDraft")),
+                    "title": data.get("title") or "",
+                    "review_decision": data.get("reviewDecision") or "",
+                    "is_ent": is_ent,
+                    "is_upg": is_upg,
+                }
+                for key, time_key, kind in (("comments", "createdAt", "comment"), ("reviews", "submittedAt", "review")):
+                    raw_items = data.get(key, [])
+                    if not isinstance(raw_items, list):
+                        continue
+                    for item in raw_items:
+                        if not isinstance(item, dict):
+                            continue
+                        author_obj = item.get("author")
+                        login = author_obj.get("login") if isinstance(author_obj, dict) else None
+                        if not login:
+                            continue
+                        body_text = item.get("body") or ""
+                        state = item.get("state") if kind == "review" else None
+                        verdict = include_verdicts and state in ("APPROVED", "CHANGES_REQUESTED")
+                        if not body_text.strip() and not verdict:
+                            continue
+                        entry = {
+                            "user": login,
+                            "created_at": item.get(time_key, ""),
+                            "html_url": item.get("url") if kind == "comment" else f"https://github.com/{repo_name}/pull/{pr_number}",
+                            "body": body_text,
+                            "is_ent": is_ent,
+                            "is_upg": is_upg,
+                        }
+                        if kind == "comment":
+                            entry["html_url"] = item.get("url", "")
+                        if verdict:
+                            entry["state"] = state
+                        comments.append(entry)
         debug_log(f"Fetched and parsed {len(comments)} global/review comments via 'gh pr view'.")
     except Exception as e:
         debug_log(f"Exception during 'gh pr view' comments fetch: {e}")
-        pass
 
-    # 3. Fetch inline review comments using standard GitHub pulls/comments API
+    # Inline review comments using standard GitHub pulls/comments API
     try:
         cmd_inline = ["gh", "api", f"repos/{repo_name}/pulls/{pr_number}/comments"]
         debug_log(f"Fetching inline files-changed review comments via standard: 'gh api repos/{repo_name}/pulls/{pr_number}/comments'")
@@ -336,27 +388,94 @@ def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
             raw_inline = json.loads(res_inline.stdout)
             if isinstance(raw_inline, list):
                 for item in raw_inline:
-                    if isinstance(item, dict):
-                        user_obj = item.get("user")
-                        if user_obj and isinstance(user_obj, dict):
-                            login = user_obj.get("login")
-                            if login:
-                                body_text = item.get("body", "")
-                                if body_text.strip():
-                                    comments.append({
-                                        "user": login,
-                                        "created_at": item.get("created_at", ""),
-                                        "html_url": item.get("html_url", ""),
-                                        "body": body_text,
-                                        "is_ent": "enterprise" in repo_name,
-                                        "is_upg": "upgrade" in repo_name
-                                    })
+                    if not isinstance(item, dict):
+                        continue
+                    user_obj = item.get("user")
+                    login = user_obj.get("login") if isinstance(user_obj, dict) else None
+                    body_text = item.get("body") or ""
+                    if login and body_text.strip():
+                        comments.append({
+                            "user": login,
+                            "created_at": item.get("created_at", ""),
+                            "html_url": item.get("html_url", ""),
+                            "body": body_text,
+                            "path": item.get("path") or "",
+                            "is_ent": is_ent,
+                            "is_upg": is_upg,
+                        })
         debug_log(f"Successfully fetched and parsed total of {len(comments)} comments combined.")
     except Exception as e:
         debug_log(f"Exception during 'gh api pulls/comments' fetch: {e}")
-        pass
-        
-    return comments
+
+    return {"meta": meta, "comments": comments}
+
+
+def fetch_repo_comments(repo_name: str, pr_number: str) -> list:
+    """Fetches non-empty review/issue/inline comments for a PR (status behaviour)."""
+    return fetch_repo_pr_data(repo_name, pr_number)["comments"]
+
+
+def _fetch_concurrently(odoo_pr_url, enterprise_pr_url, upgrade_pr_url, fetch_fn) -> list:
+    """Concurrently calls fetch_fn(repo, pr_number) for each linked PR (Comm, Ent, Upg order)."""
+    import concurrent.futures
+    jobs = []
+    for (repo, _), url in zip(PR_REPOS, (odoo_pr_url, enterprise_pr_url, upgrade_pr_url)):
+        num = _pr_number_from_url(url)
+        if num:
+            jobs.append((repo, num))
+    if not jobs:
+        return []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(fetch_fn, repo, num) for repo, num in jobs]
+        results = []
+        for fut in futures:
+            try:
+                results.append(fut.result())
+            except Exception:
+                continue
+    return results
+
+
+def _human_sorted(items: list) -> list:
+    """Filters out bots and undated items, sorted newest first."""
+    human = [c for c in items if not _is_bot_login(c["user"]) and c["created_at"]]
+    human.sort(key=lambda c: _parse_iso_time(c["created_at"]), reverse=True)
+    return human
+
+
+def get_pr_reviews(odoo_pr_url: Optional[str], enterprise_pr_url: Optional[str],
+                   upgrade_pr_url: Optional[str] = None, limit: Optional[int] = 10) -> Optional[dict]:
+    """
+    Data path for `odoo-wt reviews <branch>`.
+    Returns {"prs": [meta...], "items": [...oldest first...], "total": n} or None when gh is not
+    authenticated / no PRs are linked. limit=None returns every item.
+    Items include empty-body APPROVED / CHANGES_REQUESTED reviews (key "state").
+    """
+    if not is_gh_authenticated():
+        debug_log("Skipping PR reviews lookup because 'gh' CLI is not authenticated.")
+        return None
+    results = _fetch_concurrently(odoo_pr_url, enterprise_pr_url, upgrade_pr_url,
+                                  lambda repo, num: fetch_repo_pr_data(repo, num, include_verdicts=True))
+    if not results:
+        return None
+
+    prs = [r["meta"] for r in results if r["meta"]]
+    all_items = []
+    for r in results:
+        all_items.extend(r["comments"])
+    human = _human_sorted(all_items)
+    total = len(human)
+    selected = human if limit is None else human[:limit]
+
+    import datetime
+    now = datetime.datetime.utcnow()
+    items = []
+    for c in reversed(selected):  # chronological, newest last
+        item = dict(c)
+        item["relative"] = _relative_age(_parse_iso_time(c["created_at"]), now)
+        items.append(item)
+    return {"prs": prs, "items": items, "total": total}
+
 
 def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optional[str], upgrade_pr_url: Optional[str] = None) -> Optional[dict]:
     """
@@ -365,136 +484,43 @@ def get_latest_pr_comment(odoo_pr_url: Optional[str], enterprise_pr_url: Optiona
     if not is_gh_authenticated():
         debug_log("Skipping GitHub comments lookup because 'gh' CLI is not authenticated.")
         return None
-        
-    odoo_pr_num = None
-    if odoo_pr_url:
-        match = re.search(r'/pull/(\d+)', odoo_pr_url)
-        if match:
-            odoo_pr_num = match.group(1)
-            
-    ent_pr_num = None
-    if enterprise_pr_url:
-        match = re.search(r'/pull/(\d+)', enterprise_pr_url)
-        if match:
-            ent_pr_num = match.group(1)
-            
-    upg_pr_num = None
-    if upgrade_pr_url:
-        match = re.search(r'/pull/(\d+)', upgrade_pr_url)
-        if match:
-            upg_pr_num = match.group(1)
-            
-    if not odoo_pr_num and not ent_pr_num and not upg_pr_num:
+
+    if not any(_pr_number_from_url(u) for u in (odoo_pr_url, enterprise_pr_url, upgrade_pr_url)):
         debug_log("No linked Pull Requests found on batch, skipping comments lookup.")
         return None
-        
-    import concurrent.futures
+
     all_comments = []
-    
-    debug_log(f"Gathering latest PR comments from Odoo, Enterprise, and Upgrade PRs (Odoo PR: {odoo_pr_num}, Enterprise PR: {ent_pr_num}, Upgrade PR: {upg_pr_num})...")
-    debug_log("Spawning concurrent ThreadPoolExecutor to fetch repo comments from GitHub...")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = []
-        if odoo_pr_num:
-            futures.append(executor.submit(fetch_repo_comments, "odoo/odoo", odoo_pr_num))
-        if ent_pr_num:
-            futures.append(executor.submit(fetch_repo_comments, "odoo/enterprise", ent_pr_num))
-        if upg_pr_num:
-            futures.append(executor.submit(fetch_repo_comments, "odoo/upgrade", upg_pr_num))
-            
-        for fut in concurrent.futures.as_completed(futures):
-            try:
-                all_comments.extend(fut.result())
-            except Exception:
-                continue
-                
-    BOT_LOGINS = {
-        "robodoo", "fw-bot", "runbot", "github-actions[bot]", 
-        "runbot-odoo", "runbot-enterprise", "mergebot"
-    }
-    
-    human_comments = []
-    for c in all_comments:
-        user_lower = c["user"].lower()
-        if any(bot in user_lower for bot in BOT_LOGINS):
-            continue
-        if not c["created_at"]:
-            continue
-        human_comments.append(c)
-        
+    for comments in _fetch_concurrently(odoo_pr_url, enterprise_pr_url, upgrade_pr_url,
+                                        lambda repo, num: fetch_repo_comments(repo, num)):
+        all_comments.extend(comments)
+
+    human_comments = _human_sorted(all_comments)
     if not human_comments:
         return None
-        
+
     import datetime
-    def parse_time(c_dict):
-        iso_str = c_dict["created_at"].replace("Z", "")
-        if "." in iso_str:
-            iso_str = iso_str.split(".")[0]
-        try:
-            return datetime.datetime.fromisoformat(iso_str)
-        except Exception:
-            return datetime.datetime.min
-            
-    human_comments.sort(key=parse_time, reverse=True)
-    latest = human_comments[0]
-    
-    # Sanitize the body text to a flat, single-line format
-    body = latest.get("body", "")
-    body_clean = " ".join(body.split())
-    latest["body_clean"] = body_clean
-    
     now = datetime.datetime.utcnow()
-    c_time = parse_time(latest)
-    delta = now - c_time
-    total_seconds = int(delta.total_seconds())
-    if total_seconds < 0: total_seconds = 0
-    
-    if total_seconds < 60:
-        relative = "just now"
-    elif total_seconds < 3600:
-        relative = f"{total_seconds // 60}m ago"
-    elif total_seconds < 86400:
-        relative = f"{total_seconds // 3600}h ago"
-    else:
-        days = total_seconds // 86400
-        relative = "yesterday" if days == 1 else f"{days}d ago"
-        
-    latest["relative"] = relative
+    latest = human_comments[0]
+    latest["body_clean"] = " ".join(latest.get("body", "").split())
+    latest["relative"] = _relative_age(_parse_iso_time(latest["created_at"]), now)
     debug_log(f"Latest comment resolved -> User: @{latest['user']} ({latest['relative']}), Body snippet: '{latest['body_clean'][:60]}...'")
-    
-    # Symmetrically extract the history of the last 10 comments chronologically
+
     history = []
     for c in human_comments[:10]:
         c_body = c.get("body", "")
         c_body_clean = " ".join(c_body.split())
         if len(c_body_clean) > 90:
             c_body_clean = c_body_clean[:90].strip() + "..."
-            
-        c_time = parse_time(c)
-        c_delta = now - c_time
-        c_seconds = int(c_delta.total_seconds())
-        if c_seconds < 0: c_seconds = 0
-        
-        if c_seconds < 60:
-            c_relative = "just now"
-        elif c_seconds < 3600:
-            c_relative = f"{c_seconds // 60}m ago"
-        elif c_seconds < 86400:
-            c_relative = f"{c_seconds // 3600}h ago"
-        else:
-            c_days = c_seconds // 86400
-            c_relative = "yesterday" if c_days == 1 else f"{c_days}d ago"
-            
         history.append({
             "user": c["user"],
-            "relative": c_relative,
+            "relative": _relative_age(_parse_iso_time(c["created_at"]), now),
             "body": c_body,
             "body_clean": c_body_clean,
             "html_url": c["html_url"],
             "is_ent": c.get("is_ent", False),
             "is_upg": c.get("is_upg", False)
         })
-        
+
     latest["history"] = history
     return latest
 
