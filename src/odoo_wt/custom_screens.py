@@ -179,7 +179,12 @@ class DeployScreen(Screen):
     @work(exclusive=True)
     async def run_deployment(self):
         config_mgr.append_log("Deployment Started", {"branch": self.engine.branch_name, "version": self.data["version"]})
+        from .incomplete_worktrees import mark_started, mark_finished, remove_worktree_folder
+        # Only a folder this run creates may be rolled back: re-deploying into an existing one must never delete work
+        created_now = not self.engine.target_dir.exists()
         self.engine.target_dir.mkdir(parents=True, exist_ok=True)
+        if created_now:
+            mark_started(self.engine.target_dir)
         
         base_odoo = self.engine.wt_root / "master" / self.engine.comm_dir
         base_ent = self.engine.wt_root / "master" / self.engine.ent_dir
@@ -193,22 +198,31 @@ class DeployScreen(Screen):
                 if update.log_line:
                     self.query_one(f"#log-{update.category}", RichLog).write(update.log_line)
 
-        await asyncio.gather(
-            handle_updates(self.engine.deploy_repo(base_odoo, self.engine.comm_dir, "odoo")),
-            handle_updates(self.engine.deploy_repo(base_ent, self.engine.ent_dir, "ent")),
-            handle_updates(self.engine.setup_uv())
-        )
-
         try:
-            self.query_one("#log-uv", RichLog).write("Generating VS Code launch configuration...")
-            await self.engine.setup_vscode()
-            self.query_one("#log-uv", RichLog).write("✅ VS Code launch configuration created.")
-        except Exception as e:
-            self.query_one("#log-uv", RichLog).write(f"[bold red]Failed to create VS Code launch config: {e}[/bold red]")
+            await asyncio.gather(
+                handle_updates(self.engine.deploy_repo(base_odoo, self.engine.comm_dir, "odoo")),
+                handle_updates(self.engine.deploy_repo(base_ent, self.engine.ent_dir, "ent")),
+                handle_updates(self.engine.setup_uv())
+            )
+
+            try:
+                self.query_one("#log-uv", RichLog).write("Generating VS Code launch configuration...")
+                await self.engine.setup_vscode()
+                self.query_one("#log-uv", RichLog).write("✅ VS Code launch configuration created.")
+            except Exception as e:
+                self.query_one("#log-uv", RichLog).write(f"[bold red]Failed to create VS Code launch config: {e}[/bold red]")
+        except BaseException:
+            # Quit/cancel mid-deploy or a crash: don't leave a half-made folder behind
+            if created_now:
+                config_mgr.append_log("Deployment Rolled Back", {"path": str(self.engine.target_dir)})
+                await asyncio.to_thread(remove_worktree_folder, self.engine.target_dir, self.engine.config)
+            raise
 
         if self.engine.has_errors:
+            # Keep the folder (and its marker) for inspection; 'odoo-wt prune' cleans it up later
             self.show_failure_footer()
             return
+        mark_finished(self.engine.target_dir)
 
         config_mgr.append_log("Deployment Success", {"branch": self.engine.branch_name, "path": str(self.engine.target_dir)})
         self.show_success_footer()

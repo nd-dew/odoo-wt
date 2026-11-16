@@ -75,6 +75,7 @@ class OdooWtApp(App):
         Binding("ctrl+w", "toggle_select", "Toggle Select", show=True, key_display="^W"),
         Binding("ctrl+a", "select_all", "Select All", show=False),
         Binding("ctrl+d", "deselect_all", "Clear", show=False),
+        Binding("ctrl+g", "prune_incomplete", "Prune half-made", show=False),
         Binding("escape", "quit", "", show=False),
         Binding("ctrl+q", "quit", "Quit", show=True, key_display="^Q"),
         Binding("ctrl+c", "quit", "Quit", show=False),
@@ -410,6 +411,14 @@ class OdooWtApp(App):
         table.add_column("Runbot Status", key="col-runbot")
         table.add_column("Link", key="col-link")
         table.add_column("Last Comment", key="col-comment")
+
+        try:
+            from .incomplete_worktrees import incomplete_hint
+            hint = incomplete_hint(self.config)
+            if hint:
+                self.notify(hint.replace("run 'odoo-wt prune'", "press ^G"), severity="warning", timeout=10)
+        except Exception as e:
+            config_mgr.append_log("incomplete worktree check error", {"error": str(e)})
 
         default_tab = self.config.get("default_tab", "tab-create")
         try:
@@ -1199,6 +1208,29 @@ class OdooWtApp(App):
             self.action_refresh_wts()
         elif active == "tab-settings":
             self.action_reset_settings()
+
+    def action_prune_incomplete(self) -> None:
+        from .incomplete_worktrees import find_incomplete_worktrees, remove_worktree_folder
+        from .custom_screens import BulkDeleteConfirmScreen
+        leftovers = find_incomplete_worktrees(self.config)
+        if not leftovers:
+            self.notify("No half-made worktrees found.")
+            return
+
+        def on_confirm(confirm: bool):
+            if confirm:
+                self.run_prune(leftovers)
+
+        self.app.push_screen(BulkDeleteConfirmScreen([p.name for p in leftovers]), on_confirm)
+
+    @work(exclusive=False)
+    async def run_prune(self, leftovers) -> None:
+        from .incomplete_worktrees import remove_worktree_folder
+        for p in leftovers:
+            await asyncio.to_thread(remove_worktree_folder, p, self.config)
+            config_mgr.append_log("Pruned Half-made Worktree", {"path": str(p)})
+        self.notify(f"Pruned {len(leftovers)} half-made worktree{'s' if len(leftovers) > 1 else ''}.")
+        self.action_refresh_wts()
 
     def action_refresh_wts(self) -> None:
         self.resolved_runbot_urls.clear()

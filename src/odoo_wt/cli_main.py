@@ -78,6 +78,120 @@ def get_edit_distance(s1: str, s2: str) -> int:
         distances = distances_
     return distances[-1]
 
+def _parse_selection(text, count):
+    """Parses '1,3-4' into sorted 0-based indexes; returns None when invalid."""
+    picked = set()
+    for part in text.replace(" ", ",").split(","):
+        if not part:
+            continue
+        if "-" in part:
+            lo, _, hi = part.partition("-")
+            if not (lo.isdigit() and hi.isdigit()):
+                return None
+            lo, hi = int(lo), int(hi)
+            if lo > hi:
+                lo, hi = hi, lo
+            picked.update(range(lo, hi + 1))
+        elif part.isdigit():
+            picked.add(int(part))
+        else:
+            return None
+    if not picked or min(picked) < 1 or max(picked) > count:
+        return None
+    return sorted(i - 1 for i in picked)
+
+
+def run_prune_command(config, args):
+    from rich.console import Console
+    from .incomplete_worktrees import find_incomplete_worktrees, remove_worktree_folder
+    console = Console(highlight=False)
+
+    assume_yes = any(a in ("-y", "--yes") for a in args)
+    names = [a for a in args if not a.startswith("-")]
+
+    # 'prune --keep <name>...' / '--unkeep <name>...': manage folders that must never be flagged
+    for flag, adding in (("--keep", True), ("--unkeep", False)):
+        if flag in args:
+            if not names:
+                console.print(f"Usage: odoo-wt prune {flag} <folder> [...]")
+                sys.exit(1)
+            keep = set(config.get("prune_ignore", []))
+            keep = keep | set(names) if adding else keep - set(names)
+            config["prune_ignore"] = sorted(keep)
+            config_mgr.save(config)
+            verb = "Kept (never flagged again)" if adding else "No longer kept"
+            console.print(f"{verb}: {', '.join(names)}")
+            return
+
+    leftovers = find_incomplete_worktrees(config)
+    if names:
+        by_name = {p.name: p for p in leftovers}
+        unknown = [n for n in names if n not in by_name]
+        if unknown:
+            console.print(f"[bold red]Not a half-made worktree:[/bold red] {', '.join(unknown)}")
+            sys.exit(1)
+        leftovers = [by_name[n] for n in names]
+
+    kept = config.get("prune_ignore", [])
+    if not leftovers:
+        console.print("✨ No half-made worktrees found.")
+        if kept:
+            console.print(f"[dim]Kept on purpose: {', '.join(kept)} (odoo-wt prune --unkeep <name>)[/dim]")
+        return
+
+    console.print(f"[bold yellow]Half-made worktrees[/bold yellow] in [cyan]{config['wt_root']}[/cyan]:")
+    for idx, p in enumerate(leftovers, 1):
+        try:
+            content = ", ".join(sorted(e.name for e in p.iterdir())) or "empty"
+        except OSError:
+            content = "unreadable"
+        console.print(f"  [[green]{idx}[/green]] [bold]{p.name}[/bold] [dim]({content})[/dim]")
+
+    if assume_yes:
+        selected = leftovers
+    elif not sys.stdin.isatty():
+        console.print("\nNot a terminal: pass [bold]-y[/bold] to confirm deletion.")
+        sys.exit(1)
+    else:
+        console.print("\n  [green]a[/green]        delete all listed")
+        console.print("  [green]1,3-4[/green]    delete only those")
+        console.print("  [green]k 2,5[/green]    keep those: you use them, never flag them again")
+        console.print("  [dim]Enter    abort[/dim]")
+        while True:
+            try:
+                ans = input("\nSelect: ").strip().lower()
+            except (KeyboardInterrupt, EOFError):
+                print("\nAborted.")
+                sys.exit(1)
+            if not ans:
+                print("Aborted.")
+                return
+            if ans in ("a", "all"):
+                selected = leftovers
+                break
+            keep_mode = ans.startswith("k")
+            idxs = _parse_selection(ans[1:] if keep_mode else ans, len(leftovers))
+            if idxs is None:
+                console.print("[red]Invalid selection.[/red]")
+                continue
+            if keep_mode:
+                keep_names = [leftovers[i].name for i in idxs]
+                config["prune_ignore"] = sorted(set(config.get("prune_ignore", [])) | set(keep_names))
+                config_mgr.save(config)
+                console.print(f"Kept (never flagged again): {', '.join(keep_names)}")
+                leftovers = [p for i, p in enumerate(leftovers) if i not in idxs]
+                if not leftovers:
+                    return
+                console.print("Remaining: " + ", ".join(f"[{i}] {p.name}" for i, p in enumerate(leftovers, 1)))
+                continue
+            selected = [leftovers[i] for i in idxs]
+            break
+
+    for p in selected:
+        remove_worktree_folder(p, config)
+        console.print(f"  🧹 Removed [bold]{p.name}[/bold]")
+
+
 async def run_cli_deployment(config, data, verbose=False):
     import asyncio
     from rich.console import Console
@@ -86,8 +200,14 @@ async def run_cli_deployment(config, data, verbose=False):
     console = Console()
     console.print(f"🚀 [bold cyan]Starting Direct CLI Deployment for '{data['version']}-{data['desc']}-{data['suffix']}'...[/bold cyan]\n")
     
+    from .incomplete_worktrees import mark_started, mark_finished, remove_worktree_folder
+
     engine = DeployEngine(config, data)
+    # Only a folder this run creates may be rolled back: re-deploying into an existing one must never delete work
+    created_now = not engine.target_dir.exists()
     engine.target_dir.mkdir(parents=True, exist_ok=True)
+    if created_now:
+        mark_started(engine.target_dir)
     
     base_odoo = engine.wt_root / "master" / engine.comm_dir
     base_ent = engine.wt_root / "master" / engine.ent_dir
@@ -108,19 +228,32 @@ async def run_cli_deployment(config, data, verbose=False):
                             continue
                     console.print(f"[{label}] {line}")
                     
-    # Run odoo, ent, and uv concurrently!
-    await asyncio.gather(
-        handle_updates(engine.deploy_repo(base_odoo, engine.comm_dir, "odoo"), "Community"),
-        handle_updates(engine.deploy_repo(base_ent, engine.ent_dir, "ent"), "Enterprise"),
-        handle_updates(engine.setup_uv(), "UV Env")
-    )
-    
     try:
-        console.print("[VS Code] Generating VS Code launch configuration...")
-        await engine.setup_vscode()
-        console.print("[VS Code] ✅ VS Code launch configuration created.")
-    except Exception as e:
-        console.print(f"[VS Code] [bold red]Failed to create VS Code launch config: {e}[/bold red]")
+        # Run odoo, ent, and uv concurrently!
+        await asyncio.gather(
+            handle_updates(engine.deploy_repo(base_odoo, engine.comm_dir, "odoo"), "Community"),
+            handle_updates(engine.deploy_repo(base_ent, engine.ent_dir, "ent"), "Enterprise"),
+            handle_updates(engine.setup_uv(), "UV Env")
+        )
+        
+        try:
+            console.print("[VS Code] Generating VS Code launch configuration...")
+            await engine.setup_vscode()
+            console.print("[VS Code] ✅ VS Code launch configuration created.")
+        except Exception as e:
+            console.print(f"[VS Code] [bold red]Failed to create VS Code launch config: {e}[/bold red]")
+    except BaseException:
+        # Ctrl-C (CancelledError/KeyboardInterrupt) or a crash: don't leave a half-made folder behind
+        if created_now:
+            console.print(f"\n🧹 Rolling back half-made worktree '{engine.target_dir.name}'...")
+            remove_worktree_folder(engine.target_dir, config)
+        raise
+
+    if engine.has_errors:
+        # Keep the folder (and its marker) so the logs can be inspected; 'odoo-wt prune' cleans it up later
+        console.print(f"\n[bold red]Deployment finished with errors.[/bold red] Inspect [cyan]{engine.target_dir}[/cyan] or run [bold green]odoo-wt prune[/bold green] to remove it.")
+        os._exit(1)
+    mark_finished(engine.target_dir)
         
     console.print(f"\n✨ [bold green]SUCCESS! Worktree ready at:[/bold green] [cyan]{engine.target_dir}[/cyan]")
     
@@ -173,7 +306,7 @@ def _main_impl():
     # Check for subcommand-specific help first!
     if "--help" in sys.argv or "-h" in sys.argv:
         # Check if there is a subcommand keyword in sys.argv
-        reserved_cmds = ["status", "runbot", "reviews", "list", "create", "open", "code", "delete", "rm"]
+        reserved_cmds = ["status", "runbot", "reviews", "list", "prune", "create", "open", "code", "delete", "rm"]
         target_cmd = None
         for cmd in reserved_cmds:
             if cmd in sys.argv:
@@ -241,7 +374,7 @@ def _main_impl():
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
     if [[ ${COMP_CWORD} -eq 1 ]]; then
-        opts="status runbot reviews list create open code delete rm help autocomplete"
+        opts="status runbot reviews list prune create open code delete rm help autocomplete"
         COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
         return 0
     fi
@@ -262,7 +395,7 @@ complete -F _odoo_wt_autocomplete odoo-wt""")
         elif shell == "zsh":
             print("""_odoo_wt_zsh_autocomplete() {
     local -a subcommands
-    subcommands=(status runbot reviews list create open code delete rm help autocomplete)
+    subcommands=(status runbot reviews list prune create open code delete rm help autocomplete)
     
     if (( CURRENT == 2 )); then
         _describe -t subcommands 'subcommands' subcommands
@@ -299,6 +432,11 @@ add-zsh-hook precmd _odoo_wt_register_completion""")
             print("#   echo 'source <(odoo-wt autocomplete zsh)' >> ~/.zshrc")
             print("#   source ~/.zshrc")
             sys.exit(0)
+
+    # Prune half-made worktree folders left behind by aborted/failed deployments
+    if len(sys.argv) > 1 and sys.argv[1] == "prune":
+        run_prune_command(config, sys.argv[2:])
+        sys.exit(0)
 
     # Simple list command (one branch name per line, no formatting, no titles, sorted by recency)
     if "list" in sys.argv:
@@ -604,7 +742,7 @@ add-zsh-hook precmd _odoo_wt_register_completion""")
         closest_cmd = None
         if not explicit_create:
             query = branch_arg.strip().lower()
-            reserved_cmds = ["status", "create", "wizard", "runbot", "list"]
+            reserved_cmds = ["status", "create", "wizard", "runbot", "list", "prune"]
             if query not in reserved_cmds:
                 for cmd in reserved_cmds:
                     max_dist = 1 if len(cmd) <= 4 else 2
@@ -698,6 +836,10 @@ add-zsh-hook precmd _odoo_wt_register_completion""")
                     console.print("  [yellow]Still nothing, even with typo search.[/yellow]")
                     if len(query) < 5:
                         console.print("  [dim](typo matching only kicks in for queries of 5+ characters)[/dim]")
+                    from .incomplete_worktrees import incomplete_hint
+                    hint = incomplete_hint(config)
+                    if hint:
+                        console.print(f"  [yellow]{hint}[/yellow]")
                 else:
                     console.print("  [dim](No matching worktrees found)[/dim]")
                     
@@ -1236,6 +1378,11 @@ def print_cli_status(config, mode="combined", sort_mode="recency", verbose_level
         "reviews": "most recently active human PR comments first"
     }
     console.print(f"[dim]Sorted by: {sort_labels.get(sort_mode, sort_mode)}[/dim]")
+
+    from .incomplete_worktrees import incomplete_hint
+    hint = incomplete_hint(config)
+    if hint:
+        console.print(f"[yellow]{hint}[/yellow]")
 
 def _wrap_review_body(body, verbose, width=80, max_lines=4):
     """Wraps a review body at `width` columns. Default caps at max_lines (adds an ellipsis when cut)."""

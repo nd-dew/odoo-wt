@@ -15,6 +15,7 @@ A premium terminal tool to manage, deploy, and monitor Odoo developer worktrees.
   [bold green]runbot[/bold green] [cyan]\\[all/-a/branch][/cyan]    Show Runbot build details & failing tests [dim](CI-focused)[/dim]
   [bold green]reviews[/bold green] [cyan]\\[all/-a/branch][/cyan]   Show linked PRs & last 10 peer reviews [dim](-v: all)[/dim] [dim](PR-focused)[/dim]
   [bold green]list[/bold green]                         Simply list all local worktree branch names
+  [bold green]prune[/bold green] [cyan]\\[name...][/cyan]          Pick & delete half-made worktree folders left by aborted deployments
   [bold green]create[/bold green] [cyan]<branch>[/cyan]          Open the TUI pre-filled in the 'Creation' tab
   [bold green]open[/bold green] [cyan]<branch>[/cyan]            Directly change your shell directory into a worktree
   [bold green]code[/bold green] [cyan]<branch>[/cyan]            Directly open VS Code in a worktree
@@ -221,6 +222,30 @@ The [bold green]{subcommand}[/bold green] subcommand directly deletes a local wo
   [bold green]odoo-wt {subcommand}[/bold green] [cyan]master-crm_lead-pian[/cyan]
 """,
 
+    "prune": """\
+The [bold green]{subcommand}[/bold green] subcommand removes half-made worktree folders you pick.
+
+[bold yellow]Usage:[/bold yellow]
+  [bold green]odoo-wt {subcommand}[/bold green] [cyan]\\[name...][/cyan] [cyan]\\[-y/--yes][/cyan]
+  [bold green]odoo-wt {subcommand}[/bold green] [cyan]--keep[/cyan] [cyan]<name...>[/cyan]     Never flag these folders again
+  [bold green]odoo-wt {subcommand}[/bold green] [cyan]--unkeep[/cyan] [cyan]<name...>[/cyan]   Flag them again
+
+[bold yellow]Description:[/bold yellow]
+  A deployment interrupted by Ctrl-C is rolled back automatically. Folders that still end up
+  half-made (killed terminal, crash, failed fetch, older odoo-wt versions) are listed here: they
+  carry the '.odoo-wt-incomplete' marker, or have no git worktree inside and only odoo-wt
+  generated files (.venv link, .vscode, run). Folders holding any other file, and 'master',
+  are never listed.
+
+  The list is numbered: delete all ([green]a[/green]), only some ([green]1,3-4[/green]), or keep some ([green]k 2[/green])
+  if you use them, so they are never flagged again (stored as 'prune_ignore' in the config).
+  Passing names only considers those folders. [cyan]-y[/cyan] deletes everything listed without asking.
+
+[bold yellow]Examples:[/bold yellow]
+  [bold green]odoo-wt {subcommand}[/bold green]
+  [bold green]odoo-wt {subcommand}[/bold green] [cyan]iso help[/cyan]
+  [bold green]odoo-wt {subcommand}[/bold green] [cyan]--keep live auit[/cyan]
+""",
     "list": """\
 The [bold green]list[/bold green] subcommand simply lists all registered local worktree branch names.
 
