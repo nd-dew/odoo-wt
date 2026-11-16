@@ -679,78 +679,79 @@ add-zsh-hook precmd _odoo_wt_register_completion""")
                     matched_wt = matched_wts[0]
                     break
                     
-                # If multiple matches or we've expanded tiers, prompt interactive selector
-                if len(matched_wts) > 0 or current_tier < 3 or closest_cmd:
-                    from rich.console import Console
-                    console = Console()
-                    
-                    # 1. Propose Subcommand if any
-                    if closest_cmd:
-                        console.print(f"[bold cyan]Proposing Subcommand[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
-                        console.print(f"  [[green]y[/green]] Run the '{closest_cmd}' subcommand\n")
-                    
-                    # 2. Print matches
-                    tier_label = "Direct" if current_tier == 1 else ("Fuzzy" if current_tier == 2 else "Typo")
-                    console.print(f"[bold cyan]{tier_label} Matches[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
-                    if matched_wts:
-                        for idx, wt in enumerate(matched_wts, 1):
-                            console.print(f"  [[green]{idx}[/green]] {wt['name']}")
-                    else:
-                        console.print("  [dim](No matching worktrees found)[/dim]")
-                        
-                    print()
-                    options = []
-                    option_help = []
-                    
-                    if closest_cmd:
-                        options.append("y")
-                    if matched_wts:
-                        options.append(f"1-{len(matched_wts)}")
-                        
-                    if current_tier < 2:
-                        options.append("f")
-                        option_help.append("[[green]f[/green]] Search more (fuzzy substring / words)")
-                    if current_tier < 3:
-                        options.append("t")
-                        option_help.append("[[green]t[/green]] Search more (typo / distance)")
-                        
-                    options.append("c")
-                    option_help.append("[[green]c[/green]] Create brand new worktree")
-                    
-                    for opt in option_help:
-                        console.print(f"  {opt}")
-                        
-                    print()
-                    try:
-                        ans = input(f"Select an option [{', '.join(options)}]: ").strip().lower()
-                        if closest_cmd and (ans == closest_cmd or ans in ("y", "yes")):
-                            sys.argv.append(closest_cmd)
-                            # Re-run main recursively to execute the corrected subcommand cleanly!
-                            main()
-                            sys.exit(0)
-                        elif ans.isdigit() and 1 <= int(ans) <= len(matched_wts):
-                            matched_wt = matched_wts[int(ans) - 1]
-                            break
-                        elif ans == 'f' and current_tier < 2:
-                            current_tier = 2
-                            console.print("\n✨ Running [bold yellow]Fuzzy Substring Matcher[/bold yellow]...")
-                            continue
-                        elif ans == 't' and current_tier < 3:
-                            current_tier = 3
-                            console.print("\n✨ Running [bold yellow]Levenshtein Typo Matcher[/bold yellow]...")
-                            continue
-                        elif ans == 'c':
-                            matched_wt = None
-                            break
-                        else:
-                            print("Aborted.")
-                            sys.exit(0)
-                    except (KeyboardInterrupt, EOFError):
-                        print("\nAborted.")
-                        sys.exit(1)
+                # Otherwise always prompt: never fall into creation without the user asking for it
+                from rich.console import Console
+                console = Console()
+                
+                # 1. Propose Subcommand if any
+                if closest_cmd:
+                    console.print(f"[bold cyan]Proposing Subcommand[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
+                    console.print(f"  [[green]y[/green]] Run the '{closest_cmd}' subcommand\n")
+                
+                # 2. Print matches
+                tier_label = "Direct" if current_tier == 1 else ("Fuzzy" if current_tier == 2 else "Typo")
+                console.print(f"[bold cyan]{tier_label} Matches[/bold cyan] for '[cyan]{branch_arg}[/cyan]':")
+                if matched_wts:
+                    for idx, wt in enumerate(matched_wts, 1):
+                        console.print(f"  [[green]{idx}[/green]] {wt['name']}")
+                elif current_tier >= 3:
+                    console.print("  [yellow]Still nothing, even with typo search.[/yellow]")
+                    if len(query) < 5:
+                        console.print("  [dim](typo matching only kicks in for queries of 5+ characters)[/dim]")
                 else:
-                    matched_wt = None
-                    break
+                    console.print("  [dim](No matching worktrees found)[/dim]")
+                    
+                print()
+                options = []
+                option_help = []
+                
+                if closest_cmd:
+                    options.append("y")
+                if matched_wts:
+                    options.append(f"1-{len(matched_wts)}")
+                    
+                if current_tier < 2:
+                    options.append("f")
+                    option_help.append("[[green]f[/green]] Search more (fuzzy substring / words)")
+                if current_tier < 3:
+                    options.append("t")
+                    option_help.append("[[green]t[/green]] Search more (typo / distance)")
+                    
+                options.append("c")
+                option_help.append("[[green]c[/green]] Create brand new worktree")
+                option_help.append("[dim]anything else to abort[/dim]")
+                
+                for opt in option_help:
+                    console.print(f"  {opt}")
+                    
+                print()
+                try:
+                    ans = input(f"Select an option [{', '.join(options)}]: ").strip().lower()
+                    if closest_cmd and (ans == closest_cmd or ans in ("y", "yes")):
+                        sys.argv.append(closest_cmd)
+                        # Re-run main recursively to execute the corrected subcommand cleanly!
+                        main()
+                        sys.exit(0)
+                    elif ans.isdigit() and 1 <= int(ans) <= len(matched_wts):
+                        matched_wt = matched_wts[int(ans) - 1]
+                        break
+                    elif ans == 'f' and current_tier < 2:
+                        current_tier = 2
+                        console.print("\n✨ Running [bold yellow]Fuzzy Substring Matcher[/bold yellow]...")
+                        continue
+                    elif ans == 't' and current_tier < 3:
+                        current_tier = 3
+                        console.print("\n✨ Running [bold yellow]Levenshtein Typo Matcher[/bold yellow]...")
+                        continue
+                    elif ans == 'c':
+                        matched_wt = None
+                        break
+                    else:
+                        print("Aborted.")
+                        sys.exit(0)
+                except (KeyboardInterrupt, EOFError):
+                    print("\nAborted.")
+                    sys.exit(1)
         else:
             matched_wt = None
 
