@@ -16,7 +16,7 @@ spell = SpellChecker()
 spell.word_frequency.load_words(['odoo', 'saas', 'erp', 'mrp', 'pos', 'crm', 'wt', 'api', 'ui', 'ux', 'db', 'sql', 'backend', 'frontend', 'js', 'py', 'xml', 'owl', 'mac', 'linux', 'windows', 'repo'])
 
 from .app_config import config_mgr, debug_log
-from .system_discovery import discover_system_data, get_remote, run_git, decompose_branch, get_remote_url, is_base_branch
+from .system_discovery import discover_system_data, get_remote, run_git, decompose_branch, get_remote_url, is_base_branch, is_deletion_protected
 from .custom_screens import DeleteConfirmScreen, BulkDeleteConfirmScreen, DeployScreen, LogDetailScreen
 
 SETTINGS_HELP = {
@@ -1064,7 +1064,7 @@ class OdooWtApp(App):
 
             # Selection cell logic
             is_selected = path in self.selected_wts
-            select_cell = "" if is_base_branch(name) else ("[b green]✔[/b green]" if is_selected else "[dim]☐[/dim]")
+            select_cell = "" if is_deletion_protected(path) else ("[b green]✔[/b green]" if is_selected else "[dim]☐[/dim]")
 
             table.add_row(select_cell, display_name, status, link, comment_cell, key=path)
             
@@ -1528,8 +1528,8 @@ class OdooWtApp(App):
             row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
             path = str(row_key.value)
             wt_name = Path(path).name
-            if is_base_branch(wt_name):
-                self.notify(f"The '{wt_name}' branch is a base branch and is protected.", severity="warning")
+            if is_deletion_protected(path):
+                self.notify(f"The '{wt_name}' worktree holds the main repositories and is protected.", severity="warning")
                 return
             
             if path in self.selected_wts:
@@ -1813,7 +1813,7 @@ class OdooWtApp(App):
         
         # 1. Bulk Deletion Action
         if self.selected_wts:
-            valid_paths = [p for p in self.selected_wts if not is_base_branch(Path(p).name)]
+            valid_paths = [p for p in self.selected_wts if not is_deletion_protected(p)]
             if not valid_paths:
                 self.notify("No deletable worktrees selected.", severity="error")
                 return
@@ -1831,8 +1831,8 @@ class OdooWtApp(App):
         try:
             row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value
             wt_name = Path(row_key).name
-            if is_base_branch(wt_name):
-                self.notify(f"The '{wt_name}' base branch is protected and cannot be deleted.", severity="error")
+            if is_deletion_protected(row_key):
+                self.notify(f"The '{wt_name}' worktree holds the main repositories and cannot be deleted.", severity="error")
                 return
             def check_delete(confirm: bool):
                 if confirm: self.execute_deletion(row_key, wt_name)
@@ -2005,7 +2005,7 @@ class OdooWtApp(App):
                     coord = Coordinate(row_index, col_index)
                     row_key = table.coordinate_to_cell_key(coord).row_key
                     path = str(row_key.value)
-                    if is_base_branch(Path(path).name):
+                    if is_deletion_protected(path):
                         return
                     
                     if path in self.selected_wts:

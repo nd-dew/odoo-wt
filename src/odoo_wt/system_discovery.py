@@ -195,6 +195,18 @@ def get_remote_url(repo, remote_name):
     success, out = run_git(["remote", "get-url", remote_name], cwd=repo, capture=True)
     return out.strip() if success else "unknown"
 
+def is_deletion_protected(path) -> bool:
+    """Only the worktree holding the real git repositories (normally 'master') must never be deleted.
+
+    Version bases like '19.0' or 'saas-19.1' are ordinary git worktrees and can be removed like any other.
+    """
+    from pathlib import Path
+    path = Path(path)
+    if path.name.strip() == "master":
+        return True
+    return any((path / sub / ".git").is_dir() for sub in ("odoo", "enterprise"))
+
+
 def is_base_branch(name: str) -> bool:
     import re
     name = name.strip()
