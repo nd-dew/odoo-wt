@@ -158,7 +158,12 @@ async def test_vscode_launch_generation(tmp_path, monkeypatch):
         assert "8069" in config_entry["args"]
         assert "--with-demo" in config_entry["args"]
         assert "--dev=all" in config_entry["args"]
+        db_template_idx = config_entry["args"].index("--db-template")
+        assert config_entry["args"][db_template_idx + 1] == "template1"
         assert config_entry["cwd"] == "${workspaceFolder}"
+
+    run_script = (target_dir / "run").read_text()
+    assert "    --db-template template1 \\\n" in run_script
         
     # Assert global port was incremented
     assert engine.config["next_debug_port"] == 8070

@@ -271,7 +271,10 @@ class DeployEngine:
 
         args = [
             "--addons-path", addons_path,
-            "-d", db_name
+            "-d", db_name,
+            # Odoo copies template0 by default, which can't hold extensions; template1 can (e.g. pgvector,
+            # which a non-superuser Odoo can't create itself). Same as plain 'createdb'.
+            "--db-template", "template1",
         ]
         if valid_modules:
             args.extend(["-i", ",".join(valid_modules)])
@@ -286,7 +289,7 @@ class DeployEngine:
         paired_args = []
         i = 0
         while i < len(args):
-            if i + 1 < len(args) and args[i] in ("--addons-path", "-d", "-i", "--http-port"):
+            if i + 1 < len(args) and args[i] in ("--addons-path", "-d", "--db-template", "-i", "--http-port"):
                 paired_args.append(f'                "{args[i]}", "{args[i+1]}"')
                 i += 2
             else:
